@@ -1,0 +1,2502 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ZeroTrustPanda ZS Policy Wizard v1.5.2 - Zscaler Template Policy Configuration</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-primary: #0a0e17;
+      --bg-secondary: #111827;
+      --bg-card: #1a2236;
+      --bg-card-hover: #1f2943;
+      --bg-input: #0f1629;
+      --border: #2a3654;
+      --border-focus: #3b82f6;
+      --text-primary: #e8ecf4;
+      --text-secondary: #8896b3;
+      --text-muted: #5c6b8a;
+      --accent-blue: #3b82f6;
+      --accent-blue-dim: #1e40af;
+      --accent-green: #10b981;
+      --accent-green-dim: #065f46;
+      --accent-amber: #f59e0b;
+      --accent-amber-dim: #78350f;
+      --accent-red: #ef4444;
+      --accent-red-dim: #7f1d1d;
+      --accent-purple: #8b5cf6;
+      --accent-cyan: #06b6d4;
+      --shadow: 0 4px 24px rgba(0,0,0,0.4);
+      --radius: 8px;
+      --radius-lg: 12px;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'IBM Plex Sans', sans-serif;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      min-height: 100vh;
+      line-height: 1.6;
+    }
+
+    /* Layout */
+    .app { display: flex; flex-direction: column; min-height: 100vh; }
+    .header {
+      background: var(--bg-secondary);
+      border-bottom: 1px solid var(--border);
+      padding: 0 2rem;
+      height: 64px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .header-brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .header-brand .logo {
+      width: 36px; height: 36px;
+      background: linear-gradient(135deg, var(--accent-blue), var(--accent-cyan));
+      border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      font-weight: 700; font-size: 16px; color: white;
+    }
+    .header-brand h1 {
+      font-size: 18px; font-weight: 600;
+      background: linear-gradient(135deg, var(--text-primary), var(--accent-cyan));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    }
+    .header-brand .tag {
+      font-size: 10px; padding: 2px 8px; border-radius: 4px;
+      background: var(--accent-blue-dim); color: var(--accent-blue);
+      font-weight: 600; letter-spacing: 0.5px; text-transform: uppercase;
+    }
+    .header-right { display: flex; align-items: center; gap: 12px; }
+    .auth-badge {
+      display: flex; align-items: center; gap: 6px;
+      padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 500;
+    }
+    .auth-badge.connected { background: var(--accent-green-dim); color: var(--accent-green); }
+    .auth-badge.disconnected { background: var(--accent-red-dim); color: var(--accent-red); }
+    .auth-badge .dot { width: 6px; height: 6px; border-radius: 50%; }
+    .auth-badge.connected .dot { background: var(--accent-green); }
+    .auth-badge.disconnected .dot { background: var(--accent-red); }
+
+    .main { flex: 1; display: flex; }
+    .sidebar {
+      width: 260px;
+      background: var(--bg-secondary);
+      border-right: 1px solid var(--border);
+      padding: 1.5rem 0;
+      flex-shrink: 0;
+    }
+    .sidebar-section { padding: 0 1rem; margin-bottom: 1.5rem; }
+    .sidebar-section-title {
+      font-size: 10px; font-weight: 600; text-transform: uppercase;
+      letter-spacing: 1px; color: var(--text-muted); padding: 0 0.5rem;
+      margin-bottom: 8px;
+    }
+    .sidebar-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: 10px 12px; border-radius: var(--radius);
+      cursor: pointer; font-size: 14px; color: var(--text-secondary);
+      transition: all 0.15s;
+      position: relative;
+    }
+    .sidebar-item:hover { background: var(--bg-card); color: var(--text-primary); }
+    .sidebar-item.active {
+      background: var(--accent-blue-dim);
+      color: var(--accent-blue);
+      font-weight: 500;
+    }
+    .sidebar-item .step-num {
+      width: 24px; height: 24px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 11px; font-weight: 600;
+      background: var(--bg-input); border: 1px solid var(--border);
+    }
+    .sidebar-item.active .step-num {
+      background: var(--accent-blue); border-color: var(--accent-blue); color: white;
+    }
+    .sidebar-item.completed .step-num {
+      background: var(--accent-green); border-color: var(--accent-green); color: white;
+    }
+
+    .content { flex: 1; padding: 2rem 3rem; max-width: 960px; }
+    .content-wide { max-width: 1200px; }
+
+    /* Cards */
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 1.5rem;
+      margin-bottom: 1.5rem;
+    }
+    .card-header { margin-bottom: 1rem; }
+    .card-header h2 { font-size: 20px; font-weight: 600; margin-bottom: 4px; }
+    .card-header h3 { font-size: 16px; font-weight: 500; margin-bottom: 4px; }
+    .card-header p { font-size: 14px; color: var(--text-secondary); }
+
+    /* Form Elements */
+    .form-group { margin-bottom: 1.25rem; }
+    .form-label {
+      display: block; font-size: 13px; font-weight: 500;
+      color: var(--text-secondary); margin-bottom: 6px;
+    }
+    .form-hint { font-size: 12px; color: var(--text-muted); margin-top: 4px; }
+    input[type="text"], input[type="password"], select, textarea {
+      width: 100%;
+      padding: 10px 14px;
+      background: var(--bg-input);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      color: var(--text-primary);
+      font-family: 'IBM Plex Sans', sans-serif;
+      font-size: 14px;
+      transition: border-color 0.15s;
+      outline: none;
+    }
+    input:focus, select:focus, textarea:focus { border-color: var(--accent-blue); }
+    select { cursor: pointer; }
+    textarea { resize: vertical; min-height: 80px; }
+
+    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+
+    /* Buttons */
+    .btn {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 10px 20px; border-radius: var(--radius);
+      font-family: 'IBM Plex Sans', sans-serif;
+      font-size: 14px; font-weight: 500;
+      cursor: pointer; border: 1px solid transparent;
+      transition: all 0.15s;
+    }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-primary { background: var(--accent-blue); color: white; }
+    .btn-primary:hover:not(:disabled) { background: #2563eb; }
+    .btn-success { background: var(--accent-green); color: white; }
+    .btn-success:hover:not(:disabled) { background: #059669; }
+    .btn-warning { background: var(--accent-amber); color: #1a1a1a; }
+    .btn-danger { background: var(--accent-red); color: white; }
+    .btn-danger:hover:not(:disabled) { background: #dc2626; }
+    .btn-ghost {
+      background: transparent; color: var(--text-secondary);
+      border: 1px solid var(--border);
+    }
+    .btn-ghost:hover:not(:disabled) { border-color: var(--text-muted); color: var(--text-primary); }
+    .btn-sm { padding: 6px 12px; font-size: 12px; }
+
+    .btn-group { display: flex; gap: 8px; margin-top: 1.5rem; }
+
+    /* Tier Cards */
+    .tier-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; margin: 1rem 0; }
+    .tier-card {
+      background: var(--bg-input);
+      border: 2px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 1.25rem;
+      cursor: pointer;
+      transition: all 0.15s;
+      text-align: center;
+    }
+    .tier-card:hover { border-color: var(--text-muted); }
+    .tier-card.selected { border-color: var(--accent-blue); background: var(--accent-blue-dim); }
+    .tier-card .tier-icon { font-size: 28px; margin-bottom: 8px; }
+    .tier-card .tier-name { font-size: 16px; font-weight: 600; margin-bottom: 4px; }
+    .tier-card .tier-desc { font-size: 12px; color: var(--text-secondary); }
+
+    /* Compliance Grid */
+    .compliance-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 1rem 0; }
+    .compliance-chip {
+      padding: 8px 12px;
+      background: var(--bg-input);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 500;
+      transition: all 0.15s;
+      text-align: center;
+    }
+    .compliance-chip:hover { border-color: var(--text-muted); }
+    .compliance-chip.selected { border-color: var(--accent-purple); background: rgba(139, 92, 246, 0.15); color: var(--accent-purple); }
+
+    /* Toggle */
+    .toggle-group { display: flex; flex-direction: column; gap: 8px; }
+    .toggle-item {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 10px 14px;
+      background: var(--bg-input);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+    }
+    .toggle-item label { font-size: 14px; cursor: pointer; }
+    .toggle-switch {
+      position: relative; width: 44px; height: 24px;
+      background: var(--bg-secondary); border-radius: 12px;
+      cursor: pointer; transition: background 0.2s;
+      border: 1px solid var(--border);
+    }
+    .toggle-switch.active { background: var(--accent-blue); border-color: var(--accent-blue); }
+    .toggle-switch .toggle-knob {
+      position: absolute; top: 2px; left: 2px;
+      width: 18px; height: 18px; border-radius: 50%;
+      background: white; transition: transform 0.2s;
+    }
+    .toggle-switch.active .toggle-knob { transform: translateX(20px); }
+
+    /* Plan/Diff View */
+    .diff-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .diff-table th {
+      text-align: left; padding: 8px 12px;
+      background: var(--bg-secondary); border-bottom: 1px solid var(--border);
+      font-weight: 600; color: var(--text-secondary); font-size: 11px;
+      text-transform: uppercase; letter-spacing: 0.5px;
+    }
+    .diff-table td {
+      padding: 10px 12px; border-bottom: 1px solid var(--border);
+      vertical-align: top;
+    }
+    .diff-table tr:hover { background: var(--bg-card-hover); }
+    .badge {
+      display: inline-block; padding: 2px 8px; border-radius: 4px;
+      font-size: 11px; font-weight: 600; text-transform: uppercase;
+    }
+    .badge-create { background: var(--accent-green-dim); color: var(--accent-green); }
+    .badge-update { background: var(--accent-blue-dim); color: var(--accent-blue); }
+    .badge-risk { background: var(--accent-red-dim); color: var(--accent-red); }
+    .badge-category { background: rgba(139, 92, 246, 0.15); color: var(--accent-purple); }
+
+    /* Alerts */
+    .alert {
+      padding: 12px 16px; border-radius: var(--radius);
+      margin-bottom: 1rem; font-size: 14px;
+      display: flex; align-items: flex-start; gap: 10px;
+    }
+    .alert-info { background: var(--accent-blue-dim); border: 1px solid rgba(59,130,246,0.3); }
+    .alert-warning { background: var(--accent-amber-dim); border: 1px solid rgba(245,158,11,0.3); color: var(--accent-amber); }
+    .alert-success { background: var(--accent-green-dim); border: 1px solid rgba(16,185,129,0.3); color: var(--accent-green); }
+    .alert-danger { background: var(--accent-red-dim); border: 1px solid rgba(239,68,68,0.3); color: var(--accent-red); }
+
+    /* Explainer */
+    .explainer {
+      background: var(--bg-input);
+      border-left: 3px solid var(--accent-cyan);
+      padding: 12px 16px;
+      margin: 1rem 0;
+      border-radius: 0 var(--radius) var(--radius) 0;
+      font-size: 13px;
+      color: var(--text-secondary);
+    }
+    .explainer strong { color: var(--accent-cyan); }
+
+    /* Compliance Evidence */
+    .evidence-item {
+      padding: 8px 12px;
+      background: var(--bg-input);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      margin-bottom: 6px;
+      font-size: 13px;
+    }
+    .evidence-item .fw { color: var(--accent-purple); font-weight: 600; }
+    .evidence-item .ctrl { color: var(--accent-cyan); }
+
+    /* Audit Log */
+    .log-entry {
+      padding: 8px 12px;
+      border-bottom: 1px solid var(--border);
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 12px;
+      display: grid;
+      grid-template-columns: 180px 120px 100px 1fr;
+      gap: 8px;
+    }
+    .log-entry .ts { color: var(--text-muted); }
+    .log-entry .action { color: var(--accent-cyan); font-weight: 500; }
+    .log-entry .status-ok { color: var(--accent-green); }
+    .log-entry .status-err { color: var(--accent-red); }
+
+    /* Scrollbar */
+    ::-webkit-scrollbar { width: 8px; }
+    ::-webkit-scrollbar-track { background: var(--bg-primary); }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+
+    /* Loading spinner */
+    .spinner {
+      width: 20px; height: 20px;
+      border: 2px solid var(--border);
+      border-top-color: var(--accent-blue);
+      border-radius: 50%;
+      animation: spin 0.6s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ZPA placeholder */
+    .placeholder-banner {
+      background: linear-gradient(135deg, var(--bg-card), var(--bg-input));
+      border: 1px dashed var(--border);
+      border-radius: var(--radius-lg);
+      padding: 2rem;
+      text-align: center;
+      color: var(--text-muted);
+    }
+    .placeholder-banner h3 { color: var(--text-secondary); margin-bottom: 8px; }
+
+    /* Responsive */
+    @media (max-width: 900px) {
+      .sidebar { display: none; }
+      .content { padding: 1rem; }
+      .tier-grid { grid-template-columns: 1fr; }
+      .compliance-grid { grid-template-columns: repeat(2, 1fr); }
+      .form-row { grid-template-columns: 1fr; }
+    }
+    /* Policy Catalog */
+    .catalog-tier { margin-bottom: 2rem; }
+    .catalog-tier-header {
+      display: flex; align-items: center; gap: 0.75rem; padding: 0.75rem 1rem;
+      background: var(--bg-secondary); border: 1px solid var(--border); border-radius: var(--radius);
+      cursor: pointer; user-select: none; font-weight: 600; font-size: 15px;
+    }
+    .catalog-tier-header:hover { background: var(--bg-card-hover); }
+    .catalog-tier-header .arrow { transition: transform 0.2s; font-size: 11px; color: var(--text-muted); }
+    .catalog-tier-header .arrow.open { transform: rotate(90deg); }
+    .catalog-fw { margin: 0.5rem 0 0.5rem 1.5rem; }
+    .catalog-fw-header {
+      display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem 0.75rem;
+      background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius);
+      cursor: pointer; font-weight: 500; font-size: 13px;
+    }
+    .catalog-fw-header:hover { background: var(--bg-card-hover); }
+    .catalog-policy-group { margin: 0.5rem 0 0.5rem 1rem; }
+    .catalog-policy-header {
+      display: flex; align-items: center; gap: 0.5rem; padding: 0.4rem 0.6rem;
+      cursor: pointer; font-size: 13px; font-weight: 500; color: var(--accent-cyan);
+    }
+    .catalog-policy-header:hover { color: var(--accent-blue); }
+    .catalog-rule {
+      margin: 0.25rem 0 0.25rem 1.5rem; padding: 0.6rem 0.75rem;
+      background: var(--bg-input); border: 1px solid var(--border); border-radius: 6px;
+      font-size: 12px; line-height: 1.6;
+    }
+    .catalog-rule-name { font-weight: 600; color: var(--text-primary); font-size: 13px; }
+    .catalog-rule-action {
+      display: inline-block; padding: 1px 8px; border-radius: 4px; font-size: 11px;
+      font-weight: 600; margin-left: 0.5rem;
+    }
+    .catalog-rule-action.BLOCK { background: var(--accent-red-dim); color: var(--accent-red); }
+    .catalog-rule-action.ALLOW { background: var(--accent-green-dim); color: var(--accent-green); }
+    .catalog-rule-action.CAUTION { background: var(--accent-amber-dim); color: var(--accent-amber); }
+    .catalog-rule-action.INSPECT, .catalog-rule-action.DECRYPT { background: rgba(59,130,246,0.15); color: var(--accent-blue); }
+    .catalog-rule-action.DO_NOT_DECRYPT { background: rgba(139,92,246,0.15); color: var(--accent-purple); }
+    .catalog-rule-action.QUARANTINE, .catalog-rule-action.QUARANTINE_ISOLATE { background: rgba(139,92,246,0.15); color: var(--accent-purple); }
+    .catalog-rule-detail { color: var(--text-secondary); margin-top: 2px; }
+    .catalog-rule-cats { color: var(--text-muted); font-family: 'IBM Plex Mono', monospace; font-size: 11px; margin-top: 3px; word-break: break-all; }
+    .catalog-compliance-tag {
+      display: inline-block; padding: 1px 6px; margin: 2px 3px 2px 0; border-radius: 3px;
+      font-size: 10px; background: rgba(59,130,246,0.12); color: var(--accent-blue); font-family: 'IBM Plex Mono', monospace;
+    }
+    .catalog-count {
+      display: inline-block; padding: 1px 7px; border-radius: 10px; font-size: 11px;
+      background: var(--bg-input); color: var(--text-muted); margin-left: 0.5rem; font-weight: 400;
+    }
+    .catalog-loading { text-align: center; padding: 3rem; color: var(--text-muted); }
+    .catalog-summary { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.25rem; }
+    .catalog-summary-chip {
+      font-size: 11px; padding: 2px 8px; border-radius: 4px;
+      background: var(--bg-secondary); color: var(--text-secondary); border: 1px solid var(--border);
+    }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.9/babel.min.js"></script>
+
+  <script type="text/babel">
+    const { useState, useEffect, useCallback, useRef } = React;
+
+    // ========================
+    // Error Boundary — catches React render crashes and shows debug info instead of black screen
+    // ========================
+    class ErrorBoundary extends React.Component {
+      constructor(props) {
+        super(props);
+        this.state = { hasError: false, error: null, errorInfo: null };
+      }
+      static getDerivedStateFromError(error) {
+        return { hasError: true, error };
+      }
+      componentDidCatch(error, errorInfo) {
+        this.setState({ errorInfo });
+        // Log to console for debugging
+        console.error('[ZTP ErrorBoundary] Render crash caught:', error);
+        console.error('[ZTP ErrorBoundary] Component stack:', errorInfo?.componentStack);
+        // Also log to server error log
+        try {
+          const payload = {
+            error: error?.message || String(error),
+            stack: error?.stack,
+            componentStack: errorInfo?.componentStack
+          };
+          console.error('[ZTP ErrorBoundary] Full details:', JSON.stringify(payload, null, 2));
+        } catch(e) {}
+      }
+      render() {
+        if (this.state.hasError) {
+          return React.createElement('div', {
+            style: { padding: '2rem', background: '#1a0000', border: '2px solid #ef4444',
+                     borderRadius: '8px', margin: '1rem', color: '#fca5a5', fontFamily: 'monospace' }
+          },
+            React.createElement('h2', { style: { color: '#ef4444', marginBottom: '1rem' } }, '⚠ UI Render Error'),
+            React.createElement('p', { style: { marginBottom: '1rem' } },
+              'A React rendering error occurred. This is a bug — the data from the API could not be displayed. Details below:'),
+            React.createElement('pre', {
+              style: { fontSize: '12px', background: '#0a0a0a', padding: '1rem', borderRadius: '4px',
+                       overflow: 'auto', maxHeight: '300px', whiteSpace: 'pre-wrap', color: '#fca5a5' }
+            }, [
+              'Error: ' + (this.state.error?.message || String(this.state.error)),
+              '\n\nStack: ' + (this.state.error?.stack || 'N/A'),
+              '\n\nComponent: ' + (this.state.errorInfo?.componentStack || 'N/A')
+            ].join('')),
+            React.createElement('p', { style: { marginTop: '1rem', fontSize: '12px', color: '#9ca3af' } },
+              'Check the browser developer console (F12 → Console tab) for full details. ' +
+              'Also check the server logs in ./logs/ for API-side errors.'),
+            React.createElement('button', {
+              onClick: () => this.setState({ hasError: false, error: null, errorInfo: null }),
+              style: { marginTop: '1rem', padding: '8px 16px', background: '#ef4444', color: 'white',
+                       border: 'none', borderRadius: '4px', cursor: 'pointer' }
+            }, '🔄 Try Again')
+          );
+        }
+        return this.props.children;
+      }
+    }
+
+    // ========================
+    // App Version
+    // ========================
+    const APP_VERSION = '1.5.2';
+    const BUILD_DATE = '2026-03-30';
+
+    // ========================
+    // API Helper
+    // ========================
+    const api = {
+      sessionId: null,
+      async call(method, path, body = null) {
+        const headers = { 'Content-Type': 'application/json' };
+        if (this.sessionId) headers['X-Session-Id'] = this.sessionId;
+        const opts = { method, headers };
+        if (body) opts.body = JSON.stringify(body);
+        const res = await fetch(`/api${path}`, opts);
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Request failed');
+        return data;
+      }
+    };
+
+    // ========================
+    // Wizard Steps
+    // ========================
+    const WIZARD_STEPS = [
+      { id: 'tier', label: 'Security Tier', icon: '🛡️' },
+      { id: 'compliance', label: 'Compliance', icon: '📋' },
+      { id: 'customize', label: 'Customize', icon: '⚙️' },
+      { id: 'review', label: 'Review Plan', icon: '🔍' },
+      { id: 'apply', label: 'Apply', icon: '🚀' },
+      { id: 'audit', label: 'Audit Log', icon: '📄' }
+    ];
+
+    // ========================
+    // Main App
+    // ========================
+    function App() {
+      // Navigation: activeModule = 'zia-wizard' | 'zia-bulk' | 'zcc' | 'about' | null
+      const [activeModule, setActiveModule] = useState(null);
+      const [step, setStep] = useState('connect');
+      const [auth, setAuth] = useState({ connected: false, mode: null, cloud: null });
+      const [config, setConfig] = useState({
+        module: 'zia',
+        tier: 'BALANCED',
+        complianceFramework: null,
+        prefix: 'ZTP',
+        enableUrlFiltering: true,
+        enableFirewall: true,
+        enableSslInspection: true,
+        enableMalwareProtection: true,
+        enableAdvancedSettings: true,
+        enableSandbox: true,
+        enableDnsSecurity: true,
+        enableFileTypeControl: true,
+        enableCloudAppControl: true,
+        enableDlp: true
+      });
+      const [template, setTemplate] = useState(null);
+      const [plan, setPlan] = useState(null);
+      const [applyResult, setApplyResult] = useState(null);
+      const [auditLogs, setAuditLogs] = useState([]);
+      const [loading, setLoading] = useState(false);
+      const [error, setError] = useState(null);
+      const [completedSteps, setCompletedSteps] = useState(new Set());
+
+      const markComplete = (s) => setCompletedSteps(prev => new Set([...prev, s]));
+
+      const goTo = (s) => {
+        setError(null);
+        // Clear downstream state when going back in the wizard
+        const stepOrder = ['tier', 'compliance', 'customize', 'review', 'apply', 'audit'];
+        const targetIdx = stepOrder.indexOf(s);
+        if (targetIdx >= 0) {
+          if (targetIdx < stepOrder.indexOf('review')) { setPlan(null); }
+          if (targetIdx < stepOrder.indexOf('apply')) { setApplyResult(null); }
+          if (targetIdx < stepOrder.indexOf('customize')) { setTemplate(null); }
+        }
+        setStep(s);
+      };
+
+      const switchModule = (mod) => {
+        setError(null);
+        setActiveModule(mod);
+        if (mod === 'zia-wizard') {
+          // Reset wizard state so user can run a fresh deployment
+          setStep('tier');
+          setTemplate(null);
+          setPlan(null);
+          setApplyResult(null);
+          setCompletedSteps(new Set());
+        }
+        else if (mod === 'zia-bulk') setStep('bulk-delete');
+        else if (mod === 'zcc') setStep('zcc');
+        else if (mod === 'about') setStep('about');
+        else if (mod === 'catalog') setStep('catalog');
+      };
+
+      const showConnect = !auth.connected && activeModule !== 'catalog' && activeModule !== 'about';
+      const showZiaWizard = auth.connected && activeModule === 'zia-wizard';
+      const showZiaBulk = auth.connected && activeModule === 'zia-bulk';
+      const showZcc = auth.connected && activeModule === 'zcc';
+      const showAbout = activeModule === 'about';
+      const showCatalog = activeModule === 'catalog';
+      const ziaExpanded = activeModule === 'zia-wizard' || activeModule === 'zia-bulk';
+
+      return (
+        <div className="app">
+          <header className="header">
+            <div className="header-brand">
+              <div className="logo" style={{fontSize:'16px'}}>🐼</div>
+              <div><h1 style={{fontSize:'15px'}}>ZeroTrustPanda ZS Policy Wizard</h1></div>
+              <span className="tag">v{APP_VERSION}</span>
+            </div>
+            <div className="header-right">
+              <div className={`auth-badge ${auth.connected ? 'connected' : 'disconnected'}`}>
+                <span className="dot"></span>
+                {auth.connected ? `${auth.mode?.toUpperCase()} · ${auth.cloud}` : 'Not Connected'}
+              </div>
+              {auth.connected && (
+                <button className="btn btn-ghost btn-sm" onClick={async () => {
+                  try { await api.call('POST', '/auth/logout'); } catch(e) {}
+                  api.sessionId = null; setAuth({ connected: false }); setActiveModule(null); setCompletedSteps(new Set()); goTo('connect');
+                }}>Disconnect</button>
+              )}
+            </div>
+          </header>
+          <div className="main">
+            <nav className="sidebar">
+              <div className="sidebar-section">
+                <div className="sidebar-item" style={{opacity: auth.connected ? 0.5 : 1}}
+                  onClick={() => { if (!auth.connected) { setActiveModule(null); setStep('connect'); }}}>
+                  <span className="step-num">{auth.connected ? '✓' : '🔌'}</span>
+                  {auth.connected ? 'Connected' : 'Connect'}
+                </div>
+              </div>
+              {auth.connected && (
+                <div className="sidebar-section">
+                  <div className="sidebar-section-title">Modules</div>
+                  <div className={`sidebar-item ${ziaExpanded ? 'active' : ''}`}
+                    onClick={() => switchModule('zia-wizard')} style={{cursor:'pointer', fontWeight: ziaExpanded ? 600 : 400}}>
+                    <span className="step-num">🌐</span> Zscaler Internet Access
+                  </div>
+                  {ziaExpanded && (<>
+                    <div className={`sidebar-item ${activeModule === 'zia-wizard' ? 'active' : ''}`}
+                      onClick={() => switchModule('zia-wizard')} style={{paddingLeft:'2.2rem', fontSize:'12px', cursor:'pointer'}}>
+                      <span className="step-num" style={{fontSize:'10px', width:'16px', height:'16px'}}>🛡️</span> Security Tier Wizard
+                    </div>
+                    <div className={`sidebar-item ${activeModule === 'zia-bulk' ? 'active' : ''}`}
+                      onClick={() => switchModule('zia-bulk')} style={{paddingLeft:'2.2rem', fontSize:'12px', cursor:'pointer'}}>
+                      <span className="step-num" style={{fontSize:'10px', width:'16px', height:'16px'}}>🗑️</span> Bulk Rule Manager
+                    </div>
+                  </>)}
+                  {showZiaWizard && WIZARD_STEPS.map((s, i) => (
+                    <div key={s.id} className={`sidebar-item ${step === s.id ? 'active' : ''} ${completedSteps.has(s.id) ? 'completed' : ''}`}
+                      onClick={() => { if (completedSteps.has(s.id) || step === s.id) goTo(s.id); }}
+                      style={{paddingLeft:'3.2rem', fontSize:'11px', cursor: completedSteps.has(s.id) ? 'pointer' : 'default'}}>
+                      <span className="step-num" style={{fontSize:'9px', width:'15px', height:'15px'}}>{completedSteps.has(s.id) ? '✓' : i + 1}</span> {s.label}
+                    </div>
+                  ))}
+                  <div className={`sidebar-item ${activeModule === 'zcc' ? 'active' : ''}`}
+                    onClick={() => switchModule('zcc')} style={{cursor:'pointer'}}>
+                    <span className="step-num">📱</span> Mobile Admin Portal
+                  </div>
+                  <div className="sidebar-item" style={{opacity:0.4, cursor:'default'}}>
+                    <span className="step-num">🔒</span> Zscaler Private Access
+                  </div>
+                </div>
+              )}
+              <div className="sidebar-section" style={{marginTop:'auto'}}>
+                <div className={`sidebar-item ${activeModule === 'catalog' ? 'active' : ''}`}
+                  onClick={() => switchModule('catalog')} style={{cursor:'pointer', fontSize:'12px'}}>
+                  <span className="step-num" style={{fontSize:'10px'}}>📖</span> Policy Catalog
+                </div>
+                <div className={`sidebar-item ${activeModule === 'about' ? 'active' : ''}`}
+                  onClick={() => switchModule('about')} style={{cursor:'pointer', fontSize:'12px'}}>
+                  <span className="step-num" style={{fontSize:'10px'}}>ℹ️</span> About
+                </div>
+              </div>
+            </nav>
+            <div className={`content ${step === 'review' ? 'content-wide' : ''}`}>
+              {error && <div className="alert alert-danger">⚠ {error}</div>}
+              {showConnect && (<ConnectStep auth={auth} setAuth={setAuth} setError={setError} loading={loading} setLoading={setLoading}
+                onComplete={() => { markComplete('connect'); setActiveModule(null); setStep('select'); }} />)}
+              {auth.connected && !activeModule && (
+                <div className="card">
+                  <div className="card-header"><h2>🐼 Welcome to ZeroTrustPanda</h2><p>Select a module from the sidebar or choose below.</p></div>
+                  <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:'1rem', margin:'1rem 0'}}>
+                    <div className="tier-card" onClick={() => switchModule('zia-wizard')} style={{cursor:'pointer'}}>
+                      <div className="tier-icon">🌐</div><div className="tier-name">ZIA Security Wizard</div>
+                      <div className="tier-desc">Deploy URL Filtering, Firewall, SSL, Sandbox, DNS, File Type, Cloud App Control, and DLP policies.</div>
+                    </div>
+                    <div className="tier-card" onClick={() => switchModule('zcc')} style={{cursor:'pointer'}}>
+                      <div className="tier-icon">📱</div><div className="tier-name">Mobile Admin Portal</div>
+                      <div className="tier-desc">Configure ZCC Forwarding Profiles and App Profiles with best-practice settings.</div>
+                    </div>
+                    <div className="tier-card" onClick={() => switchModule('catalog')} style={{cursor:'pointer'}}>
+                      <div className="tier-icon">📖</div><div className="tier-name">Policy Catalog</div>
+                      <div className="tier-desc">Browse every rule across all tiers and compliance frameworks before deploying. Full rule details and compliance mappings.</div>
+                    </div>
+                    <div className="tier-card" onClick={() => switchModule('about')} style={{cursor:'pointer'}}>
+                      <div className="tier-icon">ℹ️</div><div className="tier-name">About</div>
+                      <div className="tier-desc">Documentation, modules, compliance frameworks, version history.</div>
+                    </div>
+                  </div>
+                </div>
+              )}
+              {showCatalog && (<CatalogStep />)}
+              {showAbout && (
+                <div className="card">
+                  <div className="card-header"><h2>🐼 ZeroTrustPanda ZS Policy Wizard</h2><p>Automated Zscaler policy configuration for healthcare and enterprise.</p></div>
+                  <div style={{fontSize:'13px', color:'var(--text-secondary)', lineHeight:'1.8'}}>
+                    <h3 style={{fontSize:'15px', color:'var(--accent-cyan)', margin:'1rem 0 0.5rem'}}>What This Wizard Does</h3>
+                    <p>Automates Zscaler security policy deployment based on industry best practices and compliance frameworks. Select a tier, choose compliance, deploy a complete policy set in minutes.</p>
+                    <h3 style={{fontSize:'15px', color:'var(--accent-cyan)', margin:'1.5rem 0 0.5rem'}}>ZIA Security Tier Wizard</h3>
+                    <p>Deploys policies across 7 areas (4 tiers: Strict, Balanced, Permissive, Zero Trust Hospital):</p>
+                    <div style={{paddingLeft:'1rem'}}>
+                      <div>• <strong>URL Filtering</strong> — Block legal liability, security risk, bandwidth/productivity categories</div>
+                      <div>• <strong>Cloud Firewall</strong> — Network application controls (WEBSEARCH, WEB, ENTERPRISE, P2P, etc.)</div>
+                      <div>• <strong>SSL/TLS Inspection</strong> — Decrypt/bypass with health, finance, government exemptions</div>
+                      <div>• <strong>Cloud Sandbox</strong> — Quarantine Office/PDF, scan executables, AI Instant Verdict</div>
+                      <div>• <strong>DNS Security</strong> — Block malicious DNS categories and 21+ DNS tunnel types</div>
+                      <div>• <strong>File Type Control</strong> — Block database uploads, password-protected archives, scripts</div>
+                      <div>• <strong>Cloud App Control</strong> — Restrict DoH, file sharing, webmail, streaming, IM, AI/ML</div>
+                    </div>
+                    <h3 style={{fontSize:'15px', color:'var(--accent-cyan)', margin:'1.5rem 0 0.5rem'}}>Bulk Rule Manager</h3>
+                    <p>View and delete rules across all ZIA policy categories for cleanup after testing.</p>
+                    <h3 style={{fontSize:'15px', color:'var(--accent-cyan)', margin:'1.5rem 0 0.5rem'}}>Mobile Admin Portal (ZCC)</h3>
+                    <p>Configure ZCC Forwarding Profiles and Windows App Profiles. Read supported; write requires ZCC API write permissions.</p>
+                    <h3 style={{fontSize:'15px', color:'var(--accent-cyan)', margin:'1.5rem 0 0.5rem'}}>Compliance</h3>
+                    <p>HIPAA, HITRUST CSF, NIST 800-53, NIST 800-171, PCI-DSS, CJIS, SOX, FERPA, GDPR</p>
+                    <h3 style={{fontSize:'15px', color:'var(--accent-cyan)', margin:'1.5rem 0 0.5rem'}}>Version History</h3>
+                    <div style={{paddingLeft:'1rem', fontSize:'12px'}}>
+                      <div><strong>v1.5.2</strong> — DLP rules shown in Review step, wizard state resets between runs for multi-deploy sessions</div>
+                      <div><strong>v1.5.1</strong> — Multi-user sessions (50 concurrent, 1hr TTL), Policy Catalog browser (no auth needed)</div>
+                      <div><strong>v1.5.0</strong> — Data Loss Prevention module (dictionary-first, 14 rule defs, 9 compliance frameworks)</div>
+                      <div><strong>v1.4.0</strong> — UI restructure, ZeroTrustPanda branding, firewall nwApplications fix, About page</div>
+                      <div><strong>v1.3.0</strong> — Mobile Admin Portal (ZCC), OneAPI-only auth</div>
+                      <div><strong>v1.2.x</strong> — Sandbox, DNS, File Type, Cloud App Control, Bulk Rule Manager</div>
+                      <div><strong>v1.0-1.1</strong> — URL Filtering, Firewall, SSL, Malware Protection, Error boundary</div>
+                    </div>
+                  </div>
+                </div>
+              )}
+              {showZiaWizard && step === 'tier' && (<TierStep config={config} setConfig={setConfig}
+                onNext={() => { markComplete('tier'); if (config.tier === 'ZTH_EBOOK') { setConfig(c => ({...c, complianceFramework: null})); markComplete('compliance'); goTo('customize'); } else { goTo('compliance'); } }} />)}
+              {showZiaWizard && step === 'compliance' && (<ComplianceStep config={config} setConfig={setConfig}
+                onNext={() => { markComplete('compliance'); goTo('customize'); }} onBack={() => goTo('tier')} />)}
+              {showZiaWizard && step === 'customize' && (<CustomizeStep config={config} setConfig={setConfig}
+                setTemplate={setTemplate} setError={setError} loading={loading} setLoading={setLoading}
+                onNext={() => { markComplete('customize'); goTo('review'); }} onBack={() => goTo('compliance')} />)}
+              {showZiaWizard && step === 'review' && (<ReviewStep template={template} plan={plan} setPlan={setPlan}
+                auth={auth} setError={setError} loading={loading} setLoading={setLoading}
+                onApply={() => { markComplete('review'); goTo('apply'); }} onBack={() => goTo('customize')} />)}
+              {showZiaWizard && step === 'apply' && (<ApplyStep template={template} plan={plan}
+                applyResult={applyResult} setApplyResult={setApplyResult}
+                setError={setError} loading={loading} setLoading={setLoading}
+                onNext={() => { markComplete('apply'); goTo('audit'); }} />)}
+              {showZiaWizard && step === 'audit' && (<AuditStep auditLogs={auditLogs} setAuditLogs={setAuditLogs} setError={setError} />)}
+              {showZiaBulk && (<BulkDeleteStep setError={setError} loading={loading} setLoading={setLoading} />)}
+              {showZcc && (<MobileAdminStep setError={setError} loading={loading} setLoading={setLoading} config={config} />)}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // ========================
+    // Step: Connect
+    // ========================
+    function ConnectStep({ auth, setAuth, setError, loading, setLoading, onComplete }) {
+      const [form, setForm] = useState({
+        clientId: '', clientSecret: '', vanityDomain: '', cloud: ''
+      });
+
+      const handleConnect = async () => {
+        setLoading(true); setError(null);
+        try {
+          const result = await api.call('POST', '/auth/oneapi', {
+            clientId: form.clientId, clientSecret: form.clientSecret,
+            vanityDomain: form.vanityDomain, cloud: form.cloud || undefined
+          });
+          api.sessionId = result.sessionId;
+          setAuth({ connected: true, mode: 'oneapi', cloud: form.vanityDomain });
+          onComplete();
+        } catch (e) {
+          setError(e.message);
+        }
+        setLoading(false);
+      };
+
+      return (
+        <div>
+          <div className="card">
+            <div className="card-header">
+              <h2>Connect to Zscaler</h2>
+              <p>Authenticate using OneAPI (OAuth2) credentials from ZIdentity. This provides access to ZIA, ZCC, and other Zscaler services through a single token.</p>
+            </div>
+
+            <div className="explainer">
+              <strong>Prerequisites:</strong> You need an API client configured in ZIdentity → Integration → API Clients
+              with scopes for ZIA and ZCC. The Client ID and Client Secret are generated there.
+            </div>
+
+            <div>
+              <div className="form-group">
+                <label className="form-label">Vanity Domain</label>
+                <input type="text" value={form.vanityDomain} placeholder="yourcompany"
+                  onChange={e => setForm({...form, vanityDomain: e.target.value})} />
+                <div className="form-hint">Your ZIdentity vanity domain (e.g., "acme" for acme.zslogin.net)</div>
+              </div>
+              <div className="form-group">
+                <label className="form-label">Client ID</label>
+                <input type="text" value={form.clientId} placeholder="OAuth2 Client ID"
+                  onChange={e => setForm({...form, clientId: e.target.value})} />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Client Secret</label>
+                <input type="password" value={form.clientSecret} placeholder="OAuth2 Client Secret"
+                  onChange={e => setForm({...form, clientSecret: e.target.value})} />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Cloud (optional)</label>
+                <input type="text" value={form.cloud} placeholder="Leave blank for production"
+                  onChange={e => setForm({...form, cloud: e.target.value})} />
+                <div className="form-hint">Only needed for non-production environments (e.g., beta)</div>
+              </div>
+            </div>
+
+            <div className="btn-group">
+              <button className="btn btn-primary" onClick={handleConnect} disabled={loading}>
+                {loading ? <><span className="spinner"></span> Connecting...</> : 'Connect & Authenticate'}
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // ========================
+    // Step: Module Select
+    // ========================
+    function ModuleStep({ config, setConfig, onNext }) {
+      const [schema, setSchema] = useState(null);
+      const [schemaLoading, setSchemaLoading] = useState(false);
+      const [schemaError, setSchemaError] = useState(null);
+
+      const fetchSchema = async () => {
+        setSchemaLoading(true); setSchemaError(null);
+        try {
+          const data = await api.call('GET', '/diag/schema');
+          setSchema(data);
+        } catch (e) { setSchemaError(e.message); }
+        setSchemaLoading(false);
+      };
+
+      return (
+        <div>
+          <div className="card">
+            <div className="card-header">
+              <h2>Select Modules</h2>
+              <p>Choose which Zscaler modules to configure. The MVP focuses on ZIA.</p>
+            </div>
+
+            <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:'1rem', margin:'1rem 0'}}>
+              <div className={`tier-card selected`} style={{borderColor:'var(--accent-green)'}}>
+                <div className="tier-icon">🌐</div>
+                <div className="tier-name">Zscaler Internet Access</div>
+                <div className="tier-desc">URL Filtering, Cloud Firewall, SSL Inspection, DLP, Sandbox, Cloud App Control, Malware Protection</div>
+                <div style={{marginTop:'8px', color:'var(--accent-green)', fontSize:'12px', fontWeight:600}}>✓ ACTIVE</div>
+              </div>
+              <div className="placeholder-banner" style={{border:'1px dashed var(--border)'}}>
+                <div className="tier-icon" style={{fontSize:'28px'}}>🔒</div>
+                <h3>Zscaler Private Access</h3>
+                <div className="tier-desc">App Segments, Access Policies, Wildcard Rules — Coming in a future release</div>
+                <div style={{marginTop:'8px', color:'var(--text-muted)', fontSize:'12px'}}>PLACEHOLDER</div>
+              </div>
+            </div>
+
+            <div className="card" style={{background:'var(--bg-input)', marginTop:'1rem'}}>
+              <div className="card-header">
+                <h3>API Schema Discovery</h3>
+                <p>Fetch a sample of your tenant's current rules to verify API connectivity and field formats.</p>
+              </div>
+              <button className="btn btn-ghost btn-sm" onClick={fetchSchema} disabled={schemaLoading}>
+                {schemaLoading ? <><span className="spinner"></span> Fetching...</> : '🔍 Fetch Tenant Schema'}
+              </button>
+              {schemaError && <div className="alert alert-danger" style={{marginTop:'8px'}}>⚠ {schemaError}</div>}
+              {schema && (
+                <div style={{marginTop:'12px', maxHeight:'400px', overflowY:'auto'}}>
+                  {Object.entries(schema).map(([key, val]) => (
+                    <div key={key} style={{marginBottom:'12px'}}>
+                      <div style={{fontWeight:600, fontSize:'13px', color:'var(--accent-cyan)', marginBottom:'4px'}}>{key}</div>
+                      {val.error ? (
+                        <div style={{fontSize:'12px', color:'var(--accent-red)'}}>Error: {val.error}</div>
+                      ) : (
+                        <pre style={{
+                          fontSize:'11px', fontFamily:'IBM Plex Mono', color:'var(--text-secondary)',
+                          background:'var(--bg-primary)', padding:'8px', borderRadius:'4px',
+                          overflow:'auto', maxHeight:'200px', whiteSpace:'pre-wrap', wordBreak:'break-all'
+                        }}>{JSON.stringify(val, null, 2)}</pre>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="btn-group">
+              <button className="btn btn-primary" onClick={onNext}>Continue with ZIA →</button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // ========================
+    // Step: Security Tier
+    // ========================
+    function TierStep({ config, setConfig, onNext, onBack }) {
+      const tiers = [
+        {
+          id: 'STRICT', icon: '🔒', name: 'Strict',
+          desc: 'Maximum security. Blocks productivity loss & streaming sites. Full SSL inspection. Blocks password-protected & unscannable files. Default-deny firewall.',
+          details: ['Block Legal Liability, Privacy Risk, Security Risk, Bandwidth Loss, Productivity Loss categories',
+            'Full SSL/TLS inspection on all traffic', 'Block password-protected & unscannable files',
+            'SSH tunneling blocked', 'Default-deny firewall policy']
+        },
+        {
+          id: 'BALANCED', icon: '⚖️', name: 'Balanced',
+          desc: 'Best-practice security with reasonable access. Caution pages for streaming & social media. SSL inspection with health/finance exemptions.',
+          details: ['Block Legal Liability, Privacy Risk, Security Risk categories',
+            'Caution pages for Bandwidth Loss & Productivity Loss', 'SSL inspection excluding healthcare & finance sites',
+            'Allow password-protected files', 'Standard firewall rules']
+        },
+        {
+          id: 'PERMISSIVE', icon: '🔓', name: 'Permissive',
+          desc: 'Minimal restrictions. Core security only. No SSL inspection. No bandwidth or productivity blocking.',
+          details: ['Block Legal Liability, Privacy Risk, Security Risk categories only',
+            'No bandwidth or productivity restrictions', 'No SSL/TLS inspection (reduced visibility)',
+            'Allow password-protected & unscannable files', 'Allow SSH tunneling']
+        },
+        {
+          id: 'ZTH_EBOOK', icon: '🏥', name: 'ZTH Ebook Policy',
+          desc: 'Zero Trust Hospital Architects Policy. Healthcare-optimized with PHI protection, medical research access, AI caution, and strict SSL with TLS 1.2 minimum.',
+          details: [
+            '11 URL Filtering rules: Block Legal Liability, Security, FileHost/Webmail, Crypto, Remote Access, Translation, P2P, Uncategorized',
+            'Caution pages for newly registered domains and Generative AI platforms',
+            'SSL Inspection: Exclude Finance/Health/Gov, then Inspect All with TLS 1.2 minimum',
+            'Firewall: Block QUIC, Allow Web & NTP only',
+            'Sandbox: Office/PDF quarantine+isolate, Executables allow+scan, Catch-all quarantine',
+            'DNS Security: Block critical/high risk DNS categories and DNS tunnels',
+            'File Type Control: Block database uploads, password-protected archives, executables, scripts',
+            'Cloud App Control: Block DoH, file sharing, webmail, restrict social/IM/AI/streaming',
+            'No compliance framework mapping (standalone healthcare policy)'
+          ]
+        }
+      ];
+
+      return (
+        <div>
+          <div className="card">
+            <div className="card-header">
+              <h2>Select Security Tier</h2>
+              <p>Choose a risk tolerance level. This determines how aggressively the template blocks or inspects traffic.</p>
+            </div>
+
+            <div className="explainer">
+              <strong>Why you should care:</strong> The security tier directly impacts user experience. Strict provides
+              maximum protection but may require more exception management. Balanced is recommended for most
+              organizations. Permissive is suitable for initial deployments where user disruption must be minimized.
+            </div>
+
+            <div className="tier-grid">
+              {tiers.map(t => (
+                <div key={t.id}
+                  className={`tier-card ${config.tier === t.id ? 'selected' : ''}`}
+                  onClick={() => setConfig({...config, tier: t.id})}
+                >
+                  <div className="tier-icon">{t.icon}</div>
+                  <div className="tier-name">{t.name}</div>
+                  <div className="tier-desc">{t.desc}</div>
+                </div>
+              ))}
+            </div>
+
+            {config.tier && (
+              <div style={{marginTop:'1rem'}}>
+                <h3 style={{fontSize:'14px', fontWeight:600, marginBottom:'8px'}}>
+                  {tiers.find(t=>t.id===config.tier)?.name} tier includes:
+                </h3>
+                <ul style={{paddingLeft:'1.5rem', fontSize:'13px', color:'var(--text-secondary)'}}>
+                  {tiers.find(t=>t.id===config.tier)?.details.map((d,i) => (
+                    <li key={i} style={{marginBottom:'4px'}}>{d}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            <div className="btn-group">
+              <button className="btn btn-ghost" onClick={onBack}>← Back</button>
+              <button className="btn btn-primary" onClick={onNext}>Continue →</button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // ========================
+    // Step: Compliance Framework
+    // ========================
+    function ComplianceStep({ config, setConfig, onNext, onBack }) {
+      const frameworks = [
+        { id: 'HIPAA', label: 'HIPAA', desc: 'Healthcare' },
+        { id: 'HITRUST', label: 'HITRUST CSF', desc: 'Healthcare Cert' },
+        { id: 'NIST_800_53', label: 'NIST 800-53', desc: 'Federal Systems' },
+        { id: 'NIST_800_171', label: 'NIST 800-171', desc: 'CUI Protection' },
+        { id: 'PCI', label: 'PCI DSS', desc: 'Payment Cards' },
+        { id: 'CJIS', label: 'CJIS', desc: 'Criminal Justice' },
+        { id: 'SOX', label: 'SOX', desc: 'Financial Reporting' },
+        { id: 'FERPA', label: 'FERPA', desc: 'Education Records' },
+        { id: 'GDPR', label: 'GDPR', desc: 'EU Data Protection' }
+      ];
+
+      return (
+        <div>
+          <div className="card">
+            <div className="card-header">
+              <h2>Compliance Framework (Optional)</h2>
+              <p>Select a regulatory framework to map policies to specific compliance controls. This generates evidence documentation showing which ZIA policy satisfies which control requirement.</p>
+            </div>
+
+            <div className="explainer">
+              <strong>Why you should care:</strong> Compliance mapping creates an audit trail that links each
+              ZIA policy rule to a specific regulatory control. This documentation is invaluable during audits
+              and can significantly reduce the effort required to demonstrate compliance.
+            </div>
+
+            <div className="compliance-grid">
+              <div
+                className={`compliance-chip ${!config.complianceFramework ? 'selected' : ''}`}
+                onClick={() => setConfig({...config, complianceFramework: null})}
+              >None</div>
+              {frameworks.map(f => (
+                <div key={f.id}
+                  className={`compliance-chip ${config.complianceFramework === f.id ? 'selected' : ''}`}
+                  onClick={() => setConfig({...config, complianceFramework: f.id})}
+                >
+                  <div style={{fontWeight:600}}>{f.label}</div>
+                  <div style={{fontSize:'11px', color:'var(--text-muted)', marginTop:'2px'}}>{f.desc}</div>
+                </div>
+              ))}
+            </div>
+
+            <div className="btn-group">
+              <button className="btn btn-ghost" onClick={onBack}>← Back</button>
+              <button className="btn btn-primary" onClick={onNext}>Continue →</button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // ========================
+    // Step: Customize
+    // ========================
+    function CustomizeStep({ config, setConfig, setTemplate, setError, loading, setLoading, onNext, onBack }) {
+      const toggles = [
+        { key: 'enableUrlFiltering', label: 'URL Filtering', desc: 'Block/allow web categories, create custom URL rules' },
+        { key: 'enableFirewall', label: 'Cloud Firewall', desc: 'Network-level firewall filtering rules' },
+        { key: 'enableSslInspection', label: 'SSL/TLS Inspection', desc: 'Inspect encrypted traffic for threats' },
+        { key: 'enableSandbox', label: 'Cloud Sandbox', desc: 'Quarantine & scan unknown files (Office, PDF, Executables)' },
+        { key: 'enableDnsSecurity', label: 'DNS Security', desc: 'Block malicious DNS categories and DNS tunnels' },
+        { key: 'enableFileTypeControl', label: 'File Type Control', desc: 'Block risky file types (executables, scripts, archives, databases)' },
+        { key: 'enableCloudAppControl', label: 'Cloud App Control', desc: 'Control SaaS apps (DoH, file sharing, webmail, AI/ML, social, IM)' },
+        { key: 'enableDlp', label: 'Data Loss Prevention', desc: 'DLP policy rules mapped to compliance engines (HIPAA, PCI, GDPR, etc.). Action=Allow with Zscaler Incident Receiver.' },
+        { key: 'enableMalwareProtection', label: 'Malware & Threat Protection', desc: 'Anti-virus, anti-spyware, botnet protection settings' },
+        { key: 'enableAdvancedSettings', label: 'Advanced Cloud Settings', desc: 'HTTP tunnel control, domain fronting, authentication settings' }
+      ];
+
+      const handleGenerate = async () => {
+        setLoading(true); setError(null);
+        try {
+          const tmpl = await api.call('POST', '/templates/generate', config);
+          setTemplate(tmpl);
+          onNext();
+        } catch (e) {
+          setError(e.message);
+        }
+        setLoading(false);
+      };
+
+      return (
+        <div>
+          <div className="card">
+            <div className="card-header">
+              <h2>Customize Template</h2>
+              <p>Fine-tune the naming prefix and which policy areas to include.</p>
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Naming Prefix</label>
+              <input type="text" value={config.prefix}
+                onChange={e => setConfig({...config, prefix: e.target.value.replace(/[^A-Za-z0-9_-]/g, '')})}
+                placeholder="ZTP" />
+              <div className="form-hint">
+                All created objects will be named with this prefix (e.g., {config.prefix}-Block-Legal-Liability).
+                Letters, numbers, hyphens, and underscores only.
+              </div>
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Policy Modules</label>
+              <div className="toggle-group">
+                {toggles.map(t => (
+                  <div className="toggle-item" key={t.key}>
+                    <div>
+                      <label onClick={() => setConfig({...config, [t.key]: !config[t.key]})}>{t.label}</label>
+                      <div className="form-hint">{t.desc}</div>
+                    </div>
+                    <div className={`toggle-switch ${config[t.key] ? 'active' : ''}`}
+                      onClick={() => setConfig({...config, [t.key]: !config[t.key]})}>
+                      <div className="toggle-knob"></div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="alert alert-info">
+              ℹ Template: <strong>{config.prefix}-{config.complianceFramework || 'General'}-{config.tier}</strong>
+            </div>
+
+            <div className="btn-group">
+              <button className="btn btn-ghost" onClick={onBack}>← Back</button>
+              <button className="btn btn-primary" onClick={handleGenerate} disabled={loading}>
+                {loading ? <><span className="spinner"></span> Generating...</> : 'Generate Template & Review →'}
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // ========================
+    // Step: Review / Plan
+    // ========================
+    function ReviewStep({ template, plan, setPlan, auth, setError, loading, setLoading, onApply, onBack }) {
+      const [tab, setTab] = useState('policies');
+
+      const runDryRun = async () => {
+        setLoading(true); setError(null);
+        try {
+          const result = await api.call('POST', '/plan/dryrun', { template });
+          setPlan(result);
+          setTab('diff');
+        } catch (e) {
+          setError(e.message);
+        }
+        setLoading(false);
+      };
+
+      if (!template) return <div className="alert alert-warning">No template generated. Go back to Customize step.</div>;
+
+      const allPolicies = [
+        ...(template.policies.urlFiltering || []).map(r => ({...r, category: 'URL Filtering'})),
+        ...(template.policies.firewallFiltering || []).map(r => ({...r, category: 'Firewall'})),
+        ...(template.policies.sslInspection || []).map(r => ({...r, category: 'SSL Inspection'})),
+        ...(template.policies.sandbox || []).map(r => ({...r, category: 'Sandbox', action: r.baRuleAction})),
+        ...(template.policies.dnsSecurity || []).map(r => ({...r, category: 'DNS Security'})),
+        ...(template.policies.fileTypeControl || []).map(r => ({...r, category: 'File Type Control', action: r.filteringAction})),
+        ...(template.policies.cloudAppControl || []).map(r => ({...r, category: 'Cloud App Control', action: (r.actions||[]).join(', ')})),
+        ...(template.policies.dlp || []).map(r => ({...r, category: 'Data Loss Prevention', action: r.action || 'ALLOW'})),
+      ];
+
+      return (
+        <div>
+          <div className="card">
+            <div className="card-header">
+              <h2>Review: {template.metadata.name}</h2>
+              <p>
+                Tier: <strong>{template.metadata.tier}</strong>
+                {template.metadata.complianceFramework && <> · Framework: <strong>{template.metadata.complianceFramework.name}</strong></>}
+                · Prefix: <strong>{template.metadata.prefix}</strong>
+              </p>
+            </div>
+
+            <div style={{display:'flex', gap:'8px', marginBottom:'1rem'}}>
+              <button className={`btn btn-sm ${tab==='policies' ? 'btn-primary' : 'btn-ghost'}`}
+                onClick={() => setTab('policies')}>Policy Rules ({allPolicies.length})</button>
+              <button className={`btn btn-sm ${tab==='checklist' ? 'btn-primary' : 'btn-ghost'}`}
+                onClick={() => setTab('checklist')}>Checklist</button>
+              <button className={`btn btn-sm ${tab==='compliance' ? 'btn-primary' : 'btn-ghost'}`}
+                onClick={() => setTab('compliance')}>Compliance Evidence</button>
+              <button className={`btn btn-sm ${tab==='diff' ? 'btn-primary' : 'btn-ghost'}`}
+                onClick={() => { if (!plan) runDryRun(); else setTab('diff'); }}>
+                {plan ? 'Diff View' : 'Run Dry Run'}
+              </button>
+            </div>
+
+            {tab === 'policies' && (
+              <div style={{overflowX:'auto'}}>
+                <table className="diff-table">
+                  <thead>
+                    <tr>
+                      <th>Order</th>
+                      <th>Category</th>
+                      <th>Rule Name</th>
+                      <th>Action</th>
+                      <th>Description</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {allPolicies.map((r, i) => (
+                      <tr key={i}>
+                        <td>{r.order}</td>
+                        <td><span className="badge badge-category">{r.category}</span></td>
+                        <td style={{fontFamily:'IBM Plex Mono', fontSize:'12px'}}>{r.name}</td>
+                        <td>
+                          <span className={`badge ${r.action==='BLOCK'||r.action==='BLOCK_DROP'||r.action==='BLOCK_ICMP_UNREACHABLE' ? 'badge-risk' : 'badge-create'}`}>
+                            {r.action}
+                          </span>
+                        </td>
+                        <td style={{fontSize:'12px', color:'var(--text-secondary)'}}>{r.description}</td>
+                      </tr>
+                    ))}
+                    {template.policies.malwareProtection && (
+                      <tr>
+                        <td>—</td>
+                        <td><span className="badge badge-category">Malware</span></td>
+                        <td style={{fontFamily:'IBM Plex Mono', fontSize:'12px'}}>{template.policies.malwareProtection.name}</td>
+                        <td><span className="badge badge-update">CONFIG</span></td>
+                        <td style={{fontSize:'12px', color:'var(--text-secondary)'}}>Malware & Advanced Threat Protection settings</td>
+                      </tr>
+                    )}
+                    {template.policies.advancedSettings && (
+                      <tr>
+                        <td>—</td>
+                        <td><span className="badge badge-category">Advanced</span></td>
+                        <td style={{fontFamily:'IBM Plex Mono', fontSize:'12px'}}>{template.policies.advancedSettings.name}</td>
+                        <td><span className="badge badge-update">CONFIG</span></td>
+                        <td style={{fontSize:'12px', color:'var(--text-secondary)'}}>Advanced cloud settings configuration</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {tab === 'checklist' && (
+              <div>
+                {template.implementationChecklist.map((item, i) => (
+                  <div key={i} style={{
+                    display:'flex', alignItems:'center', gap:'10px',
+                    padding:'8px 12px', borderBottom:'1px solid var(--border)',
+                    fontSize:'13px'
+                  }}>
+                    <span style={{
+                      width:'20px', height:'20px', borderRadius:'4px',
+                      border:'1px solid var(--border)', display:'flex',
+                      alignItems:'center', justifyContent:'center', fontSize:'10px',
+                      flexShrink:0
+                    }}>
+                      {item.manual ? '✋' : '○'}
+                    </span>
+                    <span className="badge badge-category" style={{fontSize:'10px', flexShrink:0}}>{item.category}</span>
+                    <span>{item.task}</span>
+                    {item.manual && <span style={{fontSize:'11px', color:'var(--accent-amber)'}}>MANUAL</span>}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {tab === 'compliance' && (
+              <div>
+                {!template.metadata.complianceFramework ? (
+                  <div className="alert alert-info">No compliance framework selected. Go back to select one for evidence mapping.</div>
+                ) : (
+                  <div>
+                    <h3 style={{fontSize:'14px', marginBottom:'1rem'}}>
+                      {template.metadata.complianceFramework.name} Compliance Evidence
+                    </h3>
+                    {allPolicies.filter(r => r.complianceMapping?.length > 0).map((r, i) => (
+                      <div key={i} className="evidence-item">
+                        <div style={{fontWeight:600, marginBottom:'4px'}}>{r.name}</div>
+                        {r.complianceMapping.map((m, j) => (
+                          <div key={j} style={{fontSize:'12px'}}>
+                            <span className="fw">{m.framework}</span> →
+                            <span className="ctrl"> {m.id}: {m.name}</span>
+                            {m.description && <span style={{color:'var(--text-muted)'}}> — {m.description}</span>}
+                          </div>
+                        ))}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {tab === 'diff' && (
+              <div>
+                {loading ? (
+                  <div style={{textAlign:'center', padding:'2rem'}}><div className="spinner" style={{margin:'0 auto'}}></div><p style={{marginTop:'8px', color:'var(--text-muted)'}}>Running dry run against your tenant...</p></div>
+                ) : plan ? (
+                  <div>
+                    <div className="alert alert-info">
+                      ℹ Plan Summary: <strong>{plan.summary.creates} creates</strong>, <strong>{plan.summary.updates} updates</strong>
+                      {plan.summary.riskyActions > 0 && <>, <span style={{color:'var(--accent-red)'}}>{plan.summary.riskyActions} risky actions</span></>}
+                    </div>
+                    {plan.warnings?.length > 0 && plan.warnings.map((w,i) => (
+                      <div key={i} className="alert alert-warning">⚠ {w}</div>
+                    ))}
+                    <table className="diff-table">
+                      <thead>
+                        <tr>
+                          <th>Action</th>
+                          <th>Category</th>
+                          <th>Rule Name</th>
+                          <th>Current</th>
+                          <th>Proposed</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {plan.actions.map((a, i) => (
+                          <tr key={i}>
+                            <td>
+                              <span className={`badge ${a.type==='CREATE' ? 'badge-create' : 'badge-update'}`}>{a.type}</span>
+                              {a.isRisky && <span className="badge badge-risk" style={{marginLeft:'4px'}}>RISK</span>}
+                            </td>
+                            <td><span className="badge badge-category">{a.category}</span></td>
+                            <td style={{fontFamily:'IBM Plex Mono', fontSize:'12px'}}>{a.name}</td>
+                            <td style={{fontSize:'12px', color:'var(--text-muted)'}}>
+                              {a.current ? JSON.stringify(a.current) : '—'}
+                            </td>
+                            <td style={{fontSize:'12px', color:'var(--accent-green)'}}>
+                              {JSON.stringify(a.proposed)}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <div>
+                    <button className="btn btn-primary" onClick={runDryRun} disabled={loading}>
+                      Run Dry Run Against Tenant
+                    </button>
+                    <p className="form-hint" style={{marginTop:'8px'}}>This will read your current configuration and show what would change.</p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            <div className="btn-group">
+              <button className="btn btn-ghost" onClick={onBack}>← Back</button>
+              {!auth.connected ? (
+                <div className="alert alert-warning" style={{margin:0}}>Connect to ZIA first to apply changes</div>
+              ) : (
+                <button className="btn btn-success" onClick={onApply}>
+                  Proceed to Apply →
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // ========================
+    // Step: Apply
+    // ========================
+    function ApplyStep({ template, plan, applyResult, setApplyResult, setError, loading, setLoading, onNext }) {
+      const [confirmed, setConfirmed] = useState(false);
+
+      const handleApply = async () => {
+        setLoading(true); setError(null);
+        try {
+          const result = await api.call('POST', '/apply', {
+            template,
+            snapshotId: plan?.snapshotId
+          });
+          setApplyResult(result);
+        } catch (e) {
+          setError(e.message);
+        }
+        setLoading(false);
+      };
+
+      const handleRollback = async () => {
+        if (!plan?.snapshotId) return;
+        setLoading(true);
+        try {
+          const result = await api.call('POST', '/rollback', { snapshotId: plan.snapshotId });
+          alert(result.message);
+        } catch (e) {
+          setError(e.message);
+        }
+        setLoading(false);
+      };
+
+      return (
+        <div>
+          <div className="card">
+            <div className="card-header">
+              <h2>Apply Configuration</h2>
+              <p>This will create policy rules in your ZIA tenant and activate the changes.</p>
+            </div>
+
+            {!applyResult ? (
+              <div>
+                <div className="alert alert-warning">
+                  ⚠ <strong>Caution:</strong> This will make real changes to your ZIA tenant. A snapshot has been
+                  taken for best-effort rollback. Created rules will be ordered above any conflicting existing rules.
+                </div>
+
+                <div className="toggle-item" style={{marginBottom:'1rem'}}>
+                  <label onClick={() => setConfirmed(!confirmed)} style={{cursor:'pointer'}}>
+                    I understand this will modify my ZIA tenant configuration and have reviewed the plan.
+                  </label>
+                  <div className={`toggle-switch ${confirmed ? 'active' : ''}`}
+                    onClick={() => setConfirmed(!confirmed)}>
+                    <div className="toggle-knob"></div>
+                  </div>
+                </div>
+
+                <div className="btn-group">
+                  <button className="btn btn-success" onClick={handleApply} disabled={!confirmed || loading}>
+                    {loading ? <><span className="spinner"></span> Applying...</> : '🚀 Apply Changes'}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div>
+                {applyResult.activated ? (
+                  <div className="alert alert-success">
+                    ✓ Changes applied and activated successfully!
+                    Applied {applyResult.summary.applied} rules with {applyResult.summary.errors} errors.
+                  </div>
+                ) : (
+                  <div className="alert alert-danger">
+                    Changes were applied but activation may have failed. Check errors below.
+                  </div>
+                )}
+
+                {applyResult.applied?.length > 0 && (
+                  <div style={{marginBottom:'1rem'}}>
+                    <h3 style={{fontSize:'14px', marginBottom:'8px', color:'var(--accent-green)'}}>Applied ({applyResult.applied.length})</h3>
+                    {applyResult.applied.map((a, i) => (
+                      <div key={i} style={{padding:'6px 12px', borderBottom:'1px solid var(--border)', fontSize:'13px'}}>
+                        <span className={`badge ${a.type==='CREATE' ? 'badge-create' : 'badge-update'}`}>{a.type}</span>
+                        {' '}<span className="badge badge-category">{a.category}</span>
+                        {' '}{a.name}
+                        {a.id && <span style={{color:'var(--text-muted)', marginLeft:'8px'}}>ID: {a.id}</span>}
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {applyResult.errors?.length > 0 && (
+                  <div style={{marginBottom:'1rem'}}>
+                    <h3 style={{fontSize:'14px', marginBottom:'8px', color:'var(--accent-red)'}}>Errors ({applyResult.errors.length})</h3>
+                    {applyResult.errors.map((e, i) => (
+                      <div key={i} className="alert alert-danger" style={{fontSize:'13px'}}>
+                        {e.category} / {e.name}: {e.error}
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <div className="btn-group">
+                  <button className="btn btn-danger" onClick={handleRollback} disabled={loading}>
+                    ↩ Attempt Rollback
+                  </button>
+                  <button className="btn btn-primary" onClick={onNext}>
+                    View Audit Log →
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      );
+    }
+
+    // ========================
+    // Step: Audit Log
+    // ========================
+    function AuditStep({ auditLogs, setAuditLogs, setError }) {
+      const [loaded, setLoaded] = useState(false);
+
+      useEffect(() => {
+        if (!loaded) {
+          api.call('GET', '/audit/logs').then(setAuditLogs).catch(e => setError(e.message));
+          setLoaded(true);
+        }
+      }, [loaded]);
+
+      return (
+        <div>
+          <div className="card">
+            <div className="card-header">
+              <h2>Audit Log</h2>
+              <p>Complete record of all actions taken during this session.</p>
+            </div>
+
+            <div className="btn-group" style={{marginTop:0, marginBottom:'1rem'}}>
+              <button className="btn btn-ghost btn-sm" onClick={() => {
+                window.open('/api/audit/export/csv', '_blank');
+              }}>📥 Export CSV</button>
+              <button className="btn btn-ghost btn-sm" onClick={() => {
+                window.open('/api/audit/export/json', '_blank');
+              }}>📥 Export JSON</button>
+              <button className="btn btn-ghost btn-sm" onClick={() => {
+                api.call('GET', '/audit/logs').then(setAuditLogs).catch(e => setError(e.message));
+              }}>🔄 Refresh</button>
+            </div>
+
+            <div style={{maxHeight:'500px', overflowY:'auto', border:'1px solid var(--border)', borderRadius:'var(--radius)'}}>
+              <div className="log-entry" style={{background:'var(--bg-secondary)', position:'sticky', top:0}}>
+                <span style={{fontWeight:600}}>Timestamp</span>
+                <span style={{fontWeight:600}}>Action</span>
+                <span style={{fontWeight:600}}>Status</span>
+                <span style={{fontWeight:600}}>Details</span>
+              </div>
+              {auditLogs.length === 0 ? (
+                <div style={{padding:'2rem', textAlign:'center', color:'var(--text-muted)'}}>No log entries yet</div>
+              ) : (
+                auditLogs.map((entry, i) => (
+                  <div key={i} className="log-entry">
+                    <span className="ts">{new Date(entry.timestamp).toLocaleString()}</span>
+                    <span className="action">{entry.action}</span>
+                    <span className={entry.status === 'success' ? 'status-ok' : 'status-err'}>
+                      {entry.status}
+                    </span>
+                    <span style={{color:'var(--text-secondary)', wordBreak:'break-all'}}>
+                      {typeof entry.details === 'object' ? JSON.stringify(entry.details) : entry.details}
+                    </span>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // ========================
+    // Step: Policy Catalog (no auth required)
+    // ========================
+    function CatalogStep() {
+      const [catalog, setCatalog] = useState(null);
+      const [loading, setLoading] = useState(false);
+      const [error, setError] = useState(null);
+      const [openTiers, setOpenTiers] = useState({});
+      const [openFws, setOpenFws] = useState({});
+      const [openPolicies, setOpenPolicies] = useState({});
+
+      useEffect(() => {
+        let cancelled = false;
+        setLoading(true);
+        fetch('/api/catalog').then(r => r.json()).then(data => {
+          if (!cancelled) { setCatalog(data); setLoading(false); }
+        }).catch(e => {
+          if (!cancelled) { setError(e.message); setLoading(false); }
+        });
+        return () => { cancelled = true; };
+      }, []);
+
+      const toggle = (map, setMap, key) => setMap(prev => ({ ...prev, [key]: !prev[key] }));
+
+      const tierMeta = {
+        STRICT: { icon: '🔒', label: 'Strict', color: 'var(--accent-red)' },
+        BALANCED: { icon: '⚖️', label: 'Balanced', color: 'var(--accent-blue)' },
+        PERMISSIVE: { icon: '🔓', label: 'Permissive', color: 'var(--accent-green)' },
+        ZTH_EBOOK: { icon: '🏥', label: 'Zero Trust Hospital', color: 'var(--accent-purple)' }
+      };
+
+      const policyLabels = {
+        urlFiltering: '🌐 URL Filtering',
+        firewallFiltering: '🔥 Cloud Firewall',
+        sslInspection: '🔒 SSL/TLS Inspection',
+        sandbox: '📦 Cloud Sandbox',
+        dnsSecurity: '🛡️ DNS Security',
+        fileTypeControl: '📄 File Type Control',
+        cloudAppControl: '☁️ Cloud App Control',
+        dlp: '🔍 Data Loss Prevention',
+        malwareProtection: '🦠 Malware Protection',
+        advancedSettings: '⚙️ Advanced Settings'
+      };
+
+      function getActionClass(action) {
+        if (!action) return '';
+        const a = String(action).toUpperCase();
+        if (a.includes('BLOCK')) return 'BLOCK';
+        if (a === 'ALLOW') return 'ALLOW';
+        if (a === 'CAUTION') return 'CAUTION';
+        if (a.includes('DECRYPT') && !a.includes('NOT')) return 'DECRYPT';
+        if (a.includes('DO_NOT_DECRYPT')) return 'DO_NOT_DECRYPT';
+        if (a.includes('QUARANTINE')) return 'QUARANTINE';
+        if (a.includes('INSPECT')) return 'INSPECT';
+        return '';
+      }
+
+      function renderRule(rule, idx) {
+        const actionClass = getActionClass(rule.action);
+        return (
+          <div className="catalog-rule" key={idx}>
+            <div>
+              <span className="catalog-rule-name">{rule.name}</span>
+              <span className={`catalog-rule-action ${actionClass}`}>{rule.action}</span>
+              {rule.severity && <span className="catalog-rule-action" style={{background:'var(--bg-secondary)',color:'var(--text-muted)',marginLeft:'4px'}}>{rule.severity.replace('RULE_SEVERITY_','')}</span>}
+            </div>
+            {rule.description && <div className="catalog-rule-detail">{rule.description}</div>}
+            {rule.urlCategories && rule.urlCategories.length > 0 && (
+              <div className="catalog-rule-cats">Categories: {rule.urlCategories.join(', ')}</div>
+            )}
+            {rule.nwApplications && rule.nwApplications.length > 0 && (
+              <div className="catalog-rule-cats">Apps: {rule.nwApplications.join(', ')}</div>
+            )}
+            {rule.dictionaryNames && rule.dictionaryNames.length > 0 && (
+              <div className="catalog-rule-cats">Dictionaries: {rule.dictionaryNames.join(', ')}</div>
+            )}
+            {rule.preferredEngines && rule.preferredEngines.length > 0 && (
+              <div className="catalog-rule-cats">Preferred Engines: {rule.preferredEngines.join(', ')}</div>
+            )}
+            {rule.fileTypes && rule.fileTypes.length > 0 && (
+              <div className="catalog-rule-cats">File Types: {Array.isArray(rule.fileTypes) ? rule.fileTypes.join(', ') : rule.fileTypes}</div>
+            )}
+            {rule.firstTimeOperation && (
+              <div className="catalog-rule-cats">First-time: {rule.firstTimeOperation}</div>
+            )}
+            {rule.withoutContentInspection && (
+              <div className="catalog-rule-cats" style={{color:'var(--accent-amber)'}}>Without Content Inspection</div>
+            )}
+            {rule.complianceMapping && rule.complianceMapping.length > 0 && (
+              <div style={{marginTop:'4px'}}>
+                {rule.complianceMapping.map((c, ci) => (
+                  <span key={ci} className="catalog-compliance-tag">{c.framework} {c.id}: {c.name}</span>
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      }
+
+      function renderPolicies(policies, tierKey, fwKey) {
+        return Object.entries(policies).map(([policyType, rules]) => {
+          const pKey = `${tierKey}-${fwKey}-${policyType}`;
+          const isOpen = openPolicies[pKey];
+          const count = Array.isArray(rules) ? rules.length : 1;
+          const label = policyLabels[policyType] || policyType;
+          return (
+            <div className="catalog-policy-group" key={policyType}>
+              <div className="catalog-policy-header" onClick={() => toggle(openPolicies, setOpenPolicies, pKey)}>
+                <span className="arrow" style={{fontSize:'10px',transition:'transform 0.2s',transform:isOpen?'rotate(90deg)':'none'}}>▶</span>
+                {label}
+                <span className="catalog-count">{count}</span>
+              </div>
+              {isOpen && Array.isArray(rules) && rules.map((r, i) => renderRule(r, i))}
+              {isOpen && !Array.isArray(rules) && rules.settings && (
+                <div className="catalog-rule">
+                  <div className="catalog-rule-name">{rules.name}</div>
+                  {rules.description && <div className="catalog-rule-detail">{rules.description}</div>}
+                  <div className="catalog-rule-cats" style={{whiteSpace:'pre-wrap'}}>{JSON.stringify(rules.settings, null, 2)}</div>
+                  {rules.complianceMapping && rules.complianceMapping.length > 0 && (
+                    <div style={{marginTop:'4px'}}>
+                      {rules.complianceMapping.map((c, ci) => (
+                        <span key={ci} className="catalog-compliance-tag">{c.framework} {c.id}: {c.name}</span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          );
+        });
+      }
+
+      if (loading) return <div className="catalog-loading">Loading policy catalog...</div>;
+      if (error) return <div className="alert alert-danger">Failed to load catalog: {error}</div>;
+      if (!catalog) return null;
+
+      return (
+        <div>
+          <div className="card">
+            <div className="card-header">
+              <h2>📖 Policy Catalog</h2>
+              <p>Browse every rule across all security tiers and compliance frameworks. No authentication required. Click a tier to expand, then drill into frameworks and policy types to see individual rules with compliance mappings.</p>
+            </div>
+
+            <div className="explainer">
+              <strong>How to use:</strong> Expand a security tier below, then pick a compliance framework (or "No Framework" for general-purpose).
+              Each policy module shows every rule that would be created, including the action, URL categories, dictionaries, protocols, and
+              mapped compliance controls. Use this to decide which tier and framework is right for your organization before connecting to ZIA.
+            </div>
+
+            {Object.entries(catalog.tiers).map(([tierKey, fwMap]) => {
+              const meta = tierMeta[tierKey] || { icon: '?', label: tierKey, color: 'var(--text-primary)' };
+              const isTierOpen = openTiers[tierKey];
+              const totalRules = Object.values(fwMap).reduce((sum, fw) =>
+                sum + Object.values(fw.ruleCounts || {}).reduce((s, c) => s + c, 0), 0
+              );
+
+              return (
+                <div className="catalog-tier" key={tierKey}>
+                  <div className="catalog-tier-header" onClick={() => toggle(openTiers, setOpenTiers, tierKey)}>
+                    <span className="arrow" style={{transform:isTierOpen?'rotate(90deg)':'none'}}>▶</span>
+                    <span>{meta.icon}</span>
+                    <span style={{color: meta.color}}>{meta.label}</span>
+                    <span className="catalog-count">{Object.keys(fwMap).length} framework{Object.keys(fwMap).length !== 1 ? 's' : ''}</span>
+                  </div>
+                  {isTierOpen && Object.entries(fwMap).map(([fwKey, fwData]) => {
+                    const fKey = `${tierKey}-${fwKey}`;
+                    const isFwOpen = openFws[fKey];
+                    const fwLabel = fwKey === 'NONE' ? 'No Framework (General)' :
+                      (catalog.frameworks[fwKey] ? `${catalog.frameworks[fwKey].name} — ${catalog.frameworks[fwKey].fullName}` : fwKey);
+                    const rc = fwData.ruleCounts || {};
+                    const totalFwRules = Object.values(rc).reduce((s, c) => s + c, 0);
+
+                    return (
+                      <div className="catalog-fw" key={fwKey}>
+                        <div className="catalog-fw-header" onClick={() => toggle(openFws, setOpenFws, fKey)}>
+                          <span className="arrow" style={{fontSize:'10px',transition:'transform 0.2s',transform:isFwOpen?'rotate(90deg)':'none'}}>▶</span>
+                          <span>{fwKey === 'NONE' ? '🌐' : '📋'}</span>
+                          <span>{fwLabel}</span>
+                          <span className="catalog-count">{totalFwRules} rules</span>
+                        </div>
+                        {isFwOpen && (
+                          <div>
+                            <div className="catalog-summary" style={{margin:'0.5rem 0 0.25rem 1rem'}}>
+                              {Object.entries(rc).map(([pt, c]) => (
+                                <span key={pt} className="catalog-summary-chip">{policyLabels[pt]?.split(' ').slice(1).join(' ') || pt}: {c}</span>
+                              ))}
+                            </div>
+                            {renderPolicies(fwData.policies, tierKey, fwKey)}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      );
+    }
+
+    // ========================
+    // Step: Mobile Admin Portal (ZCC)
+    // ========================
+    function MobileAdminStep({ setError, loading, setLoading, config }) {
+      const [wizStep, setWizStep] = useState('select'); // select, configure, review, apply
+      const [profiles, setProfiles] = useState(null);
+      const [selectedFwdId, setSelectedFwdId] = useState(null);
+      const [selectedAppId, setSelectedAppId] = useState(null);
+      const [applyResult, setApplyResult] = useState(null);
+
+      // Best-practice setting toggles
+      const [fwdSettings, setFwdSettings] = useState({
+        ztunnel2: true,
+        transparentRedirect: true,
+        dropIpv6: true,
+        allTrafficT2: true
+      });
+      const [appSettings, setAppSettings] = useState({
+        // Tunnel bypass lists
+        packetTunnelExcludeList: '',
+        packetTunnelExcludeListForIPv6: '',
+        packetTunnelIncludeList: '',
+        packetTunnelIncludeListForIPv6: '',
+        // VPN / source port
+        vpnGateways: '',
+        sourcePortBasedBypasses: '',
+        // IPv6 / DNS settings (toggles)
+        disableParallelIpv4AndIPv6: true,
+        useDefaultAdapterForDNS: false,
+        updateDnsSearchOrder: false,
+        disableDNSRouteExclusion: false,
+        enforceSplitDNS: false,
+        bypassDNSTrafficUsingUDPProxy: false,
+        truncateLargeUDPDNSResponse: false,
+        prioritizeDnsExclusions: false,
+        // DNS lists
+        packetTunnelDnsExcludeList: '',
+        packetTunnelDnsIncludeList: '',
+        dnsPriorityOrdering: '',
+        dnsPriorityOrderingForTrustedDnsCriteria: '',
+        customDNS: '',
+        // App/service IDs
+        appServiceIds: '',
+        bypassAppIds: '',
+        bypassCustomAppIds: '',
+        // Passwords (leave blank to skip)
+        logoutpassword: '',
+        uninstallpassword: '',
+        disablepassword: '',
+        exitPassword: '',
+        zdxDisablePassword: '',
+        zdDisablePassword: '',
+        zpaDisablePassword: '',
+        zdpDisablePassword: '',
+        zccRevertPassword: '',
+        zccFailCloseSettingsExitUninstallPassword: ''
+      });
+
+      // Fetch profiles on mount
+      const fetchProfiles = async () => {
+        setLoading(true); setError(null);
+        try {
+          const data = await api.call('GET', '/zcc/profiles');
+          setProfiles(data);
+          if (data.errors?.length > 0) {
+            setError('Some profile fetches failed: ' + data.errors.join('; '));
+          }
+        } catch (e) { setError(e.message); }
+        setLoading(false);
+      };
+
+      useEffect(() => { fetchProfiles(); }, []);
+
+      // Build the PATCH/POST payloads from selected settings
+      const buildPayloads = () => {
+        const payloads = { forwardingProfileId: selectedFwdId, appProfileId: selectedAppId, settings: {} };
+
+        if (selectedFwdId && profiles) {
+          const fwdProfile = profiles.forwardingProfiles.find(p => String(p.id) === String(selectedFwdId));
+          // Build forwarding profile actions from best practices
+          const fwdActions = {};
+          if (fwdSettings.ztunnel2 || fwdSettings.transparentRedirect || fwdSettings.dropIpv6 || fwdSettings.allTrafficT2) {
+            fwdActions.forwardingProfileActions = [{
+              actionType: '1',
+              networkType: '2',
+              primaryTransport: fwdSettings.ztunnel2 ? '2' : '1',
+              enablePacketTunnel: '1',
+              redirectWebTraffic: fwdSettings.transparentRedirect ? '1' : '0',
+              useTunnel2ForProxiedWebTraffic: fwdSettings.allTrafficT2 ? '1' : '0',
+              allowTLSFallback: '0',
+              systemProxy: '0',
+              dropIpv6Traffic: fwdSettings.dropIpv6 ? '1' : '0',
+              dropIpv6IncludeTrafficInT2: fwdSettings.dropIpv6 ? '1' : '0',
+              dropIpv6TrafficInIpv6Network: fwdSettings.dropIpv6 ? '1' : '0',
+              blockUnreachableDomainsTraffic: '0',
+              pathMtuDiscovery: '0',
+              latencyBasedZenEnablement: '0',
+              mtuForZadapter: 1500,
+              TLSTimeout: 90,
+              DTLSTimeout: 90,
+              UDPTimeout: 90,
+              zenProbeInterval: 600,
+              zenProbeSampleSize: 2,
+              zenThresholdLimit: 0,
+              tunnel2FallbackType: '0'
+            }];
+            fwdActions.forwardingProfileZpaActions = [{
+              actionType: '1',
+              networkType: '2',
+              primaryTransport: fwdSettings.ztunnel2 ? '2' : '1',
+              latencyBasedServerMTEnablement: 0,
+              latencyBasedZpaServerEnablement: '0',
+              mtuForZadapter: 1500,
+              TLSTimeout: 90,
+              DTLSTimeout: 90,
+              lbsZpaProbeInterval: 600,
+              lbsZpaProbeSampleSize: 2,
+              lbsZpaThresholdLimit: 0,
+              sendTrustedNetworkResultToZpa: '0'
+            }];
+          }
+          payloads.settings.fwd = fwdActions;
+        }
+
+        if (selectedAppId) {
+          // PATCH payload — only send non-empty/non-default allowlisted fields
+          const patch = {};
+          // Toggle fields — send if true
+          const toggleFields = ['disableParallelIpv4AndIPv6','useDefaultAdapterForDNS','updateDnsSearchOrder',
+            'disableDNSRouteExclusion','enforceSplitDNS','bypassDNSTrafficUsingUDPProxy',
+            'truncateLargeUDPDNSResponse','prioritizeDnsExclusions'];
+          for (const f of toggleFields) {
+            if (appSettings[f]) patch[f] = '1';
+          }
+          // String fields — send if non-empty
+          const strFields = ['packetTunnelExcludeList','packetTunnelExcludeListForIPv6',
+            'packetTunnelIncludeList','packetTunnelIncludeListForIPv6',
+            'vpnGateways','sourcePortBasedBypasses',
+            'packetTunnelDnsExcludeList','packetTunnelDnsIncludeList',
+            'dnsPriorityOrdering','dnsPriorityOrderingForTrustedDnsCriteria','customDNS',
+            'appServiceIds','bypassAppIds','bypassCustomAppIds',
+            'logoutpassword','uninstallpassword','disablepassword','exitPassword',
+            'zdxDisablePassword','zdDisablePassword','zpaDisablePassword',
+            'zdpDisablePassword','zccRevertPassword','zccFailCloseSettingsExitUninstallPassword'];
+          for (const f of strFields) {
+            if (appSettings[f]) patch[f] = appSettings[f];
+          }
+          payloads.settings.app = patch;
+        }
+
+        return payloads;
+      };
+
+      const handleApply = async () => {
+        setLoading(true); setError(null);
+        try {
+          const payloads = buildPayloads();
+          const result = await api.call('POST', '/zcc/apply', payloads);
+          setApplyResult(result);
+          setWizStep('apply');
+        } catch (e) { setError(e.message); }
+        setLoading(false);
+      };
+
+      // === SELECT STEP: pick which profiles to edit ===
+      if (wizStep === 'select') {
+        if (loading || !profiles) {
+          return (<div className="card"><div className="card-header"><h2>📱 Mobile Admin Portal</h2><p>Loading profiles from ZCC...</p></div><div style={{textAlign:'center',padding:'2rem'}}><span className="spinner"></span></div></div>);
+        }
+        return (
+          <div>
+            <div className="card">
+              <div className="card-header">
+                <h2>📱 Mobile Admin Portal — Select Profiles</h2>
+                <p>Select existing profiles to apply best-practice settings. Create dummy profiles in the ZCC Admin Portal first if needed.</p>
+              </div>
+
+              <div className="explainer">
+                <strong>How this works:</strong> This tool reads your existing ZCC profiles via GET, then applies changes using PATCH (app profiles) and POST edit (forwarding profiles). It will NOT create new profiles — you must create them manually in the ZCC Mobile Admin Portal first.
+              </div>
+
+              <div className="card" style={{background:'var(--bg-input)', marginTop:'1rem'}}>
+                <h3 style={{fontSize:'14px', marginBottom:'0.75rem'}}>Forwarding Profiles ({profiles.forwardingProfiles.length})</h3>
+                {profiles.forwardingProfiles.length === 0 ? (
+                  <div style={{fontSize:'13px', color:'var(--text-muted)'}}>No forwarding profiles found. Create one in ZCC Admin Portal first.</div>
+                ) : profiles.forwardingProfiles.map(fp => (
+                  <div key={fp.id} className={`tier-card ${String(selectedFwdId) === String(fp.id) ? 'selected' : ''}`}
+                    onClick={() => setSelectedFwdId(fp.id)}
+                    style={{cursor:'pointer', marginBottom:'0.5rem', padding:'0.75rem'}}>
+                    <div style={{fontSize:'13px', fontWeight:600}}>{fp.name || '(unnamed)'}</div>
+                    <div style={{fontSize:'11px', color:'var(--text-muted)'}}>ID: {fp.id} · Active: {fp.active ? 'Yes' : 'No'} · Actions: {fp.actionCount}</div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="card" style={{background:'var(--bg-input)', marginTop:'1rem'}}>
+                <h3 style={{fontSize:'14px', marginBottom:'0.75rem'}}>App Profiles — Windows ({profiles.appProfiles.length})</h3>
+                {profiles.appProfiles.length === 0 ? (
+                  <div style={{fontSize:'13px', color:'var(--text-muted)'}}>No Windows app profiles found. Create one in ZCC Admin Portal first.</div>
+                ) : profiles.appProfiles.map(ap => (
+                  <div key={ap.id} className={`tier-card ${String(selectedAppId) === String(ap.id) ? 'selected' : ''}`}
+                    onClick={() => setSelectedAppId(ap.id)}
+                    style={{cursor:'pointer', marginBottom:'0.5rem', padding:'0.75rem'}}>
+                    <div style={{fontSize:'13px', fontWeight:600}}>{ap.name || '(unnamed)'}</div>
+                    <div style={{fontSize:'11px', color:'var(--text-muted)'}}>ID: {ap.id} · Active: {ap.active ? 'Yes' : 'No'} · FWD Profile: {ap.forwardingProfileName || 'None'}</div>
+                  </div>
+                ))}
+              </div>
+
+              {profiles.errors?.length > 0 && (
+                <div className="alert alert-danger" style={{marginTop:'1rem'}}>
+                  {profiles.errors.map((e, i) => <div key={i}>⚠ {e}</div>)}
+                </div>
+              )}
+
+              <div className="btn-group">
+                <button className="btn btn-ghost" onClick={fetchProfiles} disabled={loading}>🔄 Refresh</button>
+                <button className="btn btn-primary"
+                  onClick={() => setWizStep('configure')}
+                  disabled={!selectedFwdId && !selectedAppId}>
+                  Configure Settings →
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      }
+
+      // === CONFIGURE STEP: choose which best practices to apply ===
+      if (wizStep === 'configure') {
+        return (
+          <div>
+            <div className="card">
+              <div className="card-header">
+                <h2>📱 Configure Best Practices</h2>
+                <p>Select which settings to apply to your chosen profiles.</p>
+              </div>
+
+              {selectedFwdId && (
+                <div className="card" style={{background:'var(--bg-input)', marginTop:'1rem'}}>
+                  <h3 style={{fontSize:'14px', marginBottom:'0.75rem', color:'var(--accent-cyan)'}}>Forwarding Profile Settings (POST edit)</h3>
+                  <div className="toggle-group">
+                    {[
+                      { key: 'ztunnel2', label: 'Z-Tunnel 2.0', desc: 'Use Z-Tunnel 2.0 as primary transport (recommended)' },
+                      { key: 'transparentRedirect', label: 'Transparent Redirection', desc: 'Redirect web traffic transparently through Z-Tunnel' },
+                      { key: 'dropIpv6', label: 'Drop IPv6 Traffic', desc: 'Drop all IPv6 to prevent tunnel bypass' },
+                      { key: 'allTrafficT2', label: 'All Traffic via Z-Tunnel 2.0', desc: 'Route all proxied web traffic through Z-Tunnel 2.0' }
+                    ].map(t => (
+                      <div className="toggle-item" key={t.key}>
+                        <div>
+                          <label onClick={() => setFwdSettings(s => ({...s, [t.key]: !s[t.key]}))}>{t.label}</label>
+                          <div className="form-hint">{t.desc}</div>
+                        </div>
+                        <div className={`toggle-switch ${fwdSettings[t.key] ? 'active' : ''}`}
+                          onClick={() => setFwdSettings(s => ({...s, [t.key]: !s[t.key]}))}>
+                          <div className="toggle-knob"></div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {selectedAppId && (
+                <div className="card" style={{background:'var(--bg-input)', marginTop:'1rem'}}>
+                  <h3 style={{fontSize:'14px', marginBottom:'0.75rem', color:'var(--accent-cyan)'}}>App Profile Settings (PATCH — allowlisted fields only)</h3>
+                  <p style={{fontSize:'12px', color:'var(--text-muted)', marginBottom:'1rem'}}>Only non-empty fields will be sent. Leave fields blank to skip them. Include existing values when adding to lists.</p>
+
+                  <h4 style={{fontSize:'13px', color:'var(--accent-blue)', margin:'1rem 0 0.5rem'}}>Network & IPv6</h4>
+                  <div className="toggle-group">
+                    {[
+                      { key: 'disableParallelIpv4AndIPv6', label: 'Disable Parallel IPv4/IPv6', desc: 'Prevents IPv6 bypass when tunnel is active' },
+                      { key: 'useDefaultAdapterForDNS', label: 'Use Default Adapter for DNS', desc: 'Route DNS through the default network adapter' },
+                      { key: 'updateDnsSearchOrder', label: 'Update DNS Search Order', desc: 'Modify DNS search order for ZCC' },
+                      { key: 'disableDNSRouteExclusion', label: 'Disable DNS Route Exclusion', desc: 'Prevent DNS route exclusions' },
+                      { key: 'enforceSplitDNS', label: 'Enforce Split DNS', desc: 'Force split DNS resolution' },
+                      { key: 'bypassDNSTrafficUsingUDPProxy', label: 'Bypass DNS via UDP Proxy', desc: 'Route DNS bypass traffic through UDP proxy' },
+                      { key: 'truncateLargeUDPDNSResponse', label: 'Truncate Large UDP DNS', desc: 'Truncate oversized UDP DNS responses' },
+                      { key: 'prioritizeDnsExclusions', label: 'Prioritize DNS Exclusions', desc: 'DNS exclusions take priority over inclusions' }
+                    ].map(t => (
+                      <div className="toggle-item" key={t.key}>
+                        <div>
+                          <label onClick={() => setAppSettings(s => ({...s, [t.key]: !s[t.key]}))}>{t.label}</label>
+                          <div className="form-hint">{t.desc}</div>
+                        </div>
+                        <div className={`toggle-switch ${appSettings[t.key] ? 'active' : ''}`}
+                          onClick={() => setAppSettings(s => ({...s, [t.key]: !s[t.key]}))}>
+                          <div className="toggle-knob"></div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <h4 style={{fontSize:'13px', color:'var(--accent-blue)', margin:'1.5rem 0 0.5rem'}}>Tunnel Bypass Lists</h4>
+                  {[
+                    { key: 'packetTunnelExcludeList', label: 'IP Bypass List (IPv4)', placeholder: '10.0.0.1,192.168.1.0/24' },
+                    { key: 'packetTunnelExcludeListForIPv6', label: 'IP Bypass List (IPv6)', placeholder: 'fd00::/8' },
+                    { key: 'packetTunnelIncludeList', label: 'IP Include List (IPv4)', placeholder: '0.0.0.0/0' },
+                    { key: 'packetTunnelIncludeListForIPv6', label: 'IP Include List (IPv6)', placeholder: '' },
+                    { key: 'vpnGateways', label: 'VPN Gateways', placeholder: 'vpn.company.com' },
+                    { key: 'sourcePortBasedBypasses', label: 'Source Port Bypasses', placeholder: '5060,5061' }
+                  ].map(f => (
+                    <div className="form-group" key={f.key} style={{marginBottom:'0.75rem'}}>
+                      <label className="form-label" style={{fontSize:'12px'}}>{f.label}</label>
+                      <input type="text" value={appSettings[f.key]}
+                        onChange={e => setAppSettings(s => ({...s, [f.key]: e.target.value}))}
+                        placeholder={f.placeholder} style={{fontSize:'12px'}} />
+                    </div>
+                  ))}
+
+                  <h4 style={{fontSize:'13px', color:'var(--accent-blue)', margin:'1.5rem 0 0.5rem'}}>DNS Configuration</h4>
+                  {[
+                    { key: 'packetTunnelDnsExcludeList', label: 'DNS Domain Exclusions', placeholder: '*.internal.corp' },
+                    { key: 'packetTunnelDnsIncludeList', label: 'DNS Domain Inclusions', placeholder: '*.company.com' },
+                    { key: 'dnsPriorityOrdering', label: 'DNS Priority Ordering', placeholder: '' },
+                    { key: 'dnsPriorityOrderingForTrustedDnsCriteria', label: 'DNS Priority (Trusted Network)', placeholder: '' },
+                    { key: 'customDNS', label: 'Custom DNS Servers', placeholder: '10.0.0.53' }
+                  ].map(f => (
+                    <div className="form-group" key={f.key} style={{marginBottom:'0.75rem'}}>
+                      <label className="form-label" style={{fontSize:'12px'}}>{f.label}</label>
+                      <input type="text" value={appSettings[f.key]}
+                        onChange={e => setAppSettings(s => ({...s, [f.key]: e.target.value}))}
+                        placeholder={f.placeholder} style={{fontSize:'12px'}} />
+                    </div>
+                  ))}
+
+                  <h4 style={{fontSize:'13px', color:'var(--accent-blue)', margin:'1.5rem 0 0.5rem'}}>App & Service Bypass</h4>
+                  {[
+                    { key: 'appServiceIds', label: 'App Service IDs', placeholder: 'Comma-separated IDs' },
+                    { key: 'bypassAppIds', label: 'Bypass App IDs (pre-defined)', placeholder: 'Comma-separated IDs' },
+                    { key: 'bypassCustomAppIds', label: 'Bypass Custom App IDs', placeholder: 'Comma-separated IDs' }
+                  ].map(f => (
+                    <div className="form-group" key={f.key} style={{marginBottom:'0.75rem'}}>
+                      <label className="form-label" style={{fontSize:'12px'}}>{f.label}</label>
+                      <input type="text" value={appSettings[f.key]}
+                        onChange={e => setAppSettings(s => ({...s, [f.key]: e.target.value}))}
+                        placeholder={f.placeholder} style={{fontSize:'12px'}} />
+                    </div>
+                  ))}
+
+                  <h4 style={{fontSize:'13px', color:'var(--accent-blue)', margin:'1.5rem 0 0.5rem'}}>Passwords (leave blank to skip)</h4>
+                  {[
+                    { key: 'logoutpassword', label: 'Logout Password' },
+                    { key: 'uninstallpassword', label: 'Uninstall Password' },
+                    { key: 'disablepassword', label: 'Disable Password' },
+                    { key: 'exitPassword', label: 'Exit Password' },
+                    { key: 'zpaDisablePassword', label: 'ZPA Disable Password' },
+                    { key: 'zdxDisablePassword', label: 'ZDX Disable Password' },
+                    { key: 'zdDisablePassword', label: 'ZD Disable Password' },
+                    { key: 'zdpDisablePassword', label: 'ZDP Disable Password' },
+                    { key: 'zccRevertPassword', label: 'ZCC Revert Password' },
+                    { key: 'zccFailCloseSettingsExitUninstallPassword', label: 'Fail Close Exit/Uninstall Password' }
+                  ].map(f => (
+                    <div className="form-group" key={f.key} style={{marginBottom:'0.75rem'}}>
+                      <label className="form-label" style={{fontSize:'12px'}}>{f.label}</label>
+                      <input type="password" value={appSettings[f.key]}
+                        onChange={e => setAppSettings(s => ({...s, [f.key]: e.target.value}))}
+                        placeholder="Leave blank to skip" style={{fontSize:'12px'}} />
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <div className="btn-group">
+                <button className="btn btn-ghost" onClick={() => setWizStep('select')}>← Back</button>
+                <button className="btn btn-primary" onClick={() => setWizStep('review')}>Review Changes →</button>
+              </div>
+            </div>
+          </div>
+        );
+      }
+
+      // === REVIEW STEP ===
+      if (wizStep === 'review') {
+        const payloads = buildPayloads();
+        return (
+          <div>
+            <div className="card">
+              <div className="card-header">
+                <h2>📱 Review ZCC Changes</h2>
+                <p>Review the changes before applying.</p>
+              </div>
+
+              {payloads.forwardingProfileId && payloads.settings?.fwd && (
+                <div style={{marginBottom:'1rem'}}>
+                  <h3 style={{fontSize:'14px', color:'var(--accent-cyan)', marginBottom:'8px'}}>
+                    Forwarding Profile (POST edit) — ID: {payloads.forwardingProfileId}
+                  </h3>
+                  <div style={{fontSize:'12px', color:'var(--text-secondary)', marginBottom:'8px'}}>
+                    The full existing profile will be fetched via GET, merged with these settings, then POSTed back.
+                  </div>
+                  <pre style={{fontSize:'11px', fontFamily:'IBM Plex Mono', color:'var(--text-secondary)',
+                    background:'var(--bg-input)', padding:'12px', borderRadius:'4px', overflow:'auto', maxHeight:'250px',
+                    whiteSpace:'pre-wrap'}}>
+                    {JSON.stringify(payloads.settings.fwd, null, 2)}
+                  </pre>
+                </div>
+              )}
+
+              {payloads.appProfileId && payloads.settings?.app && Object.keys(payloads.settings.app).length > 0 && (
+                <div style={{marginBottom:'1rem'}}>
+                  <h3 style={{fontSize:'14px', color:'var(--accent-cyan)', marginBottom:'8px'}}>
+                    App Profile (PATCH) — ID: {payloads.appProfileId}
+                  </h3>
+                  <div style={{fontSize:'12px', color:'var(--text-secondary)', marginBottom:'8px'}}>
+                    Only these allowlisted fields will be sent via PATCH. Existing values are preserved.
+                  </div>
+                  <pre style={{fontSize:'11px', fontFamily:'IBM Plex Mono', color:'var(--text-secondary)',
+                    background:'var(--bg-input)', padding:'12px', borderRadius:'4px', overflow:'auto', maxHeight:'200px',
+                    whiteSpace:'pre-wrap'}}>
+                    {JSON.stringify(payloads.settings.app, null, 2)}
+                  </pre>
+                </div>
+              )}
+
+              <div className="btn-group">
+                <button className="btn btn-ghost" onClick={() => setWizStep('configure')}>← Back</button>
+                <button className="btn btn-primary" onClick={handleApply} disabled={loading}>
+                  {loading ? <><span className="spinner"></span> Applying...</> : '🚀 Apply Changes'}
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      }
+
+      // === APPLY RESULTS ===
+      if (wizStep === 'apply' && applyResult) {
+        return (
+          <div>
+            <div className="card">
+              <div className="card-header"><h2>📱 ZCC Apply Results</h2></div>
+
+              <div className="alert" style={{
+                background: applyResult.errors?.length === 0 ? 'var(--accent-green-dim)' : 'var(--accent-amber-dim)',
+                borderColor: applyResult.errors?.length === 0 ? 'var(--accent-green)' : 'var(--accent-amber)'
+              }}>
+                <strong>{applyResult.errors?.length === 0 ? '✅ All changes applied!' : '⚠ Applied with errors'}</strong>
+                <div style={{fontSize:'13px', marginTop:'8px'}}>
+                  Applied: {applyResult.summary?.applied || 0} · Errors: {applyResult.summary?.errors || 0}
+                </div>
+              </div>
+
+              {applyResult.applied?.length > 0 && (
+                <div style={{marginTop:'1rem'}}>
+                  <h3 style={{fontSize:'14px', marginBottom:'8px', color:'var(--accent-green)'}}>Applied</h3>
+                  {applyResult.applied.map((item, i) => (
+                    <div key={i} style={{fontSize:'12px', color:'var(--text-secondary)', marginBottom:'4px'}}>
+                      ✅ {item.type} {item.category}: {item.name}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {applyResult.errors?.length > 0 && (
+                <div style={{marginTop:'1rem'}}>
+                  <h3 style={{fontSize:'14px', marginBottom:'8px', color:'var(--accent-red)'}}>Errors</h3>
+                  {applyResult.errors.map((item, i) => (
+                    <div key={i} style={{fontSize:'12px', color:'var(--accent-red)', marginBottom:'4px'}}>
+                      ❌ {item.category}: {item.error}
+                    </div>
+                  ))}
+                  {applyResult.errors.some(e => e.error?.includes('401')) && (
+                    <div className="alert alert-danger" style={{marginTop:'0.75rem', fontSize:'12px'}}>
+                      <strong>401 Unauthorized — API Client Permissions</strong>
+                      <p style={{margin:'4px 0'}}>The PATCH endpoint for app profiles requires write permission. In ZIdentity → Integration → API Clients → your client → API Resources, ensure "Client Connector" has <strong>Read/Write</strong> scope (not just Read). The forwarding profile POST edit succeeded, which confirms your token is valid — only the app profile PATCH endpoint is restricted.</p>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <div className="btn-group" style={{marginTop:'1.5rem'}}>
+                <button className="btn btn-ghost" onClick={() => { setApplyResult(null); setWizStep('select'); }}>← Start Over</button>
+              </div>
+            </div>
+          </div>
+        );
+      }
+
+      return null;
+    }
+
+    // ========================
+    // Step: Bulk Delete
+    // ========================
+    function BulkDeleteStep({ setError, loading, setLoading }) {
+      const [allRules, setAllRules] = useState(null);
+      const [selected, setSelected] = useState(new Set());
+      const [filterText, setFilterText] = useState('');
+      const [deleteResult, setDeleteResult] = useState(null);
+      const [fetchLoading, setFetchLoading] = useState(false);
+      const [confirmOpen, setConfirmOpen] = useState(false);
+      const mountedRef = useRef(true);
+
+      useEffect(() => {
+        mountedRef.current = true;
+        return () => { mountedRef.current = false; };
+      }, []);
+
+      const CATEGORY_MAP = {
+        urlFiltering: { label: 'URL Filtering', category: 'url-filtering' },
+        firewall: { label: 'Cloud Firewall', category: 'firewall' },
+        ssl: { label: 'SSL Inspection', category: 'ssl' },
+        sandbox: { label: 'Sandbox', category: 'sandbox' },
+        dns: { label: 'DNS Security', category: 'dns' },
+        fileType: { label: 'File Type Control', category: 'file-type' },
+        dlp: { label: 'DLP Rules', category: 'dlp' },
+        dlpEngines: { label: 'DLP Engines (custom)', category: 'dlp-engine' },
+        dlpDictionaries: { label: 'DLP Dictionaries (custom)', category: 'dlp-dictionary' }
+      };
+
+      const fetchRules = async () => {
+        setFetchLoading(true); setDeleteResult(null);
+        setAllRules(null);
+        setSelected(new Set());
+        console.log('[BulkDelete] Starting fetch...');
+        try {
+          const data = await api.call('GET', '/state/all-rules');
+          if (!mountedRef.current) { console.log('[BulkDelete] Component unmounted during fetch, discarding'); return; }
+
+          console.log('[BulkDelete] Raw API response keys:', Object.keys(data || {}));
+          // Log each category's data type and count
+          Object.entries(data || {}).forEach(([k, v]) => {
+            console.log(`[BulkDelete]   ${k}: type=${typeof v}, isArray=${Array.isArray(v)}, length=${Array.isArray(v) ? v.length : 'N/A'}`);
+            // Log first rule to check for object-type actions
+            if (Array.isArray(v) && v.length > 0) {
+              const sample = v[0];
+              console.log(`[BulkDelete]   ${k}[0]: id=${sample.id}, name=${sample.name}, action type=${typeof sample.action}, action=${typeof sample.action === 'object' ? JSON.stringify(sample.action) : sample.action}`);
+            }
+          });
+
+          const safe = {
+            urlFiltering: Array.isArray(data?.urlFiltering) ? data.urlFiltering : [],
+            firewall: Array.isArray(data?.firewall) ? data.firewall : [],
+            ssl: Array.isArray(data?.ssl) ? data.ssl : [],
+            sandbox: Array.isArray(data?.sandbox) ? data.sandbox : [],
+            dns: Array.isArray(data?.dns) ? data.dns : [],
+            fileType: Array.isArray(data?.fileType) ? data.fileType : [],
+            dlp: Array.isArray(data?.dlp) ? data.dlp : [],
+            dlpEngines: Array.isArray(data?.dlpEngines) ? data.dlpEngines : [],
+            dlpDictionaries: Array.isArray(data?.dlpDictionaries) ? data.dlpDictionaries : []
+          };
+
+          // Count total rules for debug
+          const total = Object.values(safe).reduce((sum, arr) => sum + arr.length, 0);
+          console.log(`[BulkDelete] Normalized: ${total} total rules across ${Object.keys(safe).length} categories`);
+
+          setAllRules(safe);
+          console.log('[BulkDelete] State updated successfully');
+        } catch (e) {
+          console.error('[BulkDelete] Fetch error:', e);
+          if (mountedRef.current) setError(e.message);
+        }
+        if (mountedRef.current) setFetchLoading(false);
+      };
+
+      // No auto-fetch — user clicks Load Rules (takes ~15s due to API rate limiting)
+
+      // Client-side filter — filters the display, not the fetch
+      const matchesFilter = (name) => {
+        if (!filterText) return true;
+        return (name || '').toLowerCase().includes(filterText.toLowerCase());
+      };
+
+      const toggleRule = (key) => {
+        const next = new Set(selected);
+        if (next.has(key)) next.delete(key); else next.add(key);
+        setSelected(next);
+      };
+
+      const selectAllVisible = () => {
+        const all = new Set(selected);
+        if (!allRules) return;
+        Object.entries(CATEGORY_MAP).forEach(([field, meta]) => {
+          const rules = allRules[field];
+          if (!Array.isArray(rules)) return;
+          rules.forEach(r => {
+            if (!r.defaultRule && r.id != null && matchesFilter(r.name))
+              all.add(`${meta.category}::${r.id}::${r.name || 'unnamed'}`);
+          });
+        });
+        setSelected(all);
+      };
+
+      const handleBulkDelete = async () => {
+        setLoading(true); setError(null); setConfirmOpen(false);
+        const rules = [];
+        selected.forEach(key => {
+          const parts = key.split('::');
+          if (parts[0] === 'cloud-app') {
+            rules.push({ category: 'cloud-app', id: parseInt(parts[1]), name: parts[2], ruleType: parts[3] });
+          } else {
+            rules.push({ category: parts[0], id: parseInt(parts[1]), name: parts[2] });
+          }
+        });
+        try {
+          const result = await api.call('POST', '/bulk-delete', { rules });
+          if (!mountedRef.current) return;
+          setDeleteResult(result);
+          setSelected(new Set());
+          fetchRules(); // Refresh
+        } catch (e) { if (mountedRef.current) setError(e.message); }
+        if (mountedRef.current) setLoading(false);
+      };
+
+      // Count total non-default rules
+      const countRules = (rules) => {
+        if (!Array.isArray(rules)) return { total: 0, filtered: 0 };
+        const nonDefault = rules.filter(r => !r.defaultRule);
+        const filtered = nonDefault.filter(r => matchesFilter(r.name));
+        return { total: nonDefault.length, filtered: filtered.length };
+      };
+
+      const renderRuleTable = (rules, catKey, catMeta) => {
+        if (!Array.isArray(rules)) return null;
+        const visible = rules.filter(r => !r.defaultRule && matchesFilter(r.name));
+        const defaults = rules.filter(r => r.defaultRule);
+        if (visible.length === 0 && defaults.length === 0) return null;
+        return (
+          <div key={catKey} style={{marginBottom:'1rem'}}>
+            <div style={{fontWeight:600, fontSize:'13px', color:'var(--accent-cyan)', marginBottom:'6px'}}>
+              {catMeta.label} ({visible.length} deletable{defaults.length > 0 ? `, ${defaults.length} default` : ''})
+            </div>
+            {visible.map(r => {
+              const key = `${catMeta.category}::${r.id}::${r.name}`;
+              return (
+                <div key={key} style={{
+                  display:'flex', alignItems:'center', gap:'8px', padding:'6px 8px',
+                  background: selected.has(key) ? 'var(--accent-red-dim)' : 'var(--bg-input)',
+                  borderRadius:'4px', marginBottom:'2px', fontSize:'12px'
+                }}>
+                  <input type="checkbox" checked={selected.has(key)}
+                    onChange={() => toggleRule(key)} />
+                  <span style={{flex:1, fontFamily:'IBM Plex Mono'}}>{r.name}</span>
+                  <span style={{color:'var(--text-muted)', fontSize:'11px'}}>ID:{r.id} · {typeof r.action === 'string' ? r.action : (r.action ? JSON.stringify(r.action) : '—')}</span>
+                </div>
+              );
+            })}
+            {defaults.length > 0 && (
+              <div style={{fontSize:'11px', color:'var(--text-muted)', padding:'4px 8px', fontStyle:'italic'}}>
+                + {defaults.length} default/predefined rule(s) (cannot be deleted)
+              </div>
+            )}
+          </div>
+        );
+      };
+
+      return (
+        <div>
+          <div className="card">
+            <div className="card-header">
+              <h2>🗑️ Bulk Rule Manager</h2>
+              <p>View and delete rules across ZIA policy categories. Default and predefined rules are excluded automatically. Cloud App Control rules must be managed in the ZIA admin portal.</p>
+            </div>
+
+            {/* Initial state — no rules loaded yet */}
+            {!allRules && !fetchLoading && (
+              <div style={{textAlign:'center', padding:'2rem'}}>
+                <p style={{color:'var(--text-secondary)', marginBottom:'1rem'}}>
+                  Click below to load rules from your ZIA tenant across URL Filtering, Firewall, SSL Inspection,
+                  Sandbox, DNS Security, and File Type Control. Takes approximately 7-10 seconds due to API rate limiting.
+                </p>
+                <button className="btn btn-primary" onClick={fetchRules}>
+                  📥 Load All Rules
+                </button>
+              </div>
+            )}
+
+            {/* Loading state */}
+            {fetchLoading && (
+              <div style={{padding:'2rem', textAlign:'center'}}>
+                <span className="spinner"></span>
+                <div style={{marginTop:'8px', color:'var(--text-secondary)'}}>
+                  Loading rules from 6 policy categories...<br/>
+                  <span style={{fontSize:'12px', color:'var(--text-muted)'}}>Takes ~7-10 seconds (API rate limiting)</span>
+                </div>
+              </div>
+            )}
+
+            {allRules && (
+              <div>
+                <div style={{display:'flex', gap:'8px', alignItems:'center', marginBottom:'1rem'}}>
+                  <div className="form-group" style={{flex:1, marginBottom:0}}>
+                    <input type="text" value={filterText}
+                      onChange={e => setFilterText(e.target.value)}
+                      placeholder="Filter rules by name (e.g. ZTH, Sandbox, Block...)" />
+                  </div>
+                  <button className="btn btn-ghost btn-sm" onClick={fetchRules}>🔄 Refresh</button>
+                </div>
+
+                <div style={{display:'flex', gap:'8px', marginBottom:'1rem'}}>
+                  <button className="btn btn-ghost btn-sm" onClick={selectAllVisible}>
+                    Select All {filterText ? 'Matching' : ''}
+                  </button>
+                  <button className="btn btn-ghost btn-sm" onClick={() => setSelected(new Set())}>Deselect All</button>
+                  <div style={{flex:1}}></div>
+                  <span style={{fontSize:'13px', color:'var(--text-secondary)', alignSelf:'center'}}>
+                    {selected.size} rule(s) selected
+                  </span>
+                </div>
+
+                <div style={{maxHeight:'500px', overflowY:'auto', border:'1px solid var(--border)', borderRadius:'var(--radius)', padding:'8px'}}>
+                  {Object.entries(CATEGORY_MAP).map(([field, meta]) =>
+                    renderRuleTable(allRules[field], field, meta)
+                  )}
+                </div>
+
+                {selected.size > 0 && !confirmOpen && (
+                  <div style={{marginTop:'1rem'}}>
+                    <button className="btn" onClick={() => setConfirmOpen(true)}
+                      style={{background:'var(--accent-red)', color:'white'}}>
+                      🗑️ Delete {selected.size} Rule(s)
+                    </button>
+                  </div>
+                )}
+
+                {confirmOpen && (
+                  <div className="alert alert-danger" style={{marginTop:'1rem'}}>
+                    <strong>⚠ Confirm Bulk Delete</strong>
+                    <p style={{margin:'8px 0'}}>You are about to permanently delete <strong>{selected.size}</strong> rule(s) from your ZIA tenant and activate changes. This cannot be undone.</p>
+                    <div style={{display:'flex', gap:'8px'}}>
+                      <button className="btn btn-sm" onClick={handleBulkDelete} disabled={loading}
+                        style={{background:'var(--accent-red)', color:'white'}}>
+                        {loading ? <><span className="spinner"></span> Deleting...</> : '⚠ Yes, Delete All'}
+                      </button>
+                      <button className="btn btn-ghost btn-sm" onClick={() => setConfirmOpen(false)}>Cancel</button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {deleteResult && (
+              <div style={{marginTop:'1rem'}}>
+                <div className="alert" style={{background:'var(--bg-input)', borderColor:'var(--border)'}}>
+                  <strong>Delete Results:</strong>
+                  <div style={{fontSize:'13px', marginTop:'8px'}}>
+                    ✅ Deleted: {deleteResult.summary?.deleted || 0} ·
+                    ❌ Errors: {deleteResult.summary?.errors || 0} ·
+                    ⏭ Skipped: {deleteResult.summary?.skipped || 0} ·
+                    {deleteResult.summary?.activated ? '✅ Activated' : '⚠ Not Activated'}
+                  </div>
+                  {deleteResult.errors?.length > 0 && (
+                    <div style={{marginTop:'8px'}}>
+                      {deleteResult.errors.map((e, i) => (
+                        <div key={i} style={{fontSize:'11px', color:'var(--accent-red)'}}>{e.name}: {e.error}</div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      );
+    }
+
+    // ========================
+    // Render
+    // ========================
+    ReactDOM.render(
+      React.createElement(ErrorBoundary, null, React.createElement(App)),
+      document.getElementById('app')
+    );
+  </script>
+</body>
+</html>
