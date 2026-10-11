@@ -1804,6 +1804,146 @@ function generateCloudAppControlRules(tier, complianceFramework, prefix = 'ZTP')
   return rules;
 }
 
+// ========================
+// ALLOW / BLOCK ACTION SETTINGS (v1.6.0)
+// ========================
+//
+// Lets the operator choose Allow or Block per policy type and per rule, so the tier's
+// defaults never silently block something important.
+//
+// actionSettings = {
+//   policy: { urlFiltering|firewallFiltering|dnsSecurity|fileTypeControl|cloudAppControl|dlp: 'DEFAULT'|'ALLOW'|'BLOCK' },
+//   rules:  { '<policyKey>:<rule name without prefix>': 'ALLOW'|'BLOCK' }   // wins over policy-level
+// }
+// 'DEFAULT' (or absent) keeps exactly what the selected tier generates, including CAUTION.
+
+// Which field holds the action for each policy type, and what Allow/Block map to.
+const ACTION_POLICY_TYPES = {
+  urlFiltering:      { label: 'URL Filtering',          field: 'action',          allow: 'ALLOW', block: 'BLOCK' },
+  firewallFiltering: { label: 'Cloud Firewall',         field: 'action',          allow: 'ALLOW', block: 'BLOCK_DROP' },
+  dnsSecurity:       { label: 'DNS Security',           field: 'action',          allow: 'ALLOW', block: 'BLOCK' },
+  fileTypeControl:   { label: 'File Type Control',      field: 'filteringAction', allow: 'ALLOW', block: 'BLOCK' },
+  cloudAppControl:   { label: 'Cloud App Control',      field: 'actions' },
+  dlp:               { label: 'Data Loss Prevention',   field: 'action',          allow: 'ALLOW', block: 'BLOCK' }
+};
+
+// Rules that keep the internet working; flipping them to Block would cut off all users.
+const LOCKED_RULE_SUFFIXES = new Set(['Allow-Web', 'Allow-NTP']);
+
+// Cloud App Control action bases that use DENY_ instead of BLOCK_ (from the
+// webApplicationRules action enum in the Automation Hub docs).
+const CAC_DENY_BASES = new Set([
+  'AI_ML_CHAT', 'AI_ML_CREATE', 'AI_ML_DELETE', 'AI_ML_DOWNLOAD', 'AI_ML_INVITE', 'AI_ML_RENAME',
+  'AI_ML_SHARE', 'AI_ML_UPLOAD', 'AI_ML_WEB_USE', 'DNS_OVER_HTTPS_USE', 'FILE_SHARE_CREATE',
+  'FILE_SHARE_DELETE', 'FILE_SHARE_DOWNLOAD', 'FILE_SHARE_EDIT', 'FILE_SHARE_FORM_SHARE',
+  'FILE_SHARE_INVITE', 'FILE_SHARE_RENAME', 'FILE_SHARE_SHARE', 'FILE_SHARE_UPLOAD', 'FILE_SHARE_VIEW',
+  'FINANCE_USE', 'HEALTH_CARE_USE', 'HOSTING_PROVIDER_CREATE', 'HOSTING_PROVIDER_DELETE',
+  'HOSTING_PROVIDER_DOWNLOAD', 'HOSTING_PROVIDER_EDIT', 'HOSTING_PROVIDER_MOVE', 'HOSTING_PROVIDER_USE',
+  'HUMAN_RESOURCES_USE', 'IT_SERVICES_USE', 'LEGAL_USE'
+]);
+
+const CAC_PREFIX_RE = /^(ALLOW|BLOCK|DENY|CAUTION|ISOLATE)_/;
+const cacBase = (a) => a.replace(CAC_PREFIX_RE, '');
+const cacToAllow = (a) => 'ALLOW_' + cacBase(a);
+const cacToBlock = (a) => (CAC_DENY_BASES.has(cacBase(a)) ? 'DENY_' : 'BLOCK_') + cacBase(a);
+const uniq = (arr) => [...new Set(arr)];
+
+const isBlockLike = (a) => typeof a === 'string' && /^(BLOCK|DENY)/.test(a);
+const isRestrictive = (a) => typeof a === 'string' && /^(BLOCK|DENY|CAUTION|ISOLATE)/.test(a);
+
+// One-word summary of a rule's action (Cloud App Control has an array).
+function summarizeAction(policyKey, rule) {
+  if (policyKey === 'cloudAppControl') {
+    const acts = rule.actions || [];
+    if (acts.some(isBlockLike)) return 'BLOCK';
+    if (acts.some(a => /^(CAUTION|ISOLATE)/.test(a))) return 'CAUTION';
+    return 'ALLOW';
+  }
+  return rule[ACTION_POLICY_TYPES[policyKey].field];
+}
+
+function applyActionSettings(policyKey, rules, actionSettings, prefix) {
+  const meta = ACTION_POLICY_TYPES[policyKey];
+  const policyChoice = actionSettings?.policy?.[policyKey];
+  const ruleChoices = actionSettings?.rules || {};
+
+  return rules.map(rule => {
+    const suffix = rule.name.startsWith(`${prefix}-`) ? rule.name.slice(prefix.length + 1) : rule.name;
+    const key = `${policyKey}:${suffix}`;
+    const locked = policyKey === 'firewallFiltering' && LOCKED_RULE_SUFFIXES.has(suffix);
+    const defaultAction = summarizeAction(policyKey, rule);
+
+    let choice = null;
+    if (!locked) {
+      if (ruleChoices[key] === 'ALLOW' || ruleChoices[key] === 'BLOCK') choice = ruleChoices[key];
+      else if (policyChoice === 'ALLOW' || policyChoice === 'BLOCK') choice = policyChoice;
+    }
+
+    const out = { ...rule, actionKey: key, actionPolicyType: policyKey, defaultAction, locked };
+
+    if (choice && policyKey === 'cloudAppControl') {
+      out.defaultActions = rule.actions;
+      out.actions = uniq((rule.actions || []).map(choice === 'ALLOW' ? cacToAllow : cacToBlock));
+    } else if (choice === 'ALLOW') {
+      out[meta.field] = meta.allow;
+    } else if (choice === 'BLOCK') {
+      // Keep the rule's own block flavour (e.g. BLOCK_DROP vs BLOCK_RESET) if it already blocks
+      out[meta.field] = isBlockLike(rule[meta.field]) ? rule[meta.field] : meta.block;
+    }
+
+    // DLP descriptions advertise the action; keep them honest
+    if (policyKey === 'dlp' && choice === 'BLOCK' && typeof out.description === 'string') {
+      out.description = out.description.replace('Action=Allow with Incident Receiver', 'Action=Block');
+    }
+
+    out.effectiveAction = summarizeAction(policyKey, out);
+    out.userChoice = choice;
+    out.actionChanged = choice !== null && JSON.stringify(policyKey === 'cloudAppControl' ? out.actions : out.effectiveAction)
+      !== JSON.stringify(policyKey === 'cloudAppControl' ? rule.actions : defaultAction);
+    out.weakened = isRestrictive(defaultAction) && !isRestrictive(out.effectiveAction);
+    if (out.weakened) out.isRisky = true;
+    return out;
+  });
+}
+
+function applyAllActionSettings(template, actionSettings) {
+  const prefix = template.metadata.prefix;
+  for (const policyKey of Object.keys(ACTION_POLICY_TYPES)) {
+    if (Array.isArray(template.policies[policyKey])) {
+      template.policies[policyKey] = applyActionSettings(policyKey, template.policies[policyKey], actionSettings, prefix);
+    }
+  }
+  template.actionChanges = Object.keys(ACTION_POLICY_TYPES).flatMap(k =>
+    (template.policies[k] || []).filter(r => r.actionChanged).map(r => ({
+      key: r.actionKey, name: r.name, policyType: k,
+      from: r.defaultAction, to: r.effectiveAction, weakened: !!r.weakened
+    })));
+  return template;
+}
+
+/**
+ * Rules per policy type with tier defaults, for the wizard's Allow / Block step.
+ */
+function getActionCatalog(config) {
+  const full = generateFullTemplate({ ...config, actionSettings: null });
+  const out = [];
+  for (const [policyKey, meta] of Object.entries(ACTION_POLICY_TYPES)) {
+    const rules = full.policies[policyKey];
+    if (!Array.isArray(rules) || rules.length === 0) continue;
+    out.push({
+      type: policyKey,
+      label: meta.label,
+      rules: rules.map(r => ({
+        key: r.actionKey, name: r.name, description: r.description,
+        defaultAction: r.defaultAction,
+        defaultActions: policyKey === 'cloudAppControl' ? r.actions : undefined,
+        locked: r.locked
+      }))
+    });
+  }
+  return out;
+}
+
 function generateFullTemplate(config) {
   const {
     tier = 'BALANCED',
@@ -1818,7 +1958,8 @@ function generateFullTemplate(config) {
     enableDnsSecurity = true,
     enableFileTypeControl = true,
     enableCloudAppControl = true,
-    enableDlp = true
+    enableDlp = true,
+    actionSettings = null
   } = config;
 
   const template = {
@@ -1828,7 +1969,8 @@ function generateFullTemplate(config) {
       complianceFramework: complianceFramework ? COMPLIANCE_FRAMEWORKS[complianceFramework] : null,
       prefix,
       generatedAt: new Date().toISOString(),
-      version: '1.5.2'
+      version: '1.6.0',
+      actionSettings: actionSettings || null
     },
     policies: {}
   };
@@ -1862,6 +2004,7 @@ function generateFullTemplate(config) {
     if (enableDlp) {
       template.policies.dlp = generateDlpRules('ZTH_EBOOK', complianceFramework, prefix);
     }
+    applyAllActionSettings(template, actionSettings);
     template.implementationChecklist = generateChecklist(template);
     return template;
   }
@@ -1899,6 +2042,7 @@ function generateFullTemplate(config) {
     template.policies.dlp = generateDlpRules(tier, complianceFramework, prefix);
   }
 
+  applyAllActionSettings(template, actionSettings);
   template.implementationChecklist = generateChecklist(template);
 
   return template;
@@ -1948,8 +2092,17 @@ function generateChecklist(template) {
   }
 
   if (template.policies.dlp) {
-    items.push({ order: order++, task: `Create ${template.policies.dlp.length} DLP policy rules (Action: Allow with Incident Receiver)`, category: 'Data Loss Prevention', status: 'pending' });
+    const dlpBlocks = template.policies.dlp.filter(r => r.action === 'BLOCK').length;
+    const dlpAllows = template.policies.dlp.length - dlpBlocks;
+    const dlpActionText = dlpBlocks === 0 ? 'Action: Allow with Incident Receiver'
+      : dlpAllows === 0 ? 'Action: Block' : `${dlpAllows} Allow, ${dlpBlocks} Block`;
+    items.push({ order: order++, task: `Create ${template.policies.dlp.length} DLP policy rules (${dlpActionText})`, category: 'Data Loss Prevention', status: 'pending' });
     items.push({ order: order++, task: 'Verify DLP engines are available on tenant (predefined engines may need Zscaler Support activation)', category: 'Data Loss Prevention', status: 'pending', manual: true });
+  }
+
+  if (template.actionChanges && template.actionChanges.length > 0) {
+    const weak = template.actionChanges.filter(c => c.weakened).length;
+    items.push({ order: order++, task: `Review ${template.actionChanges.length} Allow/Block override(s) vs tier default${weak ? ` (${weak} weaken protection)` : ''}`, category: 'Allow / Block', status: 'pending', manual: true });
   }
 
   if (template.policies.malwareProtection) {
@@ -1969,6 +2122,9 @@ function generateChecklist(template) {
 }
 
 module.exports = {
+  ACTION_POLICY_TYPES,
+  applyActionSettings,
+  getActionCatalog,
   COMPLIANCE_FRAMEWORKS,
   URL_CATEGORY_CLASSES,
   DLP_ENGINE_MAP,

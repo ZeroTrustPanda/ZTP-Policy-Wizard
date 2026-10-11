@@ -15,12 +15,14 @@ const cors = require('cors');
 const { v4: uuidv4 } = require('uuid');
 const { ZIAClient, ZIA_CLOUDS } = require('./zia-client');
 const { ZCCClient } = require('./zcc-client');
-const { generateFullTemplate, COMPLIANCE_FRAMEWORKS } = require('./templates');
-const { generateZCCTemplate } = require('./zcc-templates');
+const { generateFullTemplate, COMPLIANCE_FRAMEWORKS, getActionCatalog } = require('./templates');
+const { generateZCCTemplate, buildAppProfileBody } = require('./zcc-templates');
+const { getTemplateCatalog, getTemplate, getPlatform, BYPASS_APPS } = require('./zcc-app-profile-templates');
+const { getFwdTemplateCatalog, getFwdTemplate, buildForwardingProfileBody } = require('./zcc-fwd-profile-templates');
 const { AuditLogger } = require('./audit-logger');
 
 const app = express();
-const APP_VERSION = '1.5.2';
+const APP_VERSION = '1.7.0';
 const PORT = process.env.ZTP_PORT || 3000;
 const HOST = process.env.ZTP_HOST || '0.0.0.0';
 const SESSION_TTL_MS = 60 * 60 * 1000;   // 1 hour
@@ -244,6 +246,19 @@ app.post('/api/templates/generate', (req, res) => {
       return res.status(400).json({ error: 'Prefix must contain only letters, numbers, hyphens, and underscores' });
     }
 
+    // Validate Allow/Block action settings (v1.6.0)
+    if (config.actionSettings) {
+      const ok = v => v === 'ALLOW' || v === 'BLOCK';
+      for (const [k, v] of Object.entries(config.actionSettings.policy || {})) {
+        if (!(ok(v) || v === 'DEFAULT')) {
+          return res.status(400).json({ error: `Invalid action for policy type ${k}: ${v}` });
+        }
+      }
+      for (const [k, v] of Object.entries(config.actionSettings.rules || {})) {
+        if (!ok(v)) return res.status(400).json({ error: `Invalid action for rule ${k}: ${v}` });
+      }
+    }
+
     const template = generateFullTemplate(config);
 
     // Store in session if authenticated
@@ -254,6 +269,22 @@ app.post('/api/templates/generate', (req, res) => {
     }
 
     res.json(template);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Allow / Block step: rules per policy type with tier defaults (v1.6.0, no auth)
+app.post('/api/templates/action-catalog', (req, res) => {
+  try {
+    const config = req.body || {};
+    if (!['STRICT', 'BALANCED', 'PERMISSIVE', 'ZTH_EBOOK'].includes(config.tier)) {
+      return res.status(400).json({ error: 'Invalid tier. Must be STRICT, BALANCED, PERMISSIVE, or ZTH_EBOOK' });
+    }
+    if (config.complianceFramework && !COMPLIANCE_FRAMEWORKS[config.complianceFramework]) {
+      return res.status(400).json({ error: `Invalid compliance framework: ${config.complianceFramework}` });
+    }
+    res.json(getActionCatalog(config));
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -623,6 +654,20 @@ app.post('/api/plan/dryrun', requireAuth, async (req, res) => {
       }
     }
 
+    // Allow/Block overrides (v1.6.0): mark plan entries that differ from the tier default
+    const overrideByName = {};
+    for (const key of ['urlFiltering', 'firewallFiltering', 'dnsSecurity', 'fileTypeControl', 'cloudAppControl', 'dlp']) {
+      for (const r of template.policies?.[key] || []) overrideByName[r.name] = r;
+    }
+    for (const a of plan.actions) {
+      const r = overrideByName[a.name];
+      if (!r || r.defaultAction === undefined) continue;
+      a.defaultAction = r.defaultAction;
+      a.actionChanged = !!r.actionChanged;
+      a.weakened = !!r.weakened;
+      if (r.weakened) a.isRisky = true;
+    }
+
     // Store snapshot for rollback
     const snapshotId = uuidv4();
     let currentDlpSnapshot = [];
@@ -641,6 +686,8 @@ app.post('/api/plan/dryrun', requireAuth, async (req, res) => {
       creates: plan.actions.filter(a => a.type === 'CREATE').length,
       updates: plan.actions.filter(a => a.type === 'UPDATE').length,
       riskyActions: plan.actions.filter(a => a.isRisky).length,
+      actionOverrides: plan.actions.filter(a => a.actionChanged).length,
+      weakenedRules: plan.actions.filter(a => a.weakened).length,
       categories: [...new Set(plan.actions.map(a => a.category))]
     };
 
@@ -665,6 +712,9 @@ app.post('/api/apply', requireAuth, async (req, res) => {
 
     const { client, logger } = req.session;
     const results = { applied: [], errors: [], warnings: [] };
+    if (template.actionChanges?.length) {
+      logger.log('ACTION_OVERRIDES', { changes: template.actionChanges });
+    }
 
     // Apply URL Filtering Rules
     if (template.policies?.urlFiltering) {
@@ -1308,7 +1358,7 @@ app.post('/api/apply', requireAuth, async (req, res) => {
             state: 'ENABLED',
             rank: 7,
             protocols: ['ANY_RULE'],
-            action: 'ALLOW',
+            action: rule.action === 'BLOCK' ? 'BLOCK' : 'ALLOW', // v1.6.0: Allow/Block choice
             severity: rule.severity || 'RULE_SEVERITY_MEDIUM'
           };
 
@@ -1358,7 +1408,7 @@ app.post('/api/apply', requireAuth, async (req, res) => {
                   order: dlpOrderTracker,
                   rank: 7,
                   state: 'ENABLED',
-                  action: 'ALLOW',
+                  action: rule.action === 'BLOCK' ? 'BLOCK' : 'ALLOW',
                   protocols: ['ANY_RULE']
                 };
                 if (resolvedEngine) {
@@ -1951,6 +2001,382 @@ app.get('/api/zcc/profiles', requireAuth, async (req, res) => {
   }
 });
 
+// ========================
+// ZCC Windows App Profile — create / delete (v1.6.0, verified against live tenant)
+// ========================
+
+// Normalise list responses from listByCompany
+function zccList(resp) {
+  return Array.isArray(resp) ? resp : (resp?.list || resp?.content || resp?.policies || []);
+}
+
+// Template catalog for the Mobile Admin create wizard
+app.get('/api/zcc/templates/:platform', requireAuth, (req, res) => {
+  try { res.json(getTemplateCatalog(req.params.platform)); }
+  catch (e) { res.status(400).json({ error: e.message }); }
+});
+
+// App profiles for one platform (windows | macos), for placement previews and delete lists
+app.get('/api/zcc/app-profiles/:platform', requireAuth, async (req, res) => {
+  const { zccClient } = req.session;
+  if (!zccClient) return res.status(400).json({ error: 'ZCC client not initialized' });
+  try {
+    const plat = getPlatform(req.params.platform);
+    const list = zccList(await zccClient.getAppProfiles(plat.deviceType));
+    res.json(list.map(p => ({ id: p.id, name: p.name, active: !!Number(p.active), ruleOrder: p.ruleOrder, groupAll: p.groupAll })));
+  } catch (e) { res.status(502).json({ error: e.message }); }
+});
+
+// ========================
+// ZCC Forwarding Profile — create / delete (v1.7.0, verified against live tenant 2026-10-11)
+// ========================
+
+app.get('/api/zcc/fwd-templates', requireAuth, (req, res) => {
+  res.json(getFwdTemplateCatalog());
+});
+
+/**
+ * Plan a new forwarding profile (read-only). Check names are prefixed so they read clearly
+ * when merged into the app profile dry run.
+ */
+async function planForwardingProfile(zccClient, input, prefix = '') {
+  const { name = '', templateId = 'BEST_PRACTICE', enabledSettings = null } = input || {};
+  const checks = [];
+  const trimmed = String(name).trim();
+  const nameOk = /^[\w .()\-]{1,128}$/.test(trimmed);
+  checks.push({ name: `${prefix}Name is valid`, status: nameOk ? 'pass' : 'fail',
+    detail: nameOk ? trimmed : 'Use letters, numbers, spaces, - _ . ( ) only (max 128).' });
+  let existing = [];
+  try {
+    existing = zccList(await zccClient.getForwardingProfiles());
+    const dup = existing.find(p => String(p.name).toLowerCase() === trimmed.toLowerCase());
+    checks.push({ name: `${prefix}Name is not already used`, status: dup ? 'fail' : 'pass',
+      detail: dup ? `"${dup.name}" already exists (ID ${dup.id})` : `${existing.length} existing forwarding profiles checked` });
+  } catch (e) {
+    checks.push({ name: `${prefix}Name is not already used`, status: 'warn', detail: `Could not list forwarding profiles: ${e.message}` });
+  }
+  let template = null, applied = [], body = null;
+  try {
+    template = getFwdTemplate(templateId);
+    const built = buildForwardingProfileBody({ name: trimmed || 'placeholder', templateId, enabledSettings });
+    body = built.body; applied = built.applied;
+    checks.push({ name: `${prefix}Template`, status: 'pass', detail: `${template.name}: ${applied.length} of ${template.settings.length} settings selected` });
+  } catch (e) {
+    checks.push({ name: `${prefix}Template`, status: 'fail', detail: e.message });
+  }
+  const warnings = [];
+  if (applied.some(s => s.key === 'dropIpv6')) warnings.push('Forwarding profile drops IPv6 traffic, including on IPv6-only networks. Devices on IPv6-only networks lose access to IPv6-only destinations.');
+  const ok = !checks.some(c => c.status === 'fail');
+  return {
+    ok, checks, warnings, name: trimmed,
+    template: template ? { id: template.id, name: template.name } : null,
+    settings: applied.map(({ apply, verify, ...meta }) => meta),
+    existing: existing.map(p => ({ id: p.id, name: p.name })),
+    body, _applied: applied
+  };
+}
+
+/** Create a forwarding profile from a plan, find it in the list and verify every applied setting. */
+async function createAndVerifyForwardingProfile(zccClient, fplan) {
+  console.log(`[ZCC] Creating forwarding profile "${fplan.body.name}" from ${fplan.template.id} (${fplan.settings.length} settings)`);
+  const result = await zccClient.createForwardingProfile(fplan.body);
+  const id = result?.id;
+  if (!id) throw new Error('ZCC did not return an ID for the new forwarding profile');
+  let verification = [];
+  try {
+    const stored = zccList(await zccClient.getForwardingProfiles()).find(p => String(p.id) === String(id));
+    if (!stored) throw new Error(`Forwarding profile ${id} not found after create`);
+    verification = fplan._applied.map(s => ({ key: s.key, label: s.label, expected: s.value, ok: !!s.verify(stored) }));
+  } catch (e) {
+    verification = [{ key: 'readback', label: 'Read back from ZCC', expected: '', ok: false, error: e.message }];
+  }
+  return { id: Number(id), name: fplan.body.name, template: fplan.template, verified: verification.every(v => v.ok), verification };
+}
+
+app.post('/api/zcc/forwarding-profiles/dryrun', requireAuth, async (req, res) => {
+  const { zccClient, logger } = req.session;
+  if (!zccClient) return res.status(400).json({ error: 'ZCC client not initialized' });
+  try {
+    const plan = await planForwardingProfile(zccClient, req.body);
+    logger.log('ZCC_DRY_RUN', { category: 'Forwarding Profile', name: plan.name, template: plan.template?.id, ok: plan.ok, settings: plan.settings.map(s => s.key) });
+    const { body, _applied, ...rest } = plan;
+    res.json(rest);
+  } catch (e) { res.status(502).json({ error: e.message }); }
+});
+
+app.post('/api/zcc/forwarding-profiles', requireAuth, async (req, res) => {
+  const { zccClient, logger } = req.session;
+  if (!zccClient) return res.status(400).json({ error: 'ZCC client not initialized' });
+  try {
+    const plan = await planForwardingProfile(zccClient, req.body);
+    if (!plan.ok) return res.status(409).json({ error: 'Pre-flight checks failed: ' + plan.checks.filter(c => c.status === 'fail').map(c => `${c.name}: ${c.detail}`).join('; '), checks: plan.checks });
+    const fwd = await createAndVerifyForwardingProfile(zccClient, plan);
+    logger.log('ZCC_APPLY', { category: 'Forwarding Profile', action: 'CREATE', name: fwd.name, id: fwd.id, template: plan.template.id, settings: plan.settings.map(s => s.key), verified: fwd.verified });
+    res.json({ success: true, ...fwd });
+  } catch (e) {
+    logger.log('ZCC_APPLY', { category: 'Forwarding Profile', action: 'CREATE', error: e.message }, 'error');
+    res.status(502).json({ error: e.message, zccResponse: e.zccResponse || null });
+  }
+});
+
+// Delete a forwarding profile. Requires ?confirmName= and refuses while any app profile uses it.
+app.delete('/api/zcc/forwarding-profiles/:id', requireAuth, async (req, res) => {
+  const { zccClient, logger } = req.session;
+  if (!zccClient) return res.status(400).json({ error: 'ZCC client not initialized' });
+  try {
+    const id = String(req.params.id);
+    if (id === '0') return res.status(400).json({ error: 'The Default forwarding profile cannot be deleted.' });
+    const target = zccList(await zccClient.getForwardingProfiles()).find(p => String(p.id) === id);
+    if (!target) return res.status(404).json({ error: `Forwarding profile ${id} not found.` });
+    if (req.query.confirmName !== target.name) return res.status(400).json({ error: `Confirmation name does not match "${target.name}".` });
+    const users = [];
+    for (const dt of [3, 4]) {
+      try {
+        for (const ap of zccList(await zccClient.getAppProfiles(dt))) {
+          if (String(ap.onNetPolicy?.id ?? ap.forwardingProfileId ?? '') === id) users.push(`${ap.name} (${dt === 3 ? 'Windows' : 'macOS'})`);
+        }
+      } catch (e) { /* best effort */ }
+    }
+    if (users.length) return res.status(409).json({ error: `"${target.name}" is used by app profile(s): ${users.join(', ')}. Point them at another forwarding profile first.` });
+    await zccClient.deleteForwardingProfile(id);
+    logger.log('ZCC_APPLY', { category: 'Forwarding Profile', action: 'DELETE', id, name: target.name });
+    res.json({ success: true, id, name: target.name });
+  } catch (e) {
+    logger.log('ZCC_APPLY', { category: 'Forwarding Profile', action: 'DELETE', id: req.params.id, error: e.message }, 'error');
+    res.status(502).json({ error: e.message });
+  }
+});
+
+/**
+ * Shared planner for dry run and apply. Reads the live tenant (no writes) and returns
+ * checks, placement, the settings that will be applied, and the request body.
+ * v1.7.0: input.newForwardingProfile = { name, templateId, enabledSettings } plans a new
+ * forwarding profile that is created FIRST and linked to the app profile.
+ */
+async function planAppProfile(zccClient, platform, input) {
+  const plat = getPlatform(platform);
+  const { name = '', description = '', forwardingProfileId = 0, active = false, templateId = 'BEST_PRACTICE', enabledSettings = null, newForwardingProfile = null } = input || {};
+  const checks = [];
+  const warnings = [];
+  const trimmed = String(name).trim();
+
+  // 1. Name
+  const nameOk = /^[\w .()\-]{1,128}$/.test(trimmed);
+  checks.push({ name: 'Profile name is valid', status: nameOk ? 'pass' : 'fail',
+    detail: nameOk ? trimmed : 'Use letters, numbers, spaces, - _ . ( ) only (max 128).' });
+
+  // 2. Existing profiles: uniqueness + placement
+  const existing = zccList(await zccClient.getAppProfiles(plat.deviceType));
+  const dup = existing.find(p => String(p.name).toLowerCase() === trimmed.toLowerCase());
+  checks.push({ name: 'Name is not already used', status: dup ? 'fail' : 'pass',
+    detail: dup ? `"${dup.name}" already exists (ID ${dup.id})` : `${existing.length} existing ${plat.label} profiles checked` });
+  const nonDefault = existing.filter(p => String(p.id) !== '0' && p.name !== 'Default')
+    .sort((x, y) => (x.ruleOrder || 0) - (y.ruleOrder || 0));
+  const ruleOrder = nonDefault.length + 1;
+  const placement = [
+    ...nonDefault.map(p => ({ ruleOrder: p.ruleOrder, name: p.name, active: !!Number(p.active), isNew: false })),
+    { ruleOrder, name: trimmed || '(new profile)', active: !!active, isNew: true },
+    { ruleOrder: ruleOrder + 1, name: 'Default', active: true, isNew: false }
+  ];
+  checks.push({ name: 'Placement', status: 'pass', detail: `Rule order ${ruleOrder}, directly above Default` });
+
+  // 3. Forwarding profile: new (created first) or existing
+  let fwdName = 'Default';
+  let fwdPlan = null;
+  if (newForwardingProfile) {
+    fwdPlan = await planForwardingProfile(zccClient, newForwardingProfile, 'Forwarding profile — ');
+    fwdName = fwdPlan.name;
+    checks.unshift(...fwdPlan.checks.map(c => ({ ...c, group: 'forwarding' })));
+    warnings.push(...fwdPlan.warnings);
+    checks.push({ name: 'Create order', status: 'pass', detail: `Forwarding profile "${fwdPlan.name}" is created first, then this app profile is linked to it` });
+  } else try {
+    const fwds = zccList(await zccClient.getForwardingProfiles());
+    const f = fwds.find(x => String(x.id) === String(Number(forwardingProfileId) || 0));
+    if (f || Number(forwardingProfileId) === 0) {
+      fwdName = f ? f.name : 'Default';
+      checks.push({ name: 'Forwarding profile exists', status: 'pass', detail: `${fwdName} (ID ${Number(forwardingProfileId) || 0})` });
+    } else {
+      checks.push({ name: 'Forwarding profile exists', status: 'fail', detail: `ID ${forwardingProfileId} not found` });
+    }
+  } catch (e) {
+    checks.push({ name: 'Forwarding profile exists', status: 'warn', detail: `Could not verify: ${e.message}` });
+  }
+
+  // 4. Template + settings
+  let template, applied = [], body = null;
+  try {
+    template = getTemplate(plat.id, templateId);
+    const built = buildAppProfileBody({ platform: plat.id, name: trimmed || 'placeholder', description, ruleOrder, forwardingProfileId, active: !!active, templateId, enabledSettings });
+    body = built.body; applied = built.applied;
+    checks.push({ name: 'Template', status: 'pass', detail: `${template.name}: ${applied.length} of ${template.settings.length} settings selected` });
+  } catch (e) {
+    checks.push({ name: 'Template', status: 'fail', detail: e.message });
+  }
+
+  // 5. App bypass IDs exist in this tenant (best effort)
+  const bypass = applied.find(s => Array.isArray(s.appIds) && s.appIds.length);
+  if (bypass) {
+    try {
+      const svc = zccList(await zccClient.getWebAppServices());
+      const have = new Set(svc.map(x => String(x.id)));
+      const wanted = bypass.appIds.map(id => BYPASS_APPS.find(a => a.id === id) || { id, name: `App ${id}` });
+      const missing = wanted.filter(a => !have.has(String(a.id)));
+      checks.push({ name: 'Bypass app definitions exist in tenant', status: missing.length ? 'fail' : 'pass',
+        detail: missing.length ? `Missing: ${missing.map(m => `${m.name} (ID ${m.id})`).join(', ')}` : `${wanted.length} apps found` });
+    } catch (e) {
+      checks.push({ name: 'Bypass app definitions exist in tenant', status: 'warn', detail: `Could not verify app list: ${e.message}` });
+    }
+  }
+
+  // 6. Manual (portal-only) settings
+  const manual = applied.filter(s => s.manual);
+  if (manual.length) {
+    checks.push({ name: 'Portal-only settings', status: 'warn',
+      detail: `${manual.map(m => m.label).join(', ')}: not settable through the public API; set in the Mobile Admin portal after creation` });
+  }
+
+  // Warnings
+  const allUsers = applied.some(s => s.key === 'allUsers');
+  if (active && allUsers) {
+    const above = nonDefault.filter(p => Number(p.active)).length;
+    warnings.push(`Profile will be ENABLED for ALL USERS. It applies to every device not already matched by the ${above} enabled profile(s) above it.`);
+  } else if (active) {
+    warnings.push('Profile will be enabled, but has no users or groups assigned, so it will not match any device until you assign some.');
+  }
+  if (!active) {
+    checks.push({ name: 'Created disabled', status: 'pass', detail: 'No device is affected until you enable it' });
+  }
+
+  const ok = !checks.some(c => c.status === 'fail');
+  return {
+    ok, checks, warnings, ruleOrder, placement,
+    platform: { id: plat.id, label: plat.label, deviceType: plat.deviceType },
+    forwardingProfile: fwdPlan
+      ? { id: null, name: fwdName, isNew: true, template: fwdPlan.template, settings: fwdPlan.settings, existing: fwdPlan.existing }
+      : { id: Number(forwardingProfileId) || 0, name: fwdName, isNew: false },
+    _fwdPlan: fwdPlan,
+    template: template ? { id: template.id, name: template.name } : null,
+    settings: applied.map(({ apply, verify, ...meta }) => meta),
+    body, _applied: applied
+  };
+}
+
+// Dry run: everything except the write
+app.post('/api/zcc/app-profiles/:platform/dryrun', requireAuth, async (req, res) => {
+  const { zccClient, logger } = req.session;
+  if (!zccClient) return res.status(400).json({ error: 'ZCC client not initialized' });
+  try {
+    const plan = await planAppProfile(zccClient, req.params.platform, req.body);
+    logger.log('ZCC_DRY_RUN', { platform: plan.platform.id, name: req.body?.name, template: plan.template?.id, ok: plan.ok, settings: plan.settings.map(s => s.key) });
+    const { body, _applied, _fwdPlan, ...rest } = plan;
+    res.json({ ...rest, payloadPreview: body ? { fieldCount: Object.keys(body).length, bytes: JSON.stringify(body).length } : null,
+      fwdPayloadPreview: _fwdPlan?.body ? { fieldCount: Object.keys(_fwdPlan.body).length, bytes: JSON.stringify(_fwdPlan.body).length } : null });
+  } catch (error) {
+    res.status(502).json({ error: error.message });
+  }
+});
+
+// Create (apply). Re-runs the plan, refuses if any check fails, then verifies by reading back.
+app.post('/api/zcc/app-profiles/:platform', requireAuth, async (req, res) => {
+  const { zccClient, logger } = req.session;
+  if (!zccClient) return res.status(400).json({ error: 'ZCC client not initialized' });
+  try {
+    const plan = await planAppProfile(zccClient, req.params.platform, req.body);
+    if (!plan.ok) {
+      return res.status(409).json({ error: 'Pre-flight checks failed: ' + plan.checks.filter(c => c.status === 'fail').map(c => `${c.name}: ${c.detail}`).join('; '), checks: plan.checks });
+    }
+
+    // Step 1 (optional): create the forwarding profile first and link it
+    let fwdResult = null;
+    if (plan._fwdPlan) {
+      try {
+        fwdResult = await createAndVerifyForwardingProfile(zccClient, plan._fwdPlan);
+      } catch (e) {
+        logger.log('ZCC_APPLY', { category: 'Forwarding Profile', action: 'CREATE', name: plan._fwdPlan.name, error: e.message }, 'error');
+        return res.status(502).json({ error: `Forwarding profile "${plan._fwdPlan.name}" could not be created, so the app profile was not created either: ${e.message}`, zccResponse: e.zccResponse || null });
+      }
+      logger.log('ZCC_APPLY', { category: 'Forwarding Profile', action: 'CREATE', name: fwdResult.name, id: fwdResult.id, template: fwdResult.template.id,
+        settings: plan._fwdPlan.settings.map(s => s.key), verified: fwdResult.verified });
+      plan.body.forwardingProfileId = fwdResult.id;
+    }
+
+    // Step 2: the app profile
+    console.log(`[ZCC] Creating ${plan.platform.label} app profile "${plan.body.name}" from ${plan.template.id} (${plan.settings.length} settings, ruleOrder ${plan.ruleOrder}, active ${plan.body.active}, fwd ${plan.body.forwardingProfileId})`);
+    let result;
+    try {
+      result = await zccClient.saveAppProfile(plan.body);
+    } catch (e) {
+      // Roll back the forwarding profile we just created so a failed run leaves nothing behind
+      let rollback = null;
+      if (fwdResult) {
+        try { await zccClient.deleteForwardingProfile(fwdResult.id); rollback = `Forwarding profile "${fwdResult.name}" (ID ${fwdResult.id}) was deleted again.`; }
+        catch (re) { rollback = `Forwarding profile "${fwdResult.name}" (ID ${fwdResult.id}) was created but could not be removed: ${re.message}`; }
+        logger.log('ZCC_APPLY', { category: 'Forwarding Profile', action: 'ROLLBACK', id: fwdResult.id, detail: rollback });
+      }
+      e.message = `App profile create failed: ${e.message}${rollback ? ' ' + rollback : ''}`;
+      throw e;
+    }
+    const newId = result?.id;
+
+    // Read back and verify every applied setting
+    let stored = null, verification = [];
+    try {
+      stored = await zccClient.getApplicationProfile(newId);
+      verification = plan._applied.map(s => s.manual
+        ? { key: s.key, label: s.label, expected: s.value, ok: true, manual: true }
+        : { key: s.key, label: s.label, expected: s.value, ok: !!s.verify(stored) });
+      const storedFwd = stored?.onNetPolicy?.id ?? stored?.forwardingProfileId; // ZCC returns the linked forwarding profile as onNetPolicy
+      if (storedFwd !== undefined && storedFwd !== null) {
+        verification.unshift({ key: 'forwardingProfile', label: 'Linked forwarding profile', expected: `${plan.forwardingProfile.name} (ID ${plan.body.forwardingProfileId})`,
+          ok: String(storedFwd) === String(plan.body.forwardingProfileId) });
+      }
+    } catch (e) {
+      verification = [{ key: 'readback', label: 'Read back from ZCC', expected: '', ok: false, error: e.message }];
+    }
+    const verified = verification.every(v => v.ok);
+
+    logger.log('ZCC_APPLY', { category: 'App Profile', action: 'CREATE', platform: plan.platform.id, name: plan.body.name, id: newId, template: plan.template.id,
+      settings: plan.settings.map(s => s.key), ruleOrder: plan.ruleOrder, active: plan.body.active, verified });
+    res.json({
+      success: true, id: newId, name: plan.body.name, ruleOrder: plan.ruleOrder, active: plan.body.active === '1',
+      forwardingProfile: fwdResult ? { ...fwdResult, created: true } : { id: plan.body.forwardingProfileId, name: plan.forwardingProfile.name, created: false },
+      template: plan.template, platform: plan.platform, verified, verification,
+      manualSteps: plan._applied.filter(s => s.manual).map(s => ({ key: s.key, label: s.label, value: s.value, description: s.description })),
+      stored: stored ? { id: stored.id, name: stored.name, active: stored.active, ruleOrder: stored.ruleOrder, groupAll: stored.groupAll } : null
+    });
+  } catch (error) {
+    console.log(`[ZCC] Create app profile failed: ${error.message}`);
+    logger.log('ZCC_APPLY', { category: 'App Profile', action: 'CREATE', error: error.message }, 'error');
+    res.status(502).json({ error: error.message, zccResponse: error.zccResponse || null });
+  }
+});
+
+// Delete an app profile. Requires ?confirmName=<exact profile name> to prevent accidents.
+app.delete('/api/zcc/app-profiles/:id', requireAuth, async (req, res) => {
+  const { zccClient, logger } = req.session;
+  if (!zccClient) return res.status(400).json({ error: 'ZCC client not initialized' });
+  try {
+    const id = String(req.params.id);
+    if (id === '0') return res.status(400).json({ error: 'The Default app profile cannot be deleted.' });
+
+    const plat = getPlatform(req.query.platform || 'windows');
+    const existing = zccList(await zccClient.getAppProfiles(plat.deviceType));
+    const target = existing.find(p => String(p.id) === id);
+    if (!target) return res.status(404).json({ error: `App profile ${id} not found.` });
+    if (req.query.confirmName !== target.name) {
+      return res.status(400).json({ error: `Confirmation name does not match "${target.name}".` });
+    }
+
+    console.log(`[ZCC] Deleting app profile "${target.name}" (ID ${id})`);
+    await zccClient.deleteAppProfile(id);
+    logger.log('ZCC_APPLY', { category: 'App Profile', action: 'DELETE', name: target.name, id });
+    res.json({ success: true, id, name: target.name });
+  } catch (error) {
+    console.log(`[ZCC] Delete app profile failed: ${error.message}`);
+    res.status(502).json({ error: error.message });
+  }
+});
+
 // Apply best practices to selected profiles
 // Expects: { forwardingProfileId, appProfileId, settings: { fwd: {...}, app: {...} } }
 app.post('/api/zcc/apply', requireAuth, async (req, res) => {
@@ -2006,11 +2432,19 @@ app.post('/api/zcc/apply', requireAuth, async (req, res) => {
     // 2. Apply app profile changes via PATCH (only allowlisted fields)
     if (appProfileId && settings?.app) {
       try {
-        // Build clean PATCH payload with only non-empty allowlisted fields
-        const patchData = {};
-
-        // Always include deviceType — likely required for PATCH
-        patchData.deviceType = 3; // 3 = Windows
+        // Build PATCH payload. Verified 2026-10-09: settings must be nested where they live
+        // (policyExtension.*); policyId + deviceType are injected by zccClient.patchAppProfile.
+        const patchData = { deviceType: 3 };
+        const ext = {};
+        const EXT_FIELDS = new Set(['packetTunnelExcludeList', 'packetTunnelExcludeListForIPv6',
+          'packetTunnelIncludeList', 'packetTunnelIncludeListForIPv6', 'vpnGateways', 'sourcePortBasedBypasses',
+          'packetTunnelDnsExcludeList', 'packetTunnelDnsIncludeList',
+          'useDefaultAdapterForDNS', 'updateDnsSearchOrder', 'disableDNSRouteExclusion', 'enforceSplitDNS',
+          'bypassDNSTrafficUsingUDPProxy', 'truncateLargeUDPDNSResponse', 'prioritizeDnsExclusions',
+          'exitPassword', 'zdxDisablePassword', 'zdDisablePassword', 'zpaDisablePassword', 'zdpDisablePassword',
+          'zccRevertPassword', 'zccFailCloseSettingsExitUninstallPassword']);
+        const TOP_RENAME = { logoutpassword: 'logout_password', uninstallpassword: 'uninstall_password', disablepassword: 'disable_password' };
+        const put = (k, v) => { if (EXT_FIELDS.has(k)) ext[k] = v; else patchData[TOP_RENAME[k] || k] = v; };
 
         // Integer/boolean toggle fields — send as integers (0/1)
         const intFields = ['disableParallelIpv4AndIPv6', 'useDefaultAdapterForDNS', 'updateDnsSearchOrder',
@@ -2018,7 +2452,7 @@ app.post('/api/zcc/apply', requireAuth, async (req, res) => {
           'truncateLargeUDPDNSResponse', 'prioritizeDnsExclusions', 'groupAll'];
         for (const f of intFields) {
           if (settings.app[f] !== undefined && settings.app[f] !== '') {
-            patchData[f] = settings.app[f] === true || settings.app[f] === '1' ? 1 : 0;
+            put(f, settings.app[f] === true || settings.app[f] === '1' || settings.app[f] === 1 ? 1 : 0);
           }
         }
 
@@ -2033,35 +2467,24 @@ app.post('/api/zcc/apply', requireAuth, async (req, res) => {
           'zdxDisablePassword', 'zdDisablePassword', 'zpaDisablePassword',
           'zdpDisablePassword', 'zccRevertPassword', 'zccFailCloseSettingsExitUninstallPassword'];
         for (const f of strFields) {
-          if (settings.app[f] && settings.app[f] !== '') {
-            patchData[f] = settings.app[f];
-          }
+          if (settings.app[f] && settings.app[f] !== '') put(f, settings.app[f]);
         }
+        if (Object.keys(ext).length) patchData.policyExtension = ext;
 
         // Only deviceType means no actual changes
         if (Object.keys(patchData).length <= 1) {
           results.warnings.push('App profile: No fields to patch (all values were empty)');
         } else {
           console.log(`[ZCC] PATCHing app profile ID: ${appProfileId}`);
-          console.log(`[ZCC] PATCH payload: ${JSON.stringify(patchData)}`);
+          console.log(`[ZCC] PATCH payload: ${JSON.stringify(patchData, (k, v) => /password/i.test(k) && v ? '***' : v)}`);
 
           try {
-            const apResult = await zccClient.patchAppProfile(appProfileId, patchData);
+            await zccClient.patchAppProfile(appProfileId, patchData);
             results.applied.push({ type: 'PATCH', category: 'App Profile', name: `ID: ${appProfileId}`, id: appProfileId });
             logger.log('ZCC_APPLY', { category: 'App Profile', action: 'PATCH', id: appProfileId, fields: Object.keys(patchData) });
           } catch (e1) {
-            console.log(`[ZCC] PATCH attempt 1 failed: ${e1.message}`);
-            // Attempt 2: Try without deviceType
-            try {
-              delete patchData.deviceType;
-              console.log(`[ZCC] PATCH attempt 2 without deviceType`);
-              const apResult = await zccClient.patchAppProfile(appProfileId, patchData);
-              results.applied.push({ type: 'PATCH', category: 'App Profile', name: `ID: ${appProfileId}`, id: appProfileId });
-              logger.log('ZCC_APPLY', { category: 'App Profile', action: 'PATCH', id: appProfileId, fallback: 'no-deviceType' });
-            } catch (e2) {
-              console.log(`[ZCC] PATCH attempt 2 failed: ${e2.message}`);
-              results.errors.push({ category: 'App Profile', name: `ID: ${appProfileId}`, error: `PATCH failed: ${e2.message}` });
-            }
+            console.log(`[ZCC] PATCH failed: ${e1.message}`);
+            results.errors.push({ category: 'App Profile', name: `ID: ${appProfileId}`, error: `PATCH failed: ${e1.message}` });
           }
         }
       } catch (e) {

@@ -4,6 +4,8 @@
  * Routes through OneAPI gateway: api.zsapi.net/zcc/papi/public/v1/...
  * Uses the same Bearer token as ZIA.
  * 
+ * v1.6.0: create / full update / delete of Windows app profiles verified against a live tenant.
+ *
  * v1.5.1 Workflow:
  *   1. GET existing profiles (user creates dummy profiles manually first)
  *   2. Show checkboxes for which settings to apply
@@ -87,7 +89,22 @@ class ZCCClient {
 
   // POST edit — updates a forwarding profile (full object from GET merged with changes)
   async editForwardingProfile(profile) {
-    return this.apiCall('POST', '/zcc/papi/public/v1/webForwardingProfile/edit', profile);
+    const resp = await this.apiCall('POST', '/zcc/papi/public/v1/webForwardingProfile/edit', profile);
+    return ZCCClient.assertSuccess(resp, `Edit forwarding profile "${profile.name}"`);
+  }
+
+  // CREATE a forwarding profile (v1.7.0). Verified on ZTH 2026-10-11: the same POST /edit
+  // endpoint creates when the body carries id "-1" (what the portal sends); without it ZCC
+  // answers HTTP 400 with an empty body. Returns {success:"true", id}.
+  async createForwardingProfile(body) {
+    const resp = await this.apiCall('POST', '/zcc/papi/public/v1/webForwardingProfile/edit', { ...body, id: '-1' });
+    return ZCCClient.assertSuccess(resp, `Create forwarding profile "${body.name}"`);
+  }
+
+  // DELETE a forwarding profile (verified 2026-10-11)
+  async deleteForwardingProfile(id) {
+    const resp = await this.apiCall('DELETE', `/zcc/papi/public/v1/webForwardingProfile/${id}/delete`);
+    return ZCCClient.assertSuccess(resp, `Delete forwarding profile ${id}`);
   }
 
   // ========================
@@ -104,9 +121,54 @@ class ZCCClient {
     return this.getAppProfiles(3); // 3 = Windows
   }
 
-  // PATCH — update only allowlisted fields on an app profile by ID
+  // ZCC write endpoints answer HTTP 200 with {"success":"false"} when they reject a body.
+  // Treat that as an error so callers never report a silent failure as success.
+  static assertSuccess(resp, what) {
+    if (resp && typeof resp === 'object' && (resp.success === 'false' || resp.success === false)) {
+      const err = new Error(`${what} was rejected by ZCC (HTTP 200, success:false). The payload shape is not accepted.`);
+      err.zccResponse = resp;
+      throw err;
+    }
+    return resp;
+  }
+
+  // IP-based app bypass definitions (Teams, Zoom, M365, ...)
+  async getWebAppServices() {
+    return this.apiCall('GET', '/zcc/papi/public/v1/webAppService/listByCompany');
+  }
+
+  // GET a single app profile (newer API, richest shape)
+  async getApplicationProfile(profileId) {
+    return this.apiCall('GET', `/zcc/papi/public/v1/application-profiles/${profileId}`);
+  }
+
+  // PATCH — update allowlisted fields on an app profile by ID.
+  // Verified on ZTH 2026-10-09: body MUST include policyId + deviceType, and settings must be
+  // nested where they live (e.g. { policyExtension: { sourcePortBasedBypasses: '...' } }).
   async patchAppProfile(profileId, patchData) {
-    return this.apiCall('PATCH', `/zcc/papi/public/v1/application-profiles/${profileId}`, patchData);
+    const body = { ...patchData, policyId: Number(profileId), deviceType: patchData.deviceType || 3 };
+    const resp = await this.apiCall('PATCH', `/zcc/papi/public/v1/application-profiles/${profileId}`, body);
+    return ZCCClient.assertSuccess(resp, `PATCH app profile ${profileId}`);
+  }
+
+  // CREATE or full UPDATE (when body.id is set) via PUT /web/policy/edit.
+  // Verified on ZTH 2026-10-09: only the full portal-shaped body is accepted
+  // (see zcc-windows-profile-template.json). Minimal / SDK-shaped bodies return success:false.
+  async saveAppProfile(fullBody) {
+    const resp = await this.apiCall('PUT', '/zcc/papi/public/v1/web/policy/edit', fullBody);
+    return ZCCClient.assertSuccess(resp, fullBody.id ? `Update app profile ${fullBody.id}` : `Create app profile "${fullBody.name}"`);
+  }
+
+  // DELETE an app profile. Verified on ZTH 2026-10-09.
+  async deleteAppProfile(profileId) {
+    const resp = await this.apiCall('DELETE', `/zcc/papi/public/v1/web/policy/${profileId}/delete`);
+    return ZCCClient.assertSuccess(resp, `Delete app profile ${profileId}`);
+  }
+
+  // Enable / disable an app profile
+  async activateAppProfile(profileId, active, deviceType = 3) {
+    const resp = await this.apiCall('PUT', '/zcc/papi/public/v1/web/policy/activate', { policyId: Number(profileId), deviceType, active: active ? 1 : 0 });
+    return ZCCClient.assertSuccess(resp, `Activate app profile ${profileId}`);
   }
 
   // Legacy PUT edit (kept for fallback)
