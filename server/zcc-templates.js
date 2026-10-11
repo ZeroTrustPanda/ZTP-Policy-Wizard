@@ -187,6 +187,52 @@ function generateAppProfileTemplate(prefix = 'ZTP', wizardAnswers = {}) {
 }
 
 // ========================
+// WINDOWS APP PROFILE — CREATE BODY (v1.6.0)
+// ========================
+// The public PUT /web/policy/edit endpoint only accepts the full body the Mobile Admin
+// portal itself sends (captured from console.zscaler.com on 2026-10-09). The captured
+// body is stored verbatim in zcc-windows-profile-template.json; we only change the
+// identity fields here. Best-practice settings get layered on top in a later step.
+
+const { selectedSettings, getPlatform, getTemplate } = require('./zcc-app-profile-templates');
+const PROFILE_BODIES = {
+  windows: require('./zcc-windows-profile-template.json'),
+  macos: require('./zcc-mac-profile-template.json')
+};
+
+/**
+ * Build the full portal-shaped create body for an app profile.
+ * platform: 'windows' | 'macos'. Returns { body, applied } where applied = template settings used.
+ */
+function buildAppProfileBody({ platform = 'windows', name, description = '', ruleOrder, forwardingProfileId = 0, active = false,
+  templateId = 'PORTAL_DEFAULT', enabledSettings = null }) {
+  const plat = getPlatform(platform);
+  if (!name || !String(name).trim()) throw new Error('Profile name is required');
+  if (!Number.isInteger(ruleOrder) || ruleOrder < 1) throw new Error('ruleOrder must be a positive integer');
+  const body = JSON.parse(JSON.stringify(PROFILE_BODIES[plat.id]));
+  delete body.id;
+  body.name = String(name).trim();
+  body.description = description;
+  body.ruleOrder = ruleOrder;
+  body.ruleOrderSelectedOption = { label: String(ruleOrder), value: ruleOrder };
+  body.forwardingProfileId = Number(forwardingProfileId) || 0;
+  body.active = active ? '1' : '0';
+  body.device_type = plat.deviceType;
+
+  // Layer the chosen template's settings on top of the portal-default body
+  const tpl = getTemplate(plat.id, templateId);
+  if (tpl.baseApply) tpl.baseApply(body);
+  const applied = selectedSettings(plat.id, templateId, enabledSettings);
+  for (const s of applied) s.apply(body);
+  return { body, applied };
+}
+
+// v1.6.0 Windows alias
+function buildWindowsAppProfileBody(opts) {
+  return buildAppProfileBody({ ...opts, platform: 'windows' });
+}
+
+// ========================
 // FULL ZCC TEMPLATE
 // ========================
 
@@ -224,5 +270,7 @@ function generateZCCTemplate(config) {
 module.exports = {
   generateForwardingProfileTemplate,
   generateAppProfileTemplate,
-  generateZCCTemplate
+  generateZCCTemplate,
+  buildAppProfileBody,
+  buildWindowsAppProfileBody
 };

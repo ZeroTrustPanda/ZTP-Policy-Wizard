@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ZeroTrustPanda ZS Policy Wizard v1.5.2 - Zscaler Template Policy Configuration</title>
+  <title>ZeroTrustPanda ZS Policy Wizard v1.7.0 - Zscaler Template Policy Configuration</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
   <style>
@@ -253,6 +253,25 @@
     }
     .toggle-switch.active .toggle-knob { transform: translateX(20px); }
 
+    /* Allow / Block step (v1.6.0) */
+    .ab-group { border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 12px; background: var(--bg-input); }
+    .ab-group-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 14px; cursor: pointer; flex-wrap: wrap; }
+    .ab-group-title { font-size: 14px; font-weight: 600; }
+    .ab-group-sub { font-size: 12px; color: var(--text-muted); }
+    .ab-rows { border-top: 1px solid var(--border); }
+    .ab-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 14px; border-bottom: 1px solid var(--border); }
+    .ab-row:last-child { border-bottom: none; }
+    .ab-row-name { font-family: 'IBM Plex Mono', monospace; font-size: 12px; }
+    .ab-row-desc { font-size: 12px; color: var(--text-secondary); margin-top: 2px; }
+    .ab-seg { display: inline-flex; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; flex-shrink: 0; }
+    .ab-seg button { background: var(--bg-secondary); color: var(--text-secondary); border: none; padding: 5px 12px; font-size: 12px; cursor: pointer; font-family: inherit; }
+    .ab-seg button + button { border-left: 1px solid var(--border); }
+    .ab-seg button.on-allow { background: var(--accent-green); color: #0a0e17; font-weight: 600; }
+    .ab-seg button.on-block { background: var(--accent-red); color: #fff; font-weight: 600; }
+    .ab-seg button.on-default { background: var(--accent-blue); color: #fff; font-weight: 600; }
+    .ab-seg button:disabled { opacity: 0.4; cursor: not-allowed; }
+    .ab-warn { color: var(--accent-amber); font-size: 11px; margin-top: 2px; }
+
     /* Plan/Diff View */
     .diff-table { width: 100%; border-collapse: collapse; font-size: 13px; }
     .diff-table th {
@@ -487,7 +506,7 @@
     // ========================
     // App Version
     // ========================
-    const APP_VERSION = '1.5.2';
+    const APP_VERSION = '1.7.0';
     const BUILD_DATE = '2026-03-30';
 
     // ========================
@@ -514,6 +533,7 @@
       { id: 'tier', label: 'Security Tier', icon: '🛡️' },
       { id: 'compliance', label: 'Compliance', icon: '📋' },
       { id: 'customize', label: 'Customize', icon: '⚙️' },
+      { id: 'actions', label: 'Allow / Block', icon: '🚦' },
       { id: 'review', label: 'Review Plan', icon: '🔍' },
       { id: 'apply', label: 'Apply', icon: '🚀' },
       { id: 'audit', label: 'Audit Log', icon: '📄' }
@@ -541,7 +561,9 @@
         enableDnsSecurity: true,
         enableFileTypeControl: true,
         enableCloudAppControl: true,
-        enableDlp: true
+        enableDlp: true,
+        // v1.6.0 Allow/Block choices: policy-level ('DEFAULT'|'ALLOW'|'BLOCK') + per-rule overrides
+        actionSettings: { policy: {}, rules: {} }
       });
       const [template, setTemplate] = useState(null);
       const [plan, setPlan] = useState(null);
@@ -556,7 +578,7 @@
       const goTo = (s) => {
         setError(null);
         // Clear downstream state when going back in the wizard
-        const stepOrder = ['tier', 'compliance', 'customize', 'review', 'apply', 'audit'];
+        const stepOrder = ['tier', 'compliance', 'customize', 'actions', 'review', 'apply', 'audit'];
         const targetIdx = stepOrder.indexOf(s);
         if (targetIdx >= 0) {
           if (targetIdx < stepOrder.indexOf('review')) { setPlan(null); }
@@ -713,11 +735,14 @@
                     <h3 style={{fontSize:'15px', color:'var(--accent-cyan)', margin:'1.5rem 0 0.5rem'}}>Bulk Rule Manager</h3>
                     <p>View and delete rules across all ZIA policy categories for cleanup after testing.</p>
                     <h3 style={{fontSize:'15px', color:'var(--accent-cyan)', margin:'1.5rem 0 0.5rem'}}>Mobile Admin Portal (ZCC)</h3>
-                    <p>Configure ZCC Forwarding Profiles and Windows App Profiles. Read supported; write requires ZCC API write permissions.</p>
+                    <p>Create ZCC Forwarding Profiles and Windows / macOS App Profiles from templates. Read supported; write requires ZCC API write permissions.</p>
                     <h3 style={{fontSize:'15px', color:'var(--accent-cyan)', margin:'1.5rem 0 0.5rem'}}>Compliance</h3>
                     <p>HIPAA, HITRUST CSF, NIST 800-53, NIST 800-171, PCI-DSS, CJIS, SOX, FERPA, GDPR</p>
                     <h3 style={{fontSize:'15px', color:'var(--accent-cyan)', margin:'1.5rem 0 0.5rem'}}>Version History</h3>
                     <div style={{paddingLeft:'1rem', fontSize:'12px'}}>
+                      <div><strong>v1.7.0</strong> — Mobile Admin: forwarding profile step before the app profile. Create a new forwarding profile from the Best Practice template (your "Windows" forwarding profile, 8 settings) or Portal Default, or pick an existing one; Apply creates the forwarding profile first, links the app profile to it and verifies both (rolls the forwarding profile back if the app profile fails). Delete forwarding profiles from Mobile Admin (refused while an app profile uses them)</div>
+                      <div><strong>v1.6.1</strong> — Mobile Admin: create macOS app profiles from the Best Practice (MAC) template (17 settings, MAC forwarding profile preselected) with the same template, customize, review, dry run, apply and verify flow; Windows/macOS platform picker; macOS profiles listed for delete; Modern UI flagged as a manual portal step (the public API ignores it)</div>
+                      <div><strong>v1.6.0</strong> — Mobile Admin: create Windows app profiles from the Best Practice (PerfectPolicy) template with customize, review, dry run, apply and read-back verification; delete profiles; fixed app-profile PATCH payload. Allow / Block step: choose Allow or Block per policy type (URL, Firewall, DNS, File Type, Cloud App Control, DLP) with per-rule overrides and weakening warnings</div>
                       <div><strong>v1.5.2</strong> — DLP rules shown in Review step, wizard state resets between runs for multi-deploy sessions</div>
                       <div><strong>v1.5.1</strong> — Multi-user sessions (50 concurrent, 1hr TTL), Policy Catalog browser (no auth needed)</div>
                       <div><strong>v1.5.0</strong> — Data Loss Prevention module (dictionary-first, 14 rule defs, 9 compliance frameworks)</div>
@@ -735,10 +760,13 @@
                 onNext={() => { markComplete('compliance'); goTo('customize'); }} onBack={() => goTo('tier')} />)}
               {showZiaWizard && step === 'customize' && (<CustomizeStep config={config} setConfig={setConfig}
                 setTemplate={setTemplate} setError={setError} loading={loading} setLoading={setLoading}
-                onNext={() => { markComplete('customize'); goTo('review'); }} onBack={() => goTo('compliance')} />)}
+                onNext={() => { markComplete('customize'); goTo('actions'); }} onBack={() => goTo('compliance')} />)}
+              {showZiaWizard && step === 'actions' && (<ActionsStep config={config} setConfig={setConfig}
+                setTemplate={setTemplate} setError={setError} loading={loading} setLoading={setLoading}
+                onNext={() => { markComplete('actions'); goTo('review'); }} onBack={() => goTo('customize')} />)}
               {showZiaWizard && step === 'review' && (<ReviewStep template={template} plan={plan} setPlan={setPlan}
                 auth={auth} setError={setError} loading={loading} setLoading={setLoading}
-                onApply={() => { markComplete('review'); goTo('apply'); }} onBack={() => goTo('customize')} />)}
+                onApply={() => { markComplete('review'); goTo('apply'); }} onBack={() => goTo('actions')} />)}
               {showZiaWizard && step === 'apply' && (<ApplyStep template={template} plan={plan}
                 applyResult={applyResult} setApplyResult={setApplyResult}
                 setError={setError} loading={loading} setLoading={setLoading}
@@ -1060,7 +1088,7 @@
         { key: 'enableDnsSecurity', label: 'DNS Security', desc: 'Block malicious DNS categories and DNS tunnels' },
         { key: 'enableFileTypeControl', label: 'File Type Control', desc: 'Block risky file types (executables, scripts, archives, databases)' },
         { key: 'enableCloudAppControl', label: 'Cloud App Control', desc: 'Control SaaS apps (DoH, file sharing, webmail, AI/ML, social, IM)' },
-        { key: 'enableDlp', label: 'Data Loss Prevention', desc: 'DLP policy rules mapped to compliance engines (HIPAA, PCI, GDPR, etc.). Action=Allow with Zscaler Incident Receiver.' },
+        { key: 'enableDlp', label: 'Data Loss Prevention', desc: 'DLP policy rules mapped to compliance engines (HIPAA, PCI, GDPR, etc.). Default Action=Allow with Zscaler Incident Receiver; switch to Block on the next step.' },
         { key: 'enableMalwareProtection', label: 'Malware & Threat Protection', desc: 'Anti-virus, anti-spyware, botnet protection settings' },
         { key: 'enableAdvancedSettings', label: 'Advanced Cloud Settings', desc: 'HTTP tunnel control, domain fronting, authentication settings' }
       ];
@@ -1120,7 +1148,157 @@
 
             <div className="btn-group">
               <button className="btn btn-ghost" onClick={onBack}>← Back</button>
-              <button className="btn btn-primary" onClick={handleGenerate} disabled={loading}>
+              <button className="btn btn-primary" onClick={onNext}>Next: Allow / Block →</button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // ========================
+    // Step: Allow / Block (v1.6.0)
+    // ========================
+    const isRestrictiveAction = (a) => /(^|,\s*)(BLOCK|DENY|CAUTION|ISOLATE)/.test(a || '');
+    const isBlockAction = (a) => /(^|,\s*)(BLOCK|DENY)/.test(a || '');
+
+    function ActionsStep({ config, setConfig, setTemplate, setError, loading, setLoading, onNext, onBack }) {
+      const [catalog, setCatalog] = useState(null);
+      const [open, setOpen] = useState({});
+      const settings = config.actionSettings || { policy: {}, rules: {} };
+
+      const catalogKey = JSON.stringify([config.tier, config.complianceFramework, config.prefix,
+        config.enableUrlFiltering, config.enableFirewall, config.enableDnsSecurity,
+        config.enableFileTypeControl, config.enableCloudAppControl, config.enableDlp]);
+
+      useEffect(() => {
+        let cancelled = false;
+        setCatalog(null);
+        api.call('POST', '/templates/action-catalog', config)
+          .then(c => { if (!cancelled) setCatalog(c); })
+          .catch(e => setError(e.message));
+        return () => { cancelled = true; };
+      }, [catalogKey]);
+
+      const update = (policy, rules) => setConfig({ ...config, actionSettings: { policy, rules } });
+
+      // A policy-level choice clears that type's per-rule overrides so the two never disagree
+      const setPolicy = (type, value) => {
+        const rules = { ...settings.rules };
+        Object.keys(rules).forEach(k => { if (k.startsWith(type + ':')) delete rules[k]; });
+        update({ ...settings.policy, [type]: value }, rules);
+      };
+
+      const baseFor = (r) => r.defaultAction === 'ALLOW' ? 'ALLOW' : isBlockAction(r.defaultAction) ? 'BLOCK' : null;
+
+      const setRule = (type, rule, value) => {
+        const rules = { ...settings.rules };
+        const p = settings.policy[type];
+        const inherited = (p === 'ALLOW' || p === 'BLOCK') ? p : baseFor(rule);
+        if (value === inherited) delete rules[rule.key]; else rules[rule.key] = value;
+        update(settings.policy, rules);
+      };
+
+      const effective = (type, r) => {
+        if (r.locked) return baseFor(r);
+        if (settings.rules[r.key]) return settings.rules[r.key];
+        const p = settings.policy[type];
+        if (p === 'ALLOW' || p === 'BLOCK') return p;
+        return baseFor(r); // null = Caution/Isolate tier default
+      };
+
+      const isWeakened = (type, r) => !r.locked && isRestrictiveAction(r.defaultAction) && effective(type, r) === 'ALLOW';
+      const weakenedCount = (catalog || []).reduce((n, g) => n + g.rules.filter(r => isWeakened(g.type, r)).length, 0);
+      const overrideCount = Object.keys(settings.rules).length +
+        Object.values(settings.policy).filter(v => v === 'ALLOW' || v === 'BLOCK').length;
+
+      const resetAll = () => update({}, {});
+
+      const handleGenerate = async () => {
+        setLoading(true); setError(null);
+        try {
+          const tmpl = await api.call('POST', '/templates/generate', config);
+          setTemplate(tmpl);
+          onNext();
+        } catch (e) { setError(e.message); }
+        setLoading(false);
+      };
+
+      return (
+        <div>
+          <div className="card">
+            <div className="card-header">
+              <h2>Allow or Block</h2>
+              <p>Choose whether each policy type allows or blocks. Expand a policy type to flip individual rules.</p>
+            </div>
+
+            <div className="alert alert-info">
+              <span>ℹ <strong>Tier default</strong> keeps exactly what the {config.tier} tier creates (including Caution pages).
+              <strong> Allow all</strong> / <strong>Block all</strong> applies to every rule in that policy type; you can then change single rules.</span>
+            </div>
+
+            {weakenedCount > 0 && (
+              <div className="alert alert-warning">
+                <span>⚠ {weakenedCount} rule{weakenedCount === 1 ? '' : 's'} that the {config.tier} tier would restrict {weakenedCount === 1 ? 'is' : 'are'} set to Allow.
+                This reduces protection; it is flagged in the plan and recorded in the audit log.</span>
+              </div>
+            )}
+
+            {!catalog ? (
+              <div style={{textAlign:'center', padding:'2rem'}}><div className="spinner" style={{margin:'0 auto'}}></div></div>
+            ) : catalog.length === 0 ? (
+              <div className="alert alert-warning">None of the Allow/Block policy types are enabled. Go back to Customize.</div>
+            ) : catalog.map(g => {
+              const pol = settings.policy[g.type] || 'DEFAULT';
+              const overrides = g.rules.filter(r => settings.rules[r.key]).length;
+              const blocking = g.rules.filter(r => effective(g.type, r) === 'BLOCK').length;
+              return (
+                <div className="ab-group" key={g.type}>
+                  <div className="ab-group-header" onClick={() => setOpen({ ...open, [g.type]: !open[g.type] })}>
+                    <div>
+                      <div className="ab-group-title">{open[g.type] ? '▾' : '▸'} {g.label}</div>
+                      <div className="ab-group-sub">
+                        {g.rules.length} rule{g.rules.length === 1 ? '' : 's'} · {blocking} blocking
+                        {overrides > 0 && <> · {overrides} individually changed</>}
+                      </div>
+                    </div>
+                    <div className="ab-seg" onClick={e => e.stopPropagation()}>
+                      <button className={pol === 'DEFAULT' ? 'on-default' : ''} onClick={() => setPolicy(g.type, 'DEFAULT')}>Tier default</button>
+                      <button className={pol === 'ALLOW' ? 'on-allow' : ''} onClick={() => setPolicy(g.type, 'ALLOW')}>Allow all</button>
+                      <button className={pol === 'BLOCK' ? 'on-block' : ''} onClick={() => setPolicy(g.type, 'BLOCK')}>Block all</button>
+                    </div>
+                  </div>
+                  {open[g.type] && (
+                    <div className="ab-rows">
+                      {g.rules.map(r => {
+                        const eff = effective(g.type, r);
+                        return (
+                          <div className="ab-row" key={r.key}>
+                            <div>
+                              <div className="ab-row-name">{r.name}</div>
+                              <div className="ab-row-desc">{r.description}</div>
+                              <div className="ab-row-desc">
+                                Tier default: <strong>{r.defaultActions ? r.defaultActions.join(', ') : r.defaultAction}</strong>
+                              </div>
+                              {isWeakened(g.type, r) && <div className="ab-warn">⚠ Weaker than the {config.tier} tier default</div>}
+                              {r.locked && <div className="ab-row-desc">🔒 Required for baseline internet access; cannot be changed</div>}
+                            </div>
+                            <div className="ab-seg">
+                              <button disabled={r.locked} className={eff === 'ALLOW' ? 'on-allow' : ''} onClick={() => setRule(g.type, r, 'ALLOW')}>Allow</button>
+                              <button disabled={r.locked} className={eff === 'BLOCK' ? 'on-block' : ''} onClick={() => setRule(g.type, r, 'BLOCK')}>Block</button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+
+            <div className="btn-group">
+              <button className="btn btn-ghost" onClick={onBack}>← Back</button>
+              {overrideCount > 0 && <button className="btn btn-ghost" onClick={resetAll}>Reset to tier defaults</button>}
+              <button className="btn btn-primary" onClick={handleGenerate} disabled={loading || !catalog}>
                 {loading ? <><span className="spinner"></span> Generating...</> : 'Generate Template & Review →'}
               </button>
             </div>
@@ -1159,6 +1337,8 @@
         ...(template.policies.cloudAppControl || []).map(r => ({...r, category: 'Cloud App Control', action: (r.actions||[]).join(', ')})),
         ...(template.policies.dlp || []).map(r => ({...r, category: 'Data Loss Prevention', action: r.action || 'ALLOW'})),
       ];
+      const actionChanges = template.actionChanges || [];
+      const weakenedChanges = actionChanges.filter(c => c.weakened);
 
       return (
         <div>
@@ -1172,6 +1352,12 @@
               </p>
             </div>
 
+            {actionChanges.length > 0 && (
+              <div className={`alert ${weakenedChanges.length ? 'alert-warning' : 'alert-info'}`}>
+                <span>{weakenedChanges.length ? '⚠' : 'ℹ'} {actionChanges.length} rule{actionChanges.length === 1 ? '' : 's'} differ from the {template.metadata.tier} tier default
+                {weakenedChanges.length > 0 && <> — {weakenedChanges.length} weaken protection ({weakenedChanges.slice(0, 3).map(c => `${c.name}: ${c.from}→${c.to}`).join(', ')}{weakenedChanges.length > 3 ? ', …' : ''})</>}.</span>
+              </div>
+            )}
             <div style={{display:'flex', gap:'8px', marginBottom:'1rem'}}>
               <button className={`btn btn-sm ${tab==='policies' ? 'btn-primary' : 'btn-ghost'}`}
                 onClick={() => setTab('policies')}>Policy Rules ({allPolicies.length})</button>
@@ -1204,9 +1390,14 @@
                         <td><span className="badge badge-category">{r.category}</span></td>
                         <td style={{fontFamily:'IBM Plex Mono', fontSize:'12px'}}>{r.name}</td>
                         <td>
-                          <span className={`badge ${r.action==='BLOCK'||r.action==='BLOCK_DROP'||r.action==='BLOCK_ICMP_UNREACHABLE' ? 'badge-risk' : 'badge-create'}`}>
+                          <span className={`badge ${isBlockAction(r.action) ? 'badge-risk' : 'badge-create'}`}>
                             {r.action}
                           </span>
+                          {r.actionChanged && (
+                            <div style={{fontSize:'11px', marginTop:'4px', color: r.weakened ? 'var(--accent-amber)' : 'var(--text-muted)'}}>
+                              {r.weakened ? '⚠ ' : ''}tier default: {r.defaultActions ? r.defaultActions.join(', ') : r.defaultAction}
+                            </div>
+                          )}
                         </td>
                         <td style={{fontSize:'12px', color:'var(--text-secondary)'}}>{r.description}</td>
                       </tr>
@@ -1292,6 +1483,7 @@
                   <div>
                     <div className="alert alert-info">
                       ℹ Plan Summary: <strong>{plan.summary.creates} creates</strong>, <strong>{plan.summary.updates} updates</strong>
+                      {plan.summary.actionOverrides > 0 && <>, <strong>{plan.summary.actionOverrides} Allow/Block overrides</strong></>}
                       {plan.summary.riskyActions > 0 && <>, <span style={{color:'var(--accent-red)'}}>{plan.summary.riskyActions} risky actions</span></>}
                     </div>
                     {plan.warnings?.length > 0 && plan.warnings.map((w,i) => (
@@ -1313,6 +1505,8 @@
                             <td>
                               <span className={`badge ${a.type==='CREATE' ? 'badge-create' : 'badge-update'}`}>{a.type}</span>
                               {a.isRisky && <span className="badge badge-risk" style={{marginLeft:'4px'}}>RISK</span>}
+                              {a.weakened && <span className="badge badge-risk" style={{marginLeft:'4px'}}>WEAKENED</span>}
+                              {a.actionChanged && !a.weakened && <span className="badge badge-update" style={{marginLeft:'4px'}}>OVERRIDE</span>}
                             </td>
                             <td><span className="badge badge-category">{a.category}</span></td>
                             <td style={{fontFamily:'IBM Plex Mono', fontSize:'12px'}}>{a.name}</td>
@@ -1736,12 +1930,540 @@
     // ========================
     // Step: Mobile Admin Portal (ZCC)
     // ========================
+    const ZCC_STEPS = [
+      { id: 'platform', label: 'Platform' },
+      { id: 'forwarding', label: 'Forwarding Profile' },
+      { id: 'template', label: 'App Profile' },
+      { id: 'customize', label: 'Customize' },
+      { id: 'review', label: 'Review' },
+      { id: 'dryrun', label: 'Dry Run' },
+      { id: 'apply', label: 'Apply' }
+    ];
+
+    const ZCC_PLATFORMS = [
+      { id: 'windows', label: 'Windows', icon: '🪟', nameTag: 'Windows', reference: 'PerfectPolicy', fwdDefault: 'new' },
+      { id: 'macos', label: 'macOS', icon: '🍎', nameTag: 'macOS', reference: 'MAC', fwdDefault: 'existing' }
+    ];
+
+    // Settings toggles grouped by category (shared by the forwarding and app profile steps)
+    function ZccSettingToggles({ settings, enabled, onToggle }) {
+      const cats = [...new Set(settings.map(s => s.category))];
+      return cats.map(cat => (
+        <div key={cat} style={{marginBottom:'1rem'}}>
+          <h4 style={{fontSize:'13px', color:'var(--accent-blue)', margin:'0.75rem 0 0.5rem'}}>{cat}</h4>
+          <div className="toggle-group">
+            {settings.filter(s => s.category === cat).map(s => (
+              <div className="toggle-item" key={s.key} data-setting={s.key}>
+                <div>
+                  <label onClick={() => onToggle(s.key)}>{s.label} {s.impact === 'caution' && <span className="badge badge-risk" style={{marginLeft:'6px'}}>REVIEW</span>}{s.manual && <span className="badge badge-risk" style={{marginLeft:'6px'}}>MANUAL</span>}</label>
+                  <div className="form-hint">{s.description}</div>
+                  <div className="form-hint">Sets: <strong>{s.value}</strong> · Portal default: {s.portalDefault}</div>
+                </div>
+                <div className={`toggle-switch ${enabled.has(s.key) ? 'active' : ''}`} onClick={() => onToggle(s.key)}><div className="toggle-knob"></div></div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ));
+    }
+
+    function ZccSettingsTable({ settings }) {
+      return (
+        <div style={{overflowX:'auto'}}>
+          <table className="diff-table">
+            <thead><tr><th>Category</th><th>Setting</th><th>New value</th><th>Portal default</th><th>What it does</th></tr></thead>
+            <tbody>
+              {settings.map(s => (
+                <tr key={s.key}>
+                  <td><span className="badge badge-category">{s.category}</span></td>
+                  <td style={{fontWeight:600}}>{s.label}{s.impact === 'caution' && <span className="badge badge-risk" style={{marginLeft:'6px'}}>REVIEW</span>}{s.manual && <span className="badge badge-risk" style={{marginLeft:'6px'}}>MANUAL</span>}</td>
+                  <td style={{color:'var(--accent-green)'}}>{s.value}</td>
+                  <td style={{color:'var(--text-muted)'}}>{s.portalDefault}</td>
+                  <td style={{fontSize:'12px', color:'var(--text-secondary)'}}>{s.description}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      );
+    }
+
+    function ZccVerifyTable({ rows }) {
+      if (!rows || !rows.length) return null;
+      return (
+        <table className="diff-table">
+          <thead><tr><th></th><th>Setting</th><th>Expected</th><th>Read back</th></tr></thead>
+          <tbody>
+            {rows.map(v => (
+              <tr key={v.key}><td>{v.manual ? '✋' : v.ok ? '✅' : '❌'}</td><td>{v.label}</td><td>{v.expected}</td><td>{v.manual ? 'Set in portal' : v.ok ? 'Matches' : (v.error || 'Different')}</td></tr>
+            ))}
+          </tbody>
+        </table>
+      );
+    }
+
+    // ========================
+    // Mobile Admin: Create App Profile wizard
+    // Windows v1.6.0, macOS v1.6.1, forwarding profile first v1.7.0
+    // Platform -> Forwarding Profile -> App Profile -> Customize -> Review -> Dry Run -> Apply
+    // ========================
+    function ZccCreateWizard({ setError, config, forwardingProfiles, onExit, onCreated }) {
+      const prefix = (config && config.prefix) || 'ZTP';
+      const [step, setStep] = useState('platform');
+      const [platform, setPlatform] = useState('windows');
+      const [catalog, setCatalog] = useState(null);
+      const [templateId, setTemplateId] = useState('BEST_PRACTICE');
+      const [enabled, setEnabled] = useState(null); // Set of app profile setting keys
+      const [form, setForm] = useState({
+        name: `${prefix}-Windows-BestPractice`,
+        description: 'Created by ZTP Policy Wizard from the Best Practice template',
+        forwardingProfileId: 0,
+        active: false
+      });
+      // Forwarding profile (created first, then linked to the app profile)
+      const [fwdCatalog, setFwdCatalog] = useState(null);
+      const [fwdMode, setFwdMode] = useState('new'); // 'new' | 'existing'
+      const [fwdTemplateId, setFwdTemplateId] = useState('BEST_PRACTICE');
+      const [fwdEnabled, setFwdEnabled] = useState(null);
+      const [fwdName, setFwdName] = useState(`${prefix}-FWD-Windows-BestPractice`);
+      const [plan, setPlan] = useState(null);
+      const [busy, setBusy] = useState(false);
+      const [confirmed, setConfirmed] = useState(false);
+      const [result, setResult] = useState(null);
+
+      const plat = ZCC_PLATFORMS.find(p => p.id === platform);
+
+      // Forwarding profile the app template recommends (MAC uses the "MAC" forwarding profile), else Default
+      const recommendedFwdId = (t) => {
+        const rec = t && t.recommendedForwardingProfile;
+        if (!rec) return 0;
+        const list = forwardingProfiles || [];
+        const hit = list.find(f => String(f.id) === String(rec.id)) || list.find(f => (f.name || '').toLowerCase() === String(rec.name).toLowerCase());
+        return hit ? Number(hit.id) : 0;
+      };
+
+      useEffect(() => {
+        api.call('GET', '/zcc/fwd-templates').then(c => {
+          setFwdCatalog(c);
+          const t = c.find(x => x.id === 'BEST_PRACTICE') || c[0];
+          setFwdEnabled(new Set(t.settings.map(s => s.key)));
+        }).catch(e => setError(e.message));
+      }, []);
+
+      useEffect(() => {
+        let cancelled = false;
+        setCatalog(null); setEnabled(null); setPlan(null);
+        api.call('GET', `/zcc/templates/${platform}`).then(c => {
+          if (cancelled) return;
+          setCatalog(c);
+          const t = c.find(x => x.id === templateId) || c.find(x => x.id === 'BEST_PRACTICE') || c[0];
+          setTemplateId(t.id);
+          setEnabled(new Set(t.settings.map(s => s.key)));
+          setForm(f => ({ ...f, forwardingProfileId: recommendedFwdId(t) }));
+        }).catch(e => setError(e.message));
+        return () => { cancelled = true; };
+      }, [platform]);
+
+      // Forwarding profiles may arrive after the catalog: apply the recommendation once they do
+      useEffect(() => {
+        if (!catalog) return;
+        const t = catalog.find(x => x.id === templateId);
+        const rec = recommendedFwdId(t);
+        if (rec && !Number(form.forwardingProfileId)) setForm(f => ({ ...f, forwardingProfileId: rec }));
+      }, [forwardingProfiles, catalog]);
+
+      const pickPlatform = (id) => {
+        if (id === platform) return;
+        const from = ZCC_PLATFORMS.find(p => p.id === platform), to = ZCC_PLATFORMS.find(p => p.id === id);
+        setForm(f => ({ ...f, name: f.name.replace(`-${from.nameTag}-`, `-${to.nameTag}-`) }));
+        setFwdName(n => n.replace(`-${from.nameTag}-`, `-${to.nameTag}-`));
+        setFwdMode(to.fwdDefault);
+        setPlatform(id);
+      };
+
+      const template = catalog ? catalog.find(t => t.id === templateId) : null;
+      const chosen = template ? template.settings.filter(s => enabled && enabled.has(s.key)) : [];
+      const fwdTemplate = fwdCatalog ? fwdCatalog.find(t => t.id === fwdTemplateId) : null;
+      const fwdChosen = fwdTemplate ? fwdTemplate.settings.filter(s => fwdEnabled && fwdEnabled.has(s.key)) : [];
+      const reached = ZCC_STEPS.findIndex(s => s.id === step);
+      const isNewFwd = fwdMode === 'new';
+      const existingFwdName = (forwardingProfiles || []).find(f => String(f.id) === String(form.forwardingProfileId))?.name || 'Default';
+      const fwdLabel = isNewFwd ? fwdName : existingFwdName;
+      const fwdNameTaken = isNewFwd && (forwardingProfiles || []).some(f => String(f.name || '').toLowerCase() === fwdName.trim().toLowerCase());
+
+      const payload = () => ({
+        ...form, templateId, enabledSettings: [...(enabled || [])],
+        forwardingProfileId: isNewFwd ? 0 : form.forwardingProfileId,
+        newForwardingProfile: isNewFwd ? { name: fwdName.trim(), templateId: fwdTemplateId, enabledSettings: [...(fwdEnabled || [])] } : null
+      });
+
+      const pickTemplate = (id) => {
+        setTemplateId(id); setPlan(null);
+        const t = catalog.find(x => x.id === id);
+        setEnabled(new Set(t.settings.map(s => s.key)));
+        setForm(f => ({ ...f, forwardingProfileId: recommendedFwdId(t) || f.forwardingProfileId }));
+        if (id === 'PORTAL_DEFAULT') setForm(f => ({ ...f, name: f.name.replace(/BestPractice$/, 'Blank'), description: 'Created by ZTP Policy Wizard (portal defaults)' }));
+        else setForm(f => ({ ...f, name: f.name.replace(/Blank$/, 'BestPractice'), description: 'Created by ZTP Policy Wizard from the Best Practice template' }));
+      };
+      const pickFwdTemplate = (id) => {
+        setFwdTemplateId(id); setPlan(null);
+        const t = fwdCatalog.find(x => x.id === id);
+        setFwdEnabled(new Set(t.settings.map(s => s.key)));
+        setFwdName(n => id === 'PORTAL_DEFAULT' ? n.replace(/BestPractice$/, 'Blank') : n.replace(/Blank$/, 'BestPractice'));
+      };
+      const toggle = (key) => { setPlan(null); setEnabled(prev => { const n = new Set(prev); n.has(key) ? n.delete(key) : n.add(key); return n; }); };
+      const toggleFwd = (key) => { setPlan(null); setFwdEnabled(prev => { const n = new Set(prev); n.has(key) ? n.delete(key) : n.add(key); return n; }); };
+      const setField = (k, v) => { setPlan(null); setForm(f => ({ ...f, [k]: v })); };
+
+      const runDryRun = async () => {
+        setBusy(true); setError(null);
+        try { const p = await api.call('POST', `/zcc/app-profiles/${platform}/dryrun`, payload()); setPlan(p); setStep('dryrun'); }
+        catch (e) { setError('Dry run failed: ' + e.message); }
+        setBusy(false);
+      };
+      const runApply = async () => {
+        setBusy(true); setError(null);
+        try { const r = await api.call('POST', `/zcc/app-profiles/${platform}`, payload()); setResult(r); if (onCreated) onCreated(r); }
+        catch (e) { setError('Create failed: ' + e.message); }
+        setBusy(false);
+      };
+      const restart = () => { setStep('platform'); setPlan(null); setResult(null); setConfirmed(false); };
+
+      const statusIcon = { pass: '✅', warn: '⚠️', fail: '❌' };
+
+      const Stepper = () => (
+        <div style={{display:'flex', gap:'6px', marginBottom:'1.25rem', flexWrap:'wrap'}}>
+          {ZCC_STEPS.map((s, i) => {
+            const done = i < reached, cur = s.id === step;
+            const canGo = done && !result;
+            return (
+              <div key={s.id} onClick={() => canGo && setStep(s.id)}
+                style={{padding:'6px 12px', borderRadius:'999px', fontSize:'12px', cursor: canGo ? 'pointer' : 'default',
+                  background: cur ? 'var(--accent-blue)' : done ? 'var(--accent-green-dim)' : 'var(--bg-input)',
+                  color: cur ? '#fff' : done ? 'var(--accent-green)' : 'var(--text-muted)', border:'1px solid var(--border)'}}>
+                {done ? '✓' : `${i + 1}.`} {s.label}
+              </div>
+            );
+          })}
+        </div>
+      );
+
+      if (!catalog || !enabled || !fwdCatalog || !fwdEnabled) {
+        return (<div className="card"><div className="card-header"><h2>➕ Create {plat.label} App Profile</h2><p>Loading templates...</p></div><div style={{textAlign:'center',padding:'2rem'}}><span className="spinner"></span></div></div>);
+      }
+
+      const checksTable = (rows) => (
+        <table className="diff-table">
+          <tbody>
+            {rows.map((c, i) => (
+              <tr key={i}><td style={{width:'32px'}}>{statusIcon[c.status]}</td><td style={{fontWeight:600, width:'300px'}}>{c.name}</td><td style={{fontSize:'12px', color:'var(--text-secondary)'}}>{c.detail}</td></tr>
+            ))}
+          </tbody>
+        </table>
+      );
+
+      return (
+        <div className="card">
+          <div className="card-header">
+            <h2>➕ Create {plat.label} App Profile</h2>
+            <p>Set up the forwarding profile first, then build the {plat.label} app profile that uses it. Review exactly what each sets, dry run against your tenant, then create both.</p>
+          </div>
+          <Stepper />
+
+          {step === 'platform' && (
+            <div>
+              <div className="explainer"><strong>Why this matters:</strong> App profiles are per platform. The platform also decides the default forwarding profile choice: Windows creates a new one from your "Windows" forwarding profile, macOS uses the existing MAC forwarding profile.</div>
+              <div className="tier-grid">
+                {ZCC_PLATFORMS.map(p => (
+                  <div key={p.id} className={`tier-card ${platform === p.id ? 'selected' : ''}`} onClick={() => pickPlatform(p.id)} data-platform={p.id}>
+                    <div className="tier-icon">{p.icon}</div>
+                    <div className="tier-name">{p.label}</div>
+                    <div className="tier-desc">App profile reference: {p.reference}</div>
+                  </div>
+                ))}
+              </div>
+              <div className="btn-group">
+                <button className="btn btn-ghost" onClick={onExit}>← Mobile Admin</button>
+                <button className="btn btn-primary" onClick={() => setStep('forwarding')}>Forwarding Profile →</button>
+              </div>
+            </div>
+          )}
+
+          {step === 'forwarding' && (
+            <div>
+              <div className="explainer"><strong>Why this comes first:</strong> Every app profile points at a forwarding profile, which decides how traffic reaches ZIA and ZPA on each network type. A new forwarding profile is created first during Apply, then the app profile is created and linked to it automatically.</div>
+              <div className="tier-grid" style={{marginBottom:'1rem'}}>
+                <div className={`tier-card ${isNewFwd ? 'selected' : ''}`} onClick={() => { setFwdMode('new'); setPlan(null); }} data-fwdmode="new">
+                  <div className="tier-icon">🆕</div>
+                  <div className="tier-name">Create new forwarding profile</div>
+                  <div className="tier-desc">From the Best Practice template (your "Windows" forwarding profile) or portal defaults.</div>
+                </div>
+                <div className={`tier-card ${!isNewFwd ? 'selected' : ''}`} onClick={() => { setFwdMode('existing'); setPlan(null); }} data-fwdmode="existing">
+                  <div className="tier-icon">🔗</div>
+                  <div className="tier-name">Use existing forwarding profile</div>
+                  <div className="tier-desc">Link the app profile to a forwarding profile already in the tenant.</div>
+                </div>
+              </div>
+
+              {isNewFwd ? (
+                <div>
+                  <h3 style={{fontSize:'14px', margin:'0 0 0.5rem'}}>Forwarding profile template</h3>
+                  <div className="tier-grid">
+                    {fwdCatalog.map(t => (
+                      <div key={t.id} className={`tier-card ${fwdTemplateId === t.id ? 'selected' : ''}`} onClick={() => pickFwdTemplate(t.id)} data-fwdtemplate={t.id}>
+                        <div className="tier-icon">{t.icon}</div>
+                        <div className="tier-name">{t.name}</div>
+                        <div className="tier-desc">{t.description}</div>
+                        <div style={{fontSize:'11px', color:'var(--text-muted)', marginTop:'8px'}}>{t.settings.length} settings · Source: {t.source}</div>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Forwarding Profile Name</label>
+                    <input type="text" value={fwdName} maxLength={128} onChange={e => { setPlan(null); setFwdName(e.target.value); }} data-field="fwdName" />
+                    {fwdNameTaken && <div className="form-hint" style={{color:'var(--accent-red)'}}>A forwarding profile with this name already exists.</div>}
+                  </div>
+                  {fwdTemplate.settings.length === 0 ? (
+                    <div className="alert alert-info"><span>ℹ Portal Default has no extra settings: Tunnel with Local Proxy for ZIA, ZPA tunnel except on VPN-Trusted networks.</span></div>
+                  ) : (
+                    <div>
+                      <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', margin:'0.5rem 0'}}>
+                        <h3 style={{fontSize:'14px'}}>Forwarding settings ({fwdChosen.length}/{fwdTemplate.settings.length} selected)</h3>
+                        <div style={{display:'flex', gap:'6px'}}>
+                          <button className="btn btn-ghost btn-sm" onClick={() => { setPlan(null); setFwdEnabled(new Set(fwdTemplate.settings.map(s => s.key))); }}>Select all</button>
+                          <button className="btn btn-ghost btn-sm" onClick={() => { setPlan(null); setFwdEnabled(new Set()); }}>Clear</button>
+                        </div>
+                      </div>
+                      <ZccSettingToggles settings={fwdTemplate.settings} enabled={fwdEnabled} onToggle={toggleFwd} />
+                      <div className="form-hint">Network types: On-Trusted, VPN-Trusted, Off-Trusted and Split VPN-Trusted. Settings marked "all networks" apply to each of them.</div>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="form-group">
+                  <label className="form-label">Forwarding Profile</label>
+                  <select value={String(form.forwardingProfileId)} onChange={e => setField('forwardingProfileId', Number(e.target.value))} data-field="fwdExisting">
+                    {(forwardingProfiles || []).some(fp => String(fp.id) === '0') ? null : <option value="0">Default</option>}
+                    {(forwardingProfiles || []).map(fp => <option key={fp.id} value={String(fp.id)}>{fp.name || '(unnamed)'} (ID {fp.id})</option>)}
+                  </select>
+                  {template && template.recommendedForwardingProfile && <div className="form-hint">The {template.name} template recommends <strong>{template.recommendedForwardingProfile.name}</strong>.</div>}
+                </div>
+              )}
+              <div className="btn-group">
+                <button className="btn btn-ghost" onClick={() => setStep('platform')}>← Back</button>
+                <button className="btn btn-primary" onClick={() => setStep('template')} disabled={isNewFwd && (!fwdName.trim() || fwdNameTaken)}>App Profile →</button>
+              </div>
+            </div>
+          )}
+
+          {step === 'template' && (
+            <div>
+              <div className="explainer"><strong>Why this matters:</strong> The template decides which Client Connector settings the new app profile starts with. Best Practice copies everything enabled in the {plat.reference} reference profile; Portal Default is a blank profile. It will use forwarding profile <strong>{fwdLabel}</strong>{isNewFwd ? ' (new)' : ''}.</div>
+              <div className="tier-grid">
+                {catalog.map(t => (
+                  <div key={t.id} className={`tier-card ${templateId === t.id ? 'selected' : ''}`} onClick={() => pickTemplate(t.id)}>
+                    <div className="tier-icon">{t.icon}</div>
+                    <div className="tier-name">{t.name}</div>
+                    <div className="tier-desc">{t.description}</div>
+                    <div style={{fontSize:'11px', color:'var(--text-muted)', marginTop:'8px'}}>{t.settings.length} settings · Source: {t.source}</div>
+                  </div>
+                ))}
+              </div>
+              {template && template.settings.length > 0 && (
+                <div className="card" style={{background:'var(--bg-input)'}}>
+                  <h3 style={{fontSize:'14px', marginBottom:'0.5rem'}}>What {template.name} will do</h3>
+                  <ul style={{margin:0, paddingLeft:'1.2rem', fontSize:'13px', lineHeight:1.7}}>
+                    {template.settings.map(s => <li key={s.key}><strong>{s.label}</strong>: {s.value}{s.manual && <span className="badge badge-risk" style={{marginLeft:'6px'}}>MANUAL</span>}</li>)}
+                  </ul>
+                  {template.settings.some(s => s.manual) && <div className="form-hint" style={{marginTop:'0.5rem'}}>MANUAL = the public API does not accept this setting. The wizard reminds you to set it in the Mobile Admin portal after the profile is created.</div>}
+                </div>
+              )}
+              <div className="btn-group">
+                <button className="btn btn-ghost" onClick={() => setStep('forwarding')}>← Back</button>
+                <button className="btn btn-primary" onClick={() => setStep('customize')}>Customize →</button>
+              </div>
+            </div>
+          )}
+
+          {step === 'customize' && (
+            <div>
+              <div className="form-group">
+                <label className="form-label">App Profile Name</label>
+                <input type="text" value={form.name} maxLength={128} onChange={e => setField('name', e.target.value)} />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Description</label>
+                <input type="text" value={form.description} onChange={e => setField('description', e.target.value)} />
+              </div>
+              <div className="form-hint" style={{marginBottom:'1rem'}}>Forwarding profile: <strong>{fwdLabel}</strong>{isNewFwd ? ' (created first, then linked)' : ''}. Change it on the Forwarding Profile step.</div>
+              <div className="toggle-item" style={{marginBottom:'1rem'}}>
+                <div>
+                  <label onClick={() => setField('active', !form.active)}>Enable profile after creation</label>
+                  <div className="form-hint">Off by default. {enabled.has('allUsers') ? 'This template applies to ALL USERS, so enabling it affects real devices.' : 'With no users/groups assigned it will not match any device.'}</div>
+                </div>
+                <div className={`toggle-switch ${form.active ? 'active' : ''}`} onClick={() => setField('active', !form.active)}><div className="toggle-knob"></div></div>
+              </div>
+
+              {template.settings.length === 0 ? (
+                <div className="alert alert-info"><span>ℹ The Portal Default template has no extra settings. The profile is created exactly as the portal would create it.</span></div>
+              ) : (
+                <div>
+                  <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', margin:'0.5rem 0'}}>
+                    <h3 style={{fontSize:'14px'}}>App profile settings ({chosen.length}/{template.settings.length} selected)</h3>
+                    <div style={{display:'flex', gap:'6px'}}>
+                      <button className="btn btn-ghost btn-sm" onClick={() => { setPlan(null); setEnabled(new Set(template.settings.map(s => s.key))); }}>Select all</button>
+                      <button className="btn btn-ghost btn-sm" onClick={() => { setPlan(null); setEnabled(new Set()); }}>Clear</button>
+                    </div>
+                  </div>
+                  <ZccSettingToggles settings={template.settings} enabled={enabled} onToggle={toggle} />
+                </div>
+              )}
+              <div className="btn-group">
+                <button className="btn btn-ghost" onClick={() => setStep('template')}>← Back</button>
+                <button className="btn btn-primary" onClick={() => setStep('review')} disabled={!form.name.trim()}>Review →</button>
+              </div>
+            </div>
+          )}
+
+          {step === 'review' && (
+            <div>
+              <h3 style={{fontSize:'14px', margin:'0 0 0.5rem'}}>1. Forwarding profile {isNewFwd ? <span className="badge badge-create">NEW — CREATED FIRST</span> : <span className="badge badge-category">EXISTING</span>}</h3>
+              <table className="diff-table" style={{marginBottom:'0.75rem'}}>
+                <tbody>
+                  <tr><td style={{width:'200px', color:'var(--text-muted)'}}>Forwarding profile</td><td><strong>{fwdLabel}</strong></td></tr>
+                  {isNewFwd && <tr><td style={{color:'var(--text-muted)'}}>Template</td><td>{fwdTemplate.icon} {fwdTemplate.name}</td></tr>}
+                </tbody>
+              </table>
+              {isNewFwd && (fwdChosen.length > 0 ? <ZccSettingsTable settings={fwdChosen} /> :
+                <div className="alert alert-info"><span>ℹ No forwarding settings selected. The forwarding profile will match a portal-default profile.</span></div>)}
+              {isNewFwd && fwdTemplate.settings.length > fwdChosen.length && (
+                <div className="form-hint" style={{marginTop:'0.5rem'}}>Not applied (left at portal default): {fwdTemplate.settings.filter(s => !fwdEnabled.has(s.key)).map(s => s.label).join(', ')}</div>
+              )}
+
+              <h3 style={{fontSize:'14px', margin:'1.5rem 0 0.5rem'}}>2. App profile <span className="badge badge-create">NEW</span></h3>
+              <table className="diff-table" style={{marginBottom:'1rem'}}>
+                <tbody>
+                  <tr><td style={{width:'200px', color:'var(--text-muted)'}}>Profile</td><td><strong>{form.name}</strong></td></tr>
+                  <tr><td style={{color:'var(--text-muted)'}}>Description</td><td>{form.description || '—'}</td></tr>
+                  <tr><td style={{color:'var(--text-muted)'}}>Platform</td><td>{plat.icon} {plat.label}</td></tr>
+                  <tr><td style={{color:'var(--text-muted)'}}>Template</td><td>{template.icon} {template.name}</td></tr>
+                  <tr><td style={{color:'var(--text-muted)'}}>Forwarding profile</td><td>{fwdLabel}{isNewFwd ? ' (new, from step 1)' : ''}</td></tr>
+                  <tr><td style={{color:'var(--text-muted)'}}>State after creation</td><td>{form.active ? <span className="badge badge-risk">ENABLED</span> : <span className="badge badge-create">DISABLED</span>}</td></tr>
+                  <tr><td style={{color:'var(--text-muted)'}}>Assigned to</td><td>{enabled.has('allUsers') ? <span className="badge badge-risk">ALL USERS</span> : 'No users or groups'}</td></tr>
+                </tbody>
+              </table>
+              {chosen.length > 0 ? <ZccSettingsTable settings={chosen} /> : (
+                <div className="alert alert-info"><span>ℹ No template settings selected. The profile will match a portal-default profile.</span></div>
+              )}
+              {template.settings.length > chosen.length && (
+                <div className="form-hint" style={{marginTop:'0.5rem'}}>Not applied (left at portal default): {template.settings.filter(s => !enabled.has(s.key)).map(s => s.label).join(', ')}</div>
+              )}
+              <div className="btn-group">
+                <button className="btn btn-ghost" onClick={() => setStep('customize')}>← Back</button>
+                <button className="btn btn-primary" onClick={runDryRun} disabled={busy}>{busy ? <><span className="spinner"></span> Running...</> : 'Run Dry Run →'}</button>
+              </div>
+            </div>
+          )}
+
+          {step === 'dryrun' && plan && (
+            <div>
+              <div className={`alert ${plan.ok ? 'alert-success' : 'alert-danger'}`}>
+                <span>{plan.ok ? '✓ Dry run passed. Nothing has been changed in your tenant yet.' : '✗ Dry run found problems. Fix them before creating the profiles.'}</span>
+              </div>
+              {plan.warnings.map((w, i) => <div key={i} className="alert alert-warning"><span>⚠ {w}</span></div>)}
+              {plan.forwardingProfile?.isNew && (
+                <>
+                  <h3 style={{fontSize:'14px', margin:'1rem 0 0.5rem'}}>1. Forwarding profile "{plan.forwardingProfile.name}" (created first)</h3>
+                  {checksTable(plan.checks.filter(c => c.group === 'forwarding'))}
+                </>
+              )}
+              <h3 style={{fontSize:'14px', margin:'1rem 0 0.5rem'}}>{plan.forwardingProfile?.isNew ? '2. ' : ''}App profile "{form.name}"</h3>
+              {checksTable(plan.checks.filter(c => c.group !== 'forwarding'))}
+              <h3 style={{fontSize:'14px', margin:'1.25rem 0 0.5rem'}}>{plat.label} app profile order after create</h3>
+              <table className="diff-table">
+                <thead><tr><th>Rule</th><th>Profile</th><th>Status</th><th></th></tr></thead>
+                <tbody>
+                  {plan.placement.map((p, i) => (
+                    <tr key={i} style={p.isNew ? {background:'var(--accent-blue-dim)'} : {}}>
+                      <td>{p.ruleOrder}</td><td style={{fontWeight: p.isNew ? 700 : 400}}>{p.name}</td>
+                      <td>{p.active ? 'Enabled' : 'Disabled'}</td>
+                      <td>{p.isNew && <span className="badge badge-create">NEW</span>}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <div className="form-hint" style={{marginTop:'0.75rem'}}>
+                {plan.forwardingProfile?.isNew && <>Request 1: POST /zcc/papi/public/v1/webForwardingProfile/edit (id "-1" = create){plan.fwdPayloadPreview ? ` · ${(plan.fwdPayloadPreview.bytes / 1024).toFixed(1)} KB` : ''}<br/></>}
+                Request {plan.forwardingProfile?.isNew ? '2' : ''}: PUT /zcc/papi/public/v1/web/policy/edit · {plan.settings.length} template settings · {plan.payloadPreview ? `${plan.payloadPreview.fieldCount} top-level fields, ${(plan.payloadPreview.bytes / 1024).toFixed(1)} KB` : ''}
+              </div>
+              <div className="btn-group">
+                <button className="btn btn-ghost" onClick={() => setStep('review')}>← Back</button>
+                <button className="btn btn-ghost" onClick={runDryRun} disabled={busy}>↻ Re-run</button>
+                <button className="btn btn-success" onClick={() => { setConfirmed(false); setStep('apply'); }} disabled={!plan.ok}>Proceed to Apply →</button>
+              </div>
+            </div>
+          )}
+
+          {step === 'apply' && (
+            <div>
+              {!result ? (
+                <div>
+                  <div className="alert alert-warning">
+                    <span>⚠ <strong>Caution:</strong> {isNewFwd ? <>This first creates forwarding profile <strong>{fwdName}</strong>, then </> : 'This '}creates app profile <strong>{form.name}</strong> in your ZCC tenant at rule order {plan?.ruleOrder}, {form.active ? <strong>ENABLED</strong> : 'disabled'}{enabled.has('allUsers') ? ', assigned to all users' : ''}, using forwarding profile {fwdLabel}. If the app profile fails, the new forwarding profile is deleted again. You can delete both afterwards from Mobile Admin.</span>
+                  </div>
+                  <div className="toggle-item" style={{marginBottom:'1rem'}}>
+                    <label onClick={() => setConfirmed(!confirmed)} style={{cursor:'pointer'}}>I understand this will create {isNewFwd ? 'a forwarding profile and ' : ''}an app profile in my ZCC tenant and have reviewed the dry run.</label>
+                    <div className={`toggle-switch ${confirmed ? 'active' : ''}`} onClick={() => setConfirmed(!confirmed)}><div className="toggle-knob"></div></div>
+                  </div>
+                  <div className="btn-group">
+                    <button className="btn btn-ghost" onClick={() => setStep('dryrun')} disabled={busy}>← Back</button>
+                    <button className="btn btn-success" onClick={runApply} disabled={!confirmed || busy}>{busy ? <><span className="spinner"></span> Creating...</> : (isNewFwd ? '🚀 Create Forwarding + App Profile' : '🚀 Create App Profile')}</button>
+                  </div>
+                </div>
+              ) : (
+                <div>
+                  {result.forwardingProfile?.created && (
+                    <>
+                      <div className={`alert ${result.forwardingProfile.verified ? 'alert-success' : 'alert-warning'}`}>
+                        <span>{result.forwardingProfile.verified ? '✓' : '⚠'} 1. Created forwarding profile <strong>{result.forwardingProfile.name}</strong> (ID {result.forwardingProfile.id}). {result.forwardingProfile.verified ? 'Every setting was read back from ZCC and matches.' : 'Some settings did not read back as expected.'}</span>
+                      </div>
+                      <ZccVerifyTable rows={result.forwardingProfile.verification} />
+                    </>
+                  )}
+                  <div className={`alert ${result.verified ? 'alert-success' : 'alert-warning'}`} style={{marginTop: result.forwardingProfile?.created ? '1rem' : 0}}>
+                    <span>{result.verified ? '✓' : '⚠'} {result.forwardingProfile?.created ? '2. ' : ''}Created app profile <strong>{result.name}</strong> (ID {result.id}, rule order {result.ruleOrder}, {result.active ? 'enabled' : 'disabled'}), linked to forwarding profile {result.forwardingProfile?.name}. {result.verified ? 'Every setting was read back from ZCC and matches.' : 'Some settings did not read back as expected. See below.'}</span>
+                  </div>
+                  <ZccVerifyTable rows={result.verification} />
+                  {result.manualSteps?.length > 0 && (
+                    <div className="alert alert-warning" style={{marginTop:'1rem'}}>
+                      <span>✋ <strong>Finish in the Mobile Admin portal:</strong> open App Profiles → {plat.label} → <strong>{result.name}</strong> and set {result.manualSteps.map(m => `${m.label} = ${m.value}`).join('; ')}. The public API does not accept {result.manualSteps.length === 1 ? 'this setting' : 'these settings'}.</span>
+                    </div>
+                  )}
+                  <div className="form-hint" style={{marginTop:'0.75rem'}}>Recorded in the audit log (ZCC_DRY_RUN and ZCC_APPLY entries).</div>
+                  <div className="btn-group">
+                    <button className="btn btn-ghost" onClick={onExit}>← Mobile Admin</button>
+                    <button className="btn btn-primary" onClick={restart}>Create another</button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      );
+    }
+
     function MobileAdminStep({ setError, loading, setLoading, config }) {
+      const [mode, setMode] = useState('home'); // home | create | edit
       const [wizStep, setWizStep] = useState('select'); // select, configure, review, apply
       const [profiles, setProfiles] = useState(null);
       const [selectedFwdId, setSelectedFwdId] = useState(null);
       const [selectedAppId, setSelectedAppId] = useState(null);
       const [applyResult, setApplyResult] = useState(null);
+
+      // v1.6.0: delete Windows app profiles
+      const [deleteConfirm, setDeleteConfirm] = useState(null); // { id, name, platform }
+      const [macProfiles, setMacProfiles] = useState(null); // v1.6.1: macOS app profiles (delete only)
+      const [zccBusy, setZccBusy] = useState(false);
 
       // Best-practice setting toggles
       const [fwdSettings, setFwdSettings] = useState({
@@ -1797,6 +2519,7 @@
         try {
           const data = await api.call('GET', '/zcc/profiles');
           setProfiles(data);
+          api.call('GET', '/zcc/app-profiles/macos').then(setMacProfiles).catch(() => setMacProfiles([]));
           if (data.errors?.length > 0) {
             setError('Some profile fetches failed: ' + data.errors.join('; '));
           }
@@ -1805,6 +2528,29 @@
       };
 
       useEffect(() => { fetchProfiles(); }, []);
+
+      const handleDeleteProfile = async (ap) => {
+        setZccBusy(true); setError(null);
+        try {
+          await api.call('DELETE', `/zcc/app-profiles/${ap.id}?confirmName=${encodeURIComponent(ap.name)}&platform=${ap.platform || 'windows'}`);
+          setDeleteConfirm(null);
+          if (String(selectedAppId) === String(ap.id)) setSelectedAppId(null);
+          await fetchProfiles();
+        } catch (e) { setError('Delete failed: ' + e.message); }
+        setZccBusy(false);
+      };
+
+      // v1.7.0: delete forwarding profiles (server refuses while an app profile uses it)
+      const handleDeleteFwd = async (fp) => {
+        setZccBusy(true); setError(null);
+        try {
+          await api.call('DELETE', `/zcc/forwarding-profiles/${fp.id}?confirmName=${encodeURIComponent(fp.name)}`);
+          setDeleteConfirm(null);
+          if (String(selectedFwdId) === String(fp.id)) setSelectedFwdId(null);
+          await fetchProfiles();
+        } catch (e) { setError('Delete failed: ' + e.message); }
+        setZccBusy(false);
+      };
 
       // Build the PATCH/POST payloads from selected settings
       const buildPayloads = () => {
@@ -1897,6 +2643,38 @@
         setLoading(false);
       };
 
+      // === MODE CHOOSER ===
+      if (mode === 'home') {
+        return (
+          <div className="card">
+            <div className="card-header">
+              <h2>📱 Mobile Admin Portal</h2>
+              <p>Zscaler Client Connector app profiles and forwarding profiles via OneAPI.</p>
+            </div>
+            <div className="tier-grid">
+              <div className="tier-card" onClick={() => setMode('create')} style={{cursor:'pointer'}}>
+                <div className="tier-icon">➕</div>
+                <div className="tier-name">Create from template</div>
+                <div className="tier-desc">Forwarding profile first (from your "Windows" forwarding profile), then a Windows or macOS app profile from the Best Practice template (PerfectPolicy / MAC): customize, review, dry run, apply.</div>
+              </div>
+              <div className="tier-card" onClick={() => { setMode('edit'); setWizStep('select'); }} style={{cursor:'pointer'}}>
+                <div className="tier-icon">🛠️</div>
+                <div className="tier-name">Edit existing profiles</div>
+                <div className="tier-desc">Apply best-practice settings to existing app and forwarding profiles, or delete profiles.</div>
+              </div>
+            </div>
+          </div>
+        );
+      }
+      if (mode === 'create') {
+        return (
+          <ZccCreateWizard setError={setError} config={config}
+            forwardingProfiles={profiles ? profiles.forwardingProfiles : []}
+            onExit={() => { setMode('home'); fetchProfiles(); }}
+            onCreated={() => fetchProfiles()} />
+        );
+      }
+
       // === SELECT STEP: pick which profiles to edit ===
       if (wizStep === 'select') {
         if (loading || !profiles) {
@@ -1907,11 +2685,11 @@
             <div className="card">
               <div className="card-header">
                 <h2>📱 Mobile Admin Portal — Select Profiles</h2>
-                <p>Select existing profiles to apply best-practice settings. Create dummy profiles in the ZCC Admin Portal first if needed.</p>
+                <p>Select existing profiles to apply best-practice settings, or delete profiles.</p>
               </div>
 
               <div className="explainer">
-                <strong>How this works:</strong> This tool reads your existing ZCC profiles via GET, then applies changes using PATCH (app profiles) and POST edit (forwarding profiles). It will NOT create new profiles — you must create them manually in the ZCC Mobile Admin Portal first.
+                <strong>How this works:</strong> Pick existing profiles to apply best-practice settings (PATCH for app profiles, POST edit for forwarding profiles), or delete profiles you no longer need. To create a new profile from a template, go back and choose <strong>Create from template</strong>.
               </div>
 
               <div className="card" style={{background:'var(--bg-input)', marginTop:'1rem'}}>
@@ -1921,9 +2699,26 @@
                 ) : profiles.forwardingProfiles.map(fp => (
                   <div key={fp.id} className={`tier-card ${String(selectedFwdId) === String(fp.id) ? 'selected' : ''}`}
                     onClick={() => setSelectedFwdId(fp.id)}
-                    style={{cursor:'pointer', marginBottom:'0.5rem', padding:'0.75rem'}}>
-                    <div style={{fontSize:'13px', fontWeight:600}}>{fp.name || '(unnamed)'}</div>
-                    <div style={{fontSize:'11px', color:'var(--text-muted)'}}>ID: {fp.id} · Active: {fp.active ? 'Yes' : 'No'} · Actions: {fp.actionCount}</div>
+                    style={{cursor:'pointer', marginBottom:'0.5rem', padding:'0.75rem', display:'flex', justifyContent:'space-between', alignItems:'center', gap:'12px'}}>
+                    <div>
+                      <div style={{fontSize:'13px', fontWeight:600}}>{fp.name || '(unnamed)'}</div>
+                      <div style={{fontSize:'11px', color:'var(--text-muted)'}}>ID: {fp.id} · Active: {fp.active ? 'Yes' : 'No'} · Actions: {fp.actionCount}</div>
+                    </div>
+                    {String(fp.id) !== '0' && (
+                      <div onClick={e => e.stopPropagation()} style={{display:'flex', gap:'6px', alignItems:'center', flexShrink:0}}>
+                        {deleteConfirm && deleteConfirm.kind === 'fwd' && String(deleteConfirm.id) === String(fp.id) ? (
+                          <>
+                            <span style={{fontSize:'11px', color:'var(--accent-amber)'}}>Delete "{fp.name}"?</span>
+                            <button className="btn btn-sm" style={{background:'var(--accent-red)', color:'#fff'}} disabled={zccBusy}
+                              onClick={() => handleDeleteFwd(fp)}>Yes, delete</button>
+                            <button className="btn btn-ghost btn-sm" onClick={() => setDeleteConfirm(null)}>Cancel</button>
+                          </>
+                        ) : (
+                          <button className="btn btn-ghost btn-sm" disabled={zccBusy}
+                            onClick={() => setDeleteConfirm({ kind: 'fwd', id: fp.id, name: fp.name })}>🗑 Delete</button>
+                        )}
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
@@ -1935,9 +2730,56 @@
                 ) : profiles.appProfiles.map(ap => (
                   <div key={ap.id} className={`tier-card ${String(selectedAppId) === String(ap.id) ? 'selected' : ''}`}
                     onClick={() => setSelectedAppId(ap.id)}
-                    style={{cursor:'pointer', marginBottom:'0.5rem', padding:'0.75rem'}}>
-                    <div style={{fontSize:'13px', fontWeight:600}}>{ap.name || '(unnamed)'}</div>
-                    <div style={{fontSize:'11px', color:'var(--text-muted)'}}>ID: {ap.id} · Active: {ap.active ? 'Yes' : 'No'} · FWD Profile: {ap.forwardingProfileName || 'None'}</div>
+                    style={{cursor:'pointer', marginBottom:'0.5rem', padding:'0.75rem', display:'flex', justifyContent:'space-between', alignItems:'center', gap:'12px'}}>
+                    <div>
+                      <div style={{fontSize:'13px', fontWeight:600}}>{ap.name || '(unnamed)'}</div>
+                      <div style={{fontSize:'11px', color:'var(--text-muted)'}}>ID: {ap.id} · Active: {ap.active ? 'Yes' : 'No'} · FWD Profile: {ap.forwardingProfileName || 'None'}</div>
+                    </div>
+                    {String(ap.id) !== '0' && (
+                      <div onClick={e => e.stopPropagation()} style={{display:'flex', gap:'6px', alignItems:'center', flexShrink:0}}>
+                        {deleteConfirm && deleteConfirm.kind !== 'fwd' && String(deleteConfirm.id) === String(ap.id) ? (
+                          <>
+                            <span style={{fontSize:'11px', color:'var(--accent-amber)'}}>Delete "{ap.name}"?</span>
+                            <button className="btn btn-sm" style={{background:'var(--accent-red)', color:'#fff'}} disabled={zccBusy}
+                              onClick={() => handleDeleteProfile(ap)}>Yes, delete</button>
+                            <button className="btn btn-ghost btn-sm" onClick={() => setDeleteConfirm(null)}>Cancel</button>
+                          </>
+                        ) : (
+                          <button className="btn btn-ghost btn-sm" disabled={zccBusy}
+                            onClick={() => setDeleteConfirm({ id: ap.id, name: ap.name })}>🗑 Delete</button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              <div className="card" style={{background:'var(--bg-input)', marginTop:'1rem'}}>
+                <h3 style={{fontSize:'14px', marginBottom:'0.75rem'}}>App Profiles — macOS ({macProfiles ? macProfiles.length : '…'})</h3>
+                <div className="form-hint" style={{marginBottom:'0.5rem'}}>Delete only here. Create macOS profiles with <strong>Create from template</strong>.</div>
+                {!macProfiles ? <span className="spinner"></span> : macProfiles.length === 0 ? (
+                  <div style={{fontSize:'13px', color:'var(--text-muted)'}}>No macOS app profiles found.</div>
+                ) : [...macProfiles].sort((a, b) => (Number(a.ruleOrder) || 999) - (Number(b.ruleOrder) || 999)).map(ap => (
+                  <div key={ap.id} className="tier-card" style={{marginBottom:'0.5rem', padding:'0.75rem', display:'flex', justifyContent:'space-between', alignItems:'center', gap:'12px'}}>
+                    <div>
+                      <div style={{fontSize:'13px', fontWeight:600}}>{ap.name || '(unnamed)'}</div>
+                      <div style={{fontSize:'11px', color:'var(--text-muted)'}}>ID: {ap.id} · Rule order: {ap.ruleOrder ?? '—'} · Active: {ap.active ? 'Yes' : 'No'}</div>
+                    </div>
+                    {String(ap.id) !== '0' && (ap.name || '').toLowerCase() !== 'default' && (
+                      <div style={{display:'flex', gap:'6px', alignItems:'center', flexShrink:0}}>
+                        {deleteConfirm && deleteConfirm.kind !== 'fwd' && String(deleteConfirm.id) === String(ap.id) ? (
+                          <>
+                            <span style={{fontSize:'11px', color:'var(--accent-amber)'}}>Delete "{ap.name}"?</span>
+                            <button className="btn btn-sm" style={{background:'var(--accent-red)', color:'#fff'}} disabled={zccBusy}
+                              onClick={() => handleDeleteProfile({ ...ap, platform: 'macos' })}>Yes, delete</button>
+                            <button className="btn btn-ghost btn-sm" onClick={() => setDeleteConfirm(null)}>Cancel</button>
+                          </>
+                        ) : (
+                          <button className="btn btn-ghost btn-sm" disabled={zccBusy}
+                            onClick={() => setDeleteConfirm({ id: ap.id, name: ap.name, platform: 'macos' })}>🗑 Delete</button>
+                        )}
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
@@ -1949,6 +2791,7 @@
               )}
 
               <div className="btn-group">
+                <button className="btn btn-ghost" onClick={() => setMode('home')}>← Mobile Admin</button>
                 <button className="btn btn-ghost" onClick={fetchProfiles} disabled={loading}>🔄 Refresh</button>
                 <button className="btn btn-primary"
                   onClick={() => setWizStep('configure')}
