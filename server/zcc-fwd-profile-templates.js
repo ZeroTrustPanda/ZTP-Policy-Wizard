@@ -103,9 +103,9 @@ const WINDOWS_FWD_SETTINGS = [
 
 const FWD_TEMPLATES = {
   BEST_PRACTICE: {
-    id: 'BEST_PRACTICE', name: 'ZTP Best Practice (Windows)', icon: '⭐',
-    description: 'Everything set in the "Windows" reference forwarding profile: Tunnel to ZIA on every network, listening-proxy redirect, Z-Tunnel 2.0 for proxied traffic, drop IPv6, latency-based ZEN, no system PAC, ZPA on VPN-Trusted networks, ZPA latency-based server selection.',
-    source: 'Windows (ZTH tenant, ID 36531)',
+    id: 'BEST_PRACTICE', name: 'Zscaler POV Best Practice', icon: '⭐',
+    description: 'Forwarding settings from the Zscaler POV best practice guide: tunnel to ZIA on every network, listening-proxy redirect, Z-Tunnel 2.0 for proxied traffic, drop IPv6, latency-based ZEN, no system PAC, ZPA on VPN-Trusted networks, ZPA latency-based server selection.',
+    source: 'Zscaler POV best practice guide',
     // The reference profile also has "Predefined Trusted Networks" ticked with none selected (no effect).
     baseApply: (b) => { b.predefinedTrustedNetworks = true; },
     settings: WINDOWS_FWD_SETTINGS
