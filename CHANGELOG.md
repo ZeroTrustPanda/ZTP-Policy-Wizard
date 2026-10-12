@@ -1,5 +1,16 @@
 # Changelog
 
+## v1.7.0-standalone — 2026-10-12 (branch `standalone`)
+
+Same features as v1.7.0, packaged to run without Node.js or npm.
+
+- **Single executables** for Windows x64, macOS Apple Silicon and macOS Intel (`standalone/release/`), built with Bun.
+- **UI compiled ahead of time:** React, ReactDOM and the IBM Plex fonts are embedded; no cdnjs, no in-browser Babel, no Google Fonts. Faster page load and works where CDNs are blocked.
+- **Launcher:** binds to `127.0.0.1` only, picks port 3000 or the next free one, opens the default browser, logs to `~/ZTP-Wizard/logs`.
+- **Fewer dependencies:** `uuid` and `cors` removed (built-in `crypto.randomUUID`, same-origin UI). Express is the only runtime package and is bundled into the executable.
+- **macOS builds re-signed ad-hoc** so Apple Silicon runs them; they are not Developer ID signed or notarized.
+- Server mode (`npm start`) is unchanged apart from the dependency cleanup; `ZTP_LOG_DIR` can move the log folder.
+
 ## v1.7.0 — 2026-10-11
 
 This release covers everything since **v1.5.2**: the Allow / Block step for ZIA policies (v1.6.0), and a Mobile Admin (Zscaler Client Connector) wizard that creates forwarding profiles and Windows / macOS app profiles from best-practice templates (v1.6.0 – v1.7.0). Every ZCC write path was verified against a live tenant.

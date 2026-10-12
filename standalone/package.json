@@ -1,0 +1,13 @@
+{
+  "name": "ztp-policy-wizard-standalone-build",
+  "private": true,
+  "description": "Build tools for the standalone ZTP Policy Wizard executables (not needed to run them)",
+  "devDependencies": {
+    "@fontsource/ibm-plex-mono": "5.2.6",
+    "@fontsource/ibm-plex-sans": "5.2.6",
+    "bun": "1.2.21",
+    "esbuild": "0.25.9",
+    "react": "18.2.0",
+    "react-dom": "18.2.0"
+  }
+}

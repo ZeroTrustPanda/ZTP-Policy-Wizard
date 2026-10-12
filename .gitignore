@@ -3,3 +3,6 @@ logs/*.log
 logs/*.jsonl
 .env
 *.tar.gz
+standalone/node_modules/
+standalone/build/
+standalone/dist/

@@ -5,12 +5,11 @@
   "main": "server/index.js",
   "scripts": {
     "start": "node server/index.js",
-    "dev": "node server/index.js"
+    "dev": "node server/index.js",
+    "build:standalone": "node standalone/build.js"
   },
   "dependencies": {
-    "express": "^4.18.2",
-    "cors": "^2.8.5",
-    "uuid": "^9.0.0"
+    "express": "^4.18.2"
   },
   "engines": {
     "node": ">=18.0.0"

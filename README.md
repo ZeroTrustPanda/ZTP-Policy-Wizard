@@ -2,6 +2,35 @@
 
 Automated Zscaler Internet Access (ZIA) and Zscaler Client Connector (ZCC) policy configuration for healthcare and enterprise environments.
 
+## ⬇️ Standalone edition (this branch)
+
+No Node.js, no npm, nothing to install. Download the zip for your computer from [`standalone/release/`](standalone/release/), unzip, double-click:
+
+| Computer | Download |
+|---|---|
+| Windows 10/11 (64-bit) | [`ZTP-Wizard-1.7.0-windows-x64.zip`](standalone/release/ZTP-Wizard-1.7.0-windows-x64.zip) |
+| Mac with Apple Silicon (M1–M4) | [`ZTP-Wizard-1.7.0-macos-arm64.zip`](standalone/release/ZTP-Wizard-1.7.0-macos-arm64.zip) |
+| Intel Mac | [`ZTP-Wizard-1.7.0-macos-x64.zip`](standalone/release/ZTP-Wizard-1.7.0-macos-x64.zip) |
+
+The wizard starts on `http://127.0.0.1:3000` (or the next free port), opens your browser, and keeps your API credentials on your computer. Logs go to `ZTP-Wizard/logs` in your home folder.
+
+**The builds are not code-signed yet**, so the first launch needs one extra click:
+- **Windows:** SmartScreen → *More info* → *Run anyway*.
+- **Mac:** right-click `ZTP-Wizard` → *Open* → *Open*. If macOS still refuses, run `xattr -d com.apple.quarantine ZTP-Wizard` in the unzipped folder (and, if it reports "killed", `codesign --force --sign - ZTP-Wizard`).
+
+Same features as the v1.7.0 server version on `main`. The UI is compiled ahead of time with React and fonts built in, so it works without reaching any CDN; only the Zscaler API calls need the network.
+
+**Build it yourself** (any OS, needs Node 18+, python3 and zip):
+```
+npm ci
+cd standalone && npm ci && cd ..
+npm run build:standalone          # all three targets -> standalone/release/
+node standalone/build.js linux-x64   # or a single target
+```
+`standalone/build-ui.js` compiles the UI, `standalone/main.js` is the launcher, `standalone/build.js` compiles with Bun, and `standalone/adhoc-sign.py` re-signs the macOS builds ad-hoc (Bun's cross-compiled macOS signature doesn't match the final file, and Apple Silicon refuses to run it).
+
+Running from source still works exactly as before: `npm ci && npm start`.
+
 ## What This Does
 
 Deploy a complete Zscaler security policy stack in minutes instead of hours. Select a security tier, choose a compliance framework, review the rules, and apply — the wizard handles the API calls, rule ordering, and activation.
