@@ -3,3 +3,5 @@ logs/*.log
 logs/*.jsonl
 .env
 *.tar.gz
+certs/*.crt
+certs/*.pem

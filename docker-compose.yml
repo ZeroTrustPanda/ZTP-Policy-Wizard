@@ -1,0 +1,12 @@
+services:
+  ztp-policy-wizard:
+    build: .
+    image: ztp-policy-wizard:latest
+    ports:
+      - "8000:8000"
+    environment:
+      - ZTP_PORT=8000
+      - ZTP_HOST=0.0.0.0
+    volumes:
+      - ./logs:/app/logs
+    restart: unless-stopped
