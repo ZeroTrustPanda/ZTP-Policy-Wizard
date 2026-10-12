@@ -80,7 +80,7 @@ const WINDOWS_BEST_PRACTICE_SETTINGS = [
     key: 'parallelIpv4Ipv6',
     label: 'Disable Parallel IPv4 and IPv6: explicit value',
     category: 'Network',
-    description: 'Sets "Disable Parallel IPv4 and IPv6" to 0, as in PerfectPolicy, instead of -1 ("Default").',
+    description: 'Sets "Disable Parallel IPv4 and IPv6" to 0 instead of -1 ("Default").',
     value: '0', portalDefault: '-1 (Default)', impact: 'info',
     apply: (b) => { b.disableParallelIpv4AndIPv6 = 0; b.disableParallelIpv4andIpv6 = '0'; b.windowsPolicy.disableParallelIpv4andIpv6 = '0'; },
     verify: (p) => num(p.disableParallelIpv4AndIPv6) === 0
@@ -188,7 +188,7 @@ const MAC_BEST_PRACTICE_SETTINGS = [
     key: 'failCloseTunnelExit',
     label: 'Fail-close on tunnel process exit: Off',
     category: 'Security',
-    description: 'Does not lock down traffic when the Client Connector tunnel process exits (MAC value). The portal default locks traffic down.',
+    description: 'Does not lock down traffic when the Client Connector tunnel process exits. The portal default locks traffic down.',
     value: 'Off (no lockdown)', portalDefault: 'On (lockdown)', impact: 'caution',
     apply: (b) => { b.policyExtension.zccFailCloseSettingsLockdownOnTunnelProcessExit = '0'; b.zccFailCloseSettingsLockdownOnTunnelProcessExit = 0; },
     verify: (p) => num(p.policyExtension?.zccFailCloseSettingsLockdownOnTunnelProcessExit) === 0
@@ -215,7 +215,7 @@ const MAC_BEST_PRACTICE_SETTINGS = [
     key: 'prioritizeDnsExclusionsOff',
     label: 'Prioritize DNS Exclusions: Off',
     category: 'Network',
-    description: 'DNS exclusions do not take priority over inclusions (MAC value). The portal default prioritizes exclusions.',
+    description: 'DNS exclusions do not take priority over inclusions. The portal default prioritizes exclusions.',
     value: 'Off', portalDefault: 'On', impact: 'info',
     apply: (b) => { b.policyExtension.prioritizeDnsExclusions = 0; b.prioritizeDnsExclusions = '0'; },
     verify: (p) => num(p.policyExtension?.prioritizeDnsExclusions) === 0
@@ -224,7 +224,7 @@ const MAC_BEST_PRACTICE_SETTINGS = [
     key: 'flowBasedTunnel',
     label: 'Enable Flow-Based Tunnel',
     category: 'Network',
-    description: 'Turns on the flow-based tunnel option, as in the MAC reference profile.',
+    description: 'Turns on the flow-based tunnel option.',
     value: 'On', portalDefault: 'Off', impact: 'info',
     apply: (b) => { b.policyExtension.enableFlowBasedTunnel = '1'; },
     verify: (p) => num(p.policyExtension?.enableFlowBasedTunnel) === 1
@@ -270,8 +270,8 @@ const MAC_BEST_PRACTICE_SETTINGS = [
     key: 'notificationTemplate',
     label: 'Notification Template (ID 2221)',
     category: 'User Experience',
-    description: 'Uses the tenant notification template 2221 (as MAC does) instead of the legacy notification settings. Template IDs are tenant-specific.',
-    value: 'Template 2221', portalDefault: 'Legacy Notification Settings', impact: 'info',
+    description: 'Uses notification template 2221 instead of the legacy notification settings. Template IDs are tenant-specific: change it or switch this off on other tenants.',
+    value: 'Template 2221', portalDefault: 'Legacy Notification Settings', impact: 'caution',
     apply: (b) => { b.notificationTemplateId = 2221; b.notificationTemplateSelected = [{ label: '2221', value: 2221 }]; },
     verify: (p) => num(p.notificationTemplateContract?.id ?? p.notificationTemplateId) === 2221
   },
@@ -288,7 +288,7 @@ const MAC_BEST_PRACTICE_SETTINGS = [
     key: 'modernUi',
     label: 'Client Connector UI: Modern UI Experience',
     category: 'User Experience',
-    description: 'MAC uses the Modern UI. The public API ignores this field on create, update and PATCH (verified 2026-10-09), so set it in the Mobile Admin portal after creation.',
+    description: 'Uses the Modern UI Experience. The public API ignores this field on create, update and PATCH, so set it in the Mobile Admin portal after creation.',
     value: 'Modern UI Experience', portalDefault: 'Follow Global Setting', impact: 'info', manual: true,
     apply: (b) => {
       // Sent anyway in case the API starts honouring it; verification treats it as a manual step.
@@ -310,7 +310,7 @@ const MAC_BEST_PRACTICE_SETTINGS = [
     key: 'packetCaptureExtrasOff',
     label: 'Automatic Packet Capture Extras: Off',
     category: 'Troubleshooting',
-    description: 'Turns off automatic packet capture for critical and other sections and the extra capture disk space (MAC values).',
+    description: 'Turns off automatic packet capture for critical and other sections and the extra capture disk space.',
     value: 'Off', portalDefault: 'On (512 MB extra space)', impact: 'info',
     apply: (b) => {
       for (const k of ['enableAPCforCriticalSections', 'enableAPCforOtherSections', 'enablePCAdditionalSpace']) { b.policyExtension[k] = '0'; b[k] = '0'; }
@@ -341,9 +341,9 @@ const PLATFORMS = {
 const TEMPLATES = {
   windows: {
     BEST_PRACTICE: {
-      id: 'BEST_PRACTICE', name: 'ZTP Best Practice (PerfectPolicy)', icon: '⭐',
-      description: 'Everything enabled in the PerfectPolicy reference profile: SSL cert + WFP driver, Microsoft 365/Teams/Zoom/AVD IP bypass, domain profile detection, notification framework, ZPA reauth notice, CLI, applies to all users.',
-      source: 'PerfectPolicy (ZTH tenant, ID 230119)',
+      id: 'BEST_PRACTICE', name: 'Zscaler POV Best Practice', icon: '⭐',
+      description: 'Common Client Connector settings from the Zscaler POV best practice guide: SSL certificate and WFP driver, Microsoft 365 / Teams / Zoom / AVD IP bypass, domain profile detection, notification framework, ZPA re-authentication notice, CLI, applies to all users.',
+      source: 'Zscaler POV best practice guide',
       recommendedForwardingProfile: null,
       settings: WINDOWS_BEST_PRACTICE_SETTINGS
     },
@@ -357,10 +357,10 @@ const TEMPLATES = {
   },
   macos: {
     BEST_PRACTICE: {
-      id: 'BEST_PRACTICE', name: 'ZTP Best Practice (MAC)', icon: '⭐',
-      description: 'Everything enabled in the MAC reference profile: SSL cert, iCloud Private Relay block, recommended PAC, Teams/Zoom/AVD IP bypass, flow-based tunnel, reconnect on wake, notification framework, local packet capture, applies to all users.',
-      source: 'MAC (ZTH tenant, ID 66609)',
-      recommendedForwardingProfile: { id: 39325, name: 'MAC' },
+      id: 'BEST_PRACTICE', name: 'Zscaler POV Best Practice', icon: '⭐',
+      description: 'Common Client Connector settings from the Zscaler POV best practice guide: SSL certificate, iCloud Private Relay block, recommended PAC, Teams / Zoom / AVD IP bypass, flow-based tunnel, reconnect on wake, notification framework, local packet capture, applies to all users.',
+      source: 'Zscaler POV best practice guide',
+      recommendedForwardingProfile: null,
       // Same values as the portal default, but MAC stores them as strings; keeps the clone byte-identical.
       baseApply: (b) => { b.policyExtension.deleteDHCPOption121Routes = '{"trusted":"1","offTrusted":"1","vpnTrusted":"1","splitVpnTrusted":"1"}'; },
       settings: MAC_BEST_PRACTICE_SETTINGS

@@ -22,7 +22,7 @@ const { getFwdTemplateCatalog, getFwdTemplate, buildForwardingProfileBody } = re
 const { AuditLogger } = require('./audit-logger');
 
 const app = express();
-const APP_VERSION = '1.7.0';
+const APP_VERSION = '1.7.1';
 const PORT = process.env.ZTP_PORT || 3000;
 const HOST = process.env.ZTP_HOST || '0.0.0.0';
 const SESSION_TTL_MS = 60 * 60 * 1000;   // 1 hour

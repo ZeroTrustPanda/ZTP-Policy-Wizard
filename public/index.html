@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ZeroTrustPanda ZS Policy Wizard v1.7.0 - Zscaler Template Policy Configuration</title>
+  <title>ZeroTrustPanda ZS Policy Wizard v1.7.1 - Zscaler Template Policy Configuration</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
   <style>
@@ -506,7 +506,7 @@
     // ========================
     // App Version
     // ========================
-    const APP_VERSION = '1.7.0';
+    const APP_VERSION = '1.7.1';
     const BUILD_DATE = '2026-03-30';
 
     // ========================
@@ -740,9 +740,10 @@
                     <p>HIPAA, HITRUST CSF, NIST 800-53, NIST 800-171, PCI-DSS, CJIS, SOX, FERPA, GDPR</p>
                     <h3 style={{fontSize:'15px', color:'var(--accent-cyan)', margin:'1.5rem 0 0.5rem'}}>Version History</h3>
                     <div style={{paddingLeft:'1rem', fontSize:'12px'}}>
-                      <div><strong>v1.7.0</strong> — Mobile Admin: forwarding profile step before the app profile. Create a new forwarding profile from the Best Practice template (your "Windows" forwarding profile, 8 settings) or Portal Default, or pick an existing one; Apply creates the forwarding profile first, links the app profile to it and verifies both (rolls the forwarding profile back if the app profile fails). Delete forwarding profiles from Mobile Admin (refused while an app profile uses them)</div>
-                      <div><strong>v1.6.1</strong> — Mobile Admin: create macOS app profiles from the Best Practice (MAC) template (17 settings, MAC forwarding profile preselected) with the same template, customize, review, dry run, apply and verify flow; Windows/macOS platform picker; macOS profiles listed for delete; Modern UI flagged as a manual portal step (the public API ignores it)</div>
-                      <div><strong>v1.6.0</strong> — Mobile Admin: create Windows app profiles from the Best Practice (PerfectPolicy) template with customize, review, dry run, apply and read-back verification; delete profiles; fixed app-profile PATCH payload. Allow / Block step: choose Allow or Block per policy type (URL, Firewall, DNS, File Type, Cloud App Control, DLP) with per-rule overrides and weakening warnings</div>
+                      <div><strong>v1.7.1</strong> — Mobile Admin wording: templates renamed "Zscaler POV Best Practice", each step explains what a forwarding profile and an app profile are; macOS now also defaults to creating a new forwarding profile</div>
+                      <div><strong>v1.7.0</strong> — Mobile Admin: forwarding profile step before the app profile. Create a new forwarding profile from the POV best practice template (8 settings) or Portal Default, or pick an existing one; Apply creates the forwarding profile first, links the app profile to it and verifies both (rolls the forwarding profile back if the app profile fails). Delete forwarding profiles from Mobile Admin (refused while an app profile uses them)</div>
+                      <div><strong>v1.6.1</strong> — Mobile Admin: create macOS app profiles from the POV best practice template (17 settings) with the same template, customize, review, dry run, apply and verify flow; Windows/macOS platform picker; macOS profiles listed for delete; Modern UI flagged as a manual portal step (the public API ignores it)</div>
+                      <div><strong>v1.6.0</strong> — Mobile Admin: create Windows app profiles from the POV best practice template with customize, review, dry run, apply and read-back verification; delete profiles; fixed app-profile PATCH payload. Allow / Block step: choose Allow or Block per policy type (URL, Firewall, DNS, File Type, Cloud App Control, DLP) with per-rule overrides and weakening warnings</div>
                       <div><strong>v1.5.2</strong> — DLP rules shown in Review step, wizard state resets between runs for multi-deploy sessions</div>
                       <div><strong>v1.5.1</strong> — Multi-user sessions (50 concurrent, 1hr TTL), Policy Catalog browser (no auth needed)</div>
                       <div><strong>v1.5.0</strong> — Data Loss Prevention module (dictionary-first, 14 rule defs, 9 compliance frameworks)</div>
@@ -1941,8 +1942,8 @@
     ];
 
     const ZCC_PLATFORMS = [
-      { id: 'windows', label: 'Windows', icon: '🪟', nameTag: 'Windows', reference: 'PerfectPolicy', fwdDefault: 'new' },
-      { id: 'macos', label: 'macOS', icon: '🍎', nameTag: 'macOS', reference: 'MAC', fwdDefault: 'existing' }
+      { id: 'windows', label: 'Windows', icon: '🪟', nameTag: 'Windows', blurb: 'Client Connector on Windows 10 / 11 devices', fwdDefault: 'new' },
+      { id: 'macos', label: 'macOS', icon: '🍎', nameTag: 'macOS', blurb: 'Client Connector on Macs (Apple Silicon and Intel)', fwdDefault: 'new' }
     ];
 
     // Settings toggles grouped by category (shared by the forwarding and app profile steps)
@@ -2033,7 +2034,7 @@
 
       const plat = ZCC_PLATFORMS.find(p => p.id === platform);
 
-      // Forwarding profile the app template recommends (MAC uses the "MAC" forwarding profile), else Default
+      // Forwarding profile an app template recommends (none of the POV templates do), else Default
       const recommendedFwdId = (t) => {
         const rec = t && t.recommendedForwardingProfile;
         if (!rec) return 0;
@@ -2149,7 +2150,7 @@
       );
 
       if (!catalog || !enabled || !fwdCatalog || !fwdEnabled) {
-        return (<div className="card"><div className="card-header"><h2>➕ Create {plat.label} App Profile</h2><p>Loading templates...</p></div><div style={{textAlign:'center',padding:'2rem'}}><span className="spinner"></span></div></div>);
+        return (<div className="card"><div className="card-header"><h2>➕ Create Zscaler Client Connector App Profile and Forwarding Profile</h2><p>Loading templates...</p></div><div style={{textAlign:'center',padding:'2rem'}}><span className="spinner"></span></div></div>);
       }
 
       const checksTable = (rows) => (
@@ -2165,20 +2166,20 @@
       return (
         <div className="card">
           <div className="card-header">
-            <h2>➕ Create {plat.label} App Profile</h2>
-            <p>Set up the forwarding profile first, then build the {plat.label} app profile that uses it. Review exactly what each sets, dry run against your tenant, then create both.</p>
+            <h2>➕ Create Zscaler Client Connector App Profile and Forwarding Profile</h2>
+            <p>Builds the common Mobile Admin settings for Zscaler Client Connector, following the Zscaler POV best practice guide. Set up the forwarding profile first, then the {plat.label} app profile that uses it. Review exactly what each sets, dry run against your tenant, then create both.</p>
           </div>
           <Stepper />
 
           {step === 'platform' && (
             <div>
-              <div className="explainer"><strong>Why this matters:</strong> App profiles are per platform. The platform also decides the default forwarding profile choice: Windows creates a new one from your "Windows" forwarding profile, macOS uses the existing MAC forwarding profile.</div>
+              <div className="explainer"><strong>Why this matters:</strong> App profiles are per platform, so pick the devices this profile is for. Both platforms follow the Zscaler POV best practice guide, and both start with a new forwarding profile by default.</div>
               <div className="tier-grid">
                 {ZCC_PLATFORMS.map(p => (
                   <div key={p.id} className={`tier-card ${platform === p.id ? 'selected' : ''}`} onClick={() => pickPlatform(p.id)} data-platform={p.id}>
                     <div className="tier-icon">{p.icon}</div>
                     <div className="tier-name">{p.label}</div>
-                    <div className="tier-desc">App profile reference: {p.reference}</div>
+                    <div className="tier-desc">{p.blurb}</div>
                   </div>
                 ))}
               </div>
@@ -2191,12 +2192,12 @@
 
           {step === 'forwarding' && (
             <div>
-              <div className="explainer"><strong>Why this comes first:</strong> Every app profile points at a forwarding profile, which decides how traffic reaches ZIA and ZPA on each network type. A new forwarding profile is created first during Apply, then the app profile is created and linked to it automatically.</div>
+              <div className="explainer"><strong>What a forwarding profile is:</strong> it tells Client Connector how to send traffic on each type of network the device can be on (a trusted network, a VPN, or off-network): whether internet traffic is tunneled to ZIA, whether private-app traffic goes through ZPA, and how. Every app profile points at one, so it comes first. During Apply the forwarding profile is created first and the app profile is linked to it automatically. The Zscaler POV Best Practice template follows the POV best practice guide.</div>
               <div className="tier-grid" style={{marginBottom:'1rem'}}>
                 <div className={`tier-card ${isNewFwd ? 'selected' : ''}`} onClick={() => { setFwdMode('new'); setPlan(null); }} data-fwdmode="new">
                   <div className="tier-icon">🆕</div>
                   <div className="tier-name">Create new forwarding profile</div>
-                  <div className="tier-desc">From the Best Practice template (your "Windows" forwarding profile) or portal defaults.</div>
+                  <div className="tier-desc">Following the Zscaler POV best practice guide, or portal defaults.</div>
                 </div>
                 <div className={`tier-card ${!isNewFwd ? 'selected' : ''}`} onClick={() => { setFwdMode('existing'); setPlan(null); }} data-fwdmode="existing">
                   <div className="tier-icon">🔗</div>
@@ -2258,7 +2259,7 @@
 
           {step === 'template' && (
             <div>
-              <div className="explainer"><strong>Why this matters:</strong> The template decides which Client Connector settings the new app profile starts with. Best Practice copies everything enabled in the {plat.reference} reference profile; Portal Default is a blank profile. It will use forwarding profile <strong>{fwdLabel}</strong>{isNewFwd ? ' (new)' : ''}.</div>
+              <div className="explainer"><strong>What an app profile is:</strong> it holds the Client Connector settings for the {plat.label} devices it applies to: certificates and drivers, which apps bypass the tunnel, notifications, troubleshooting options, and who it applies to. The Zscaler POV Best Practice template follows the POV best practice guide; Portal Default is a blank profile. It will use forwarding profile <strong>{fwdLabel}</strong>{isNewFwd ? ' (new)' : ''}.</div>
               <div className="tier-grid">
                 {catalog.map(t => (
                   <div key={t.id} className={`tier-card ${templateId === t.id ? 'selected' : ''}`} onClick={() => pickTemplate(t.id)}>
@@ -2655,7 +2656,7 @@
               <div className="tier-card" onClick={() => setMode('create')} style={{cursor:'pointer'}}>
                 <div className="tier-icon">➕</div>
                 <div className="tier-name">Create from template</div>
-                <div className="tier-desc">Forwarding profile first (from your "Windows" forwarding profile), then a Windows or macOS app profile from the Best Practice template (PerfectPolicy / MAC): customize, review, dry run, apply.</div>
+                <div className="tier-desc">A forwarding profile and a Windows or macOS app profile following the Zscaler POV best practice guide: customize, review, dry run, apply.</div>
               </div>
               <div className="tier-card" onClick={() => { setMode('edit'); setWizStep('select'); }} style={{cursor:'pointer'}}>
                 <div className="tier-icon">🛠️</div>

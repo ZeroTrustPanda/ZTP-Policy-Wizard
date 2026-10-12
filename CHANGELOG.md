@@ -1,5 +1,18 @@
 # Changelog
 
+## v1.7.1-standalone — 2026-10-12 (branch `standalone`)
+
+- Standalone downloads rebuilt as **1.7.1** with the Zscaler POV best practice wording below. No other changes.
+
+## v1.7.1 — 2026-10-12
+
+### Changed
+- **Wording follows the Zscaler POV best practice guide:** the Mobile Admin create wizard is now titled *Create Zscaler Client Connector App Profile and Forwarding Profile* and describes what it builds as the common Mobile Admin settings for Client Connector.
+- **Templates renamed:** the Best Practice templates (forwarding profile, Windows and macOS app profiles) are now called **Zscaler POV Best Practice**. No screen refers to the lab reference profiles any more.
+- **Steps explain the concepts:** the Forwarding Profile step explains what a forwarding profile is, and the App Profile step explains what an app profile is.
+- **macOS creates its own forwarding profile:** macOS now also defaults to creating a new forwarding profile instead of linking an existing one named "MAC", so it works the same on any tenant.
+- **Notification template flagged:** the macOS notification template setting (ID 2221) is marked **REVIEW**, because template IDs differ per tenant.
+
 ## v1.7.0-standalone — 2026-10-12 (branch `standalone`)
 
 Same features as v1.7.0, packaged to run without Node.js or npm.

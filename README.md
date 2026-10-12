@@ -1,4 +1,4 @@
-# 🐼 ZeroTrustPanda — ZTP Policy Wizard v1.7.0
+# 🐼 ZeroTrustPanda — ZTP Policy Wizard v1.7.1
 
 Automated Zscaler Internet Access (ZIA) and Zscaler Client Connector (ZCC) policy configuration for healthcare and enterprise environments.
 
@@ -8,9 +8,9 @@ No Node.js, no npm, nothing to install. Download the zip for your computer from 
 
 | Computer | Download |
 |---|---|
-| Windows 10/11 (64-bit) | [`ZTP-Wizard-1.7.0-windows-x64.zip`](standalone/release/ZTP-Wizard-1.7.0-windows-x64.zip) |
-| Mac with Apple Silicon (M1–M4) | [`ZTP-Wizard-1.7.0-macos-arm64.zip`](standalone/release/ZTP-Wizard-1.7.0-macos-arm64.zip) |
-| Intel Mac | [`ZTP-Wizard-1.7.0-macos-x64.zip`](standalone/release/ZTP-Wizard-1.7.0-macos-x64.zip) |
+| Windows 10/11 (64-bit) | [`ZTP-Wizard-1.7.1-windows-x64.zip`](standalone/release/ZTP-Wizard-1.7.1-windows-x64.zip) |
+| Mac with Apple Silicon (M1–M4) | [`ZTP-Wizard-1.7.1-macos-arm64.zip`](standalone/release/ZTP-Wizard-1.7.1-macos-arm64.zip) |
+| Intel Mac | [`ZTP-Wizard-1.7.1-macos-x64.zip`](standalone/release/ZTP-Wizard-1.7.1-macos-x64.zip) |
 
 The wizard starts on `http://127.0.0.1:3000` (or the next free port), opens your browser, and keeps your API credentials on your computer. Logs go to `ZTP-Wizard/logs` in your home folder.
 
@@ -18,7 +18,7 @@ The wizard starts on `http://127.0.0.1:3000` (or the next free port), opens your
 - **Windows:** SmartScreen → *More info* → *Run anyway*.
 - **Mac:** right-click `ZTP-Wizard` → *Open* → *Open*. If macOS still refuses, run `xattr -d com.apple.quarantine ZTP-Wizard` in the unzipped folder (and, if it reports "killed", `codesign --force --sign - ZTP-Wizard`).
 
-Same features as the v1.7.0 server version on `main`. The UI is compiled ahead of time with React and fonts built in, so it works without reaching any CDN; only the Zscaler API calls need the network.
+Same features as the v1.7.1 server version on `main`. The UI is compiled ahead of time with React and fonts built in, so it works without reaching any CDN; only the Zscaler API calls need the network.
 
 **Build it yourself** (any OS, needs Node 18+, python3 and zip):
 ```
@@ -56,11 +56,11 @@ After **Customize**, the wizard lists each policy type (URL Filtering, Cloud Fir
 
 ## Mobile Admin: Create Forwarding + App Profile (v1.7.0)
 
-Mobile Admin → **Create from template** walks through the same flow as the ZIA wizard, with the forwarding profile first because the app profile has to point at it:
+Mobile Admin → **Create from template** builds the common Mobile Admin settings for Zscaler Client Connector, following the **Zscaler POV best practice guide**. It walks through the same flow as the ZIA wizard, with the forwarding profile first because the app profile has to point at it:
 
 **Platform → Forwarding Profile → App Profile → Customize → Review → Dry Run → Apply**
 
-**Forwarding Profile step**: create a new one or pick an existing one (Windows defaults to new, macOS to the existing MAC profile). The *ZTP Best Practice (Windows)* template is the 8 settings the tenant's "Windows" forwarding profile (ID 36531) has beyond a portal-default forwarding profile:
+**Forwarding Profile step**: a forwarding profile tells Client Connector how to send traffic on each network type (trusted network, VPN, off-network) to ZIA and ZPA. Create a new one (the default on both platforms) or pick an existing one. The *Zscaler POV Best Practice* forwarding template sets 8 things beyond a portal-default forwarding profile:
 
 | Setting | Value | Portal default |
 |---|---|---|
@@ -77,13 +77,13 @@ Apply creates the forwarding profile first (`POST /webForwardingProfile/edit` wi
 
 App profile steps (v1.6.0 Windows, v1.6.1 macOS):
 
-1. **App Profile**: *ZTP Best Practice* or *Portal Default* (blank). Windows Best Practice = the 12 settings enabled in the PerfectPolicy reference profile. macOS Best Practice = the 17 settings enabled in the MAC reference profile, with the MAC forwarding profile preselected.
+1. **App Profile**: an app profile holds the Client Connector settings for the devices it applies to. Choose *Zscaler POV Best Practice* (12 settings on Windows, 17 on macOS, from the POV best practice guide) or *Portal Default* (blank).
 2. **Customize**: name, description, forwarding profile, enable-after-create (off by default), and a toggle for each template setting.
 3. **Review**: every setting with its new value, the portal default, and what it does.
 4. **Dry Run**: read-only checks against the tenant (name unique, forwarding profile exists, bypass apps exist, placement above Default) and the resulting rule order.
 5. **Apply**: creates the profile with `PUT /zcc/papi/public/v1/web/policy/edit`, reads it back and verifies each setting. Logged as `ZCC_DRY_RUN` / `ZCC_APPLY`.
 
-macOS Best Practice (MAC): SSL certificate, block iCloud Private Relay, fail-close on tunnel exit off, recommended PAC URL, domain inclusions `*`, prioritize DNS exclusions off, flow-based tunnel, reconnect on wake, Teams/Zoom/W365-AVD IP bypass, notification framework, switch focus, notification template 2221, re-enable Internet Security after 60 min, Modern UI, local packet capture, automatic packet capture extras off, all users.
+macOS POV Best Practice: SSL certificate, block iCloud Private Relay, fail-close on tunnel exit off, recommended PAC URL, domain inclusions `*`, prioritize DNS exclusions off, flow-based tunnel, reconnect on wake, Teams/Zoom/W365-AVD IP bypass, notification framework, switch focus, notification template 2221 (tenant-specific, flagged REVIEW), re-enable Internet Security after 60 min, Modern UI, local packet capture, automatic packet capture extras off, all users.
 
 **Manual step:** the public API ignores the macOS *Modern UI* setting on create, update and PATCH, so the wizard marks it MANUAL and reminds you to set it in the portal after creation.
 
@@ -205,9 +205,10 @@ The DLP module uses a **dictionary-first** approach:
 
 | Version | Changes |
 |---------|---------|
-| **1.7.0** | Mobile Admin: forwarding profile step before the app profile (Best Practice from the "Windows" forwarding profile, 8 settings), created first and linked, with rollback; forwarding profile delete with in-use guard |
-| **1.6.1** | Mobile Admin: macOS app profile create from the MAC Best Practice template (platform picker, MAC forwarding profile preselected, Modern UI as a manual step), macOS profiles listed for delete |
-| **1.6.0** | Mobile Admin: Windows app profile create from the PerfectPolicy template; Allow / Block step: pick Allow or Block per policy type (URL, Firewall, DNS, File Type, Cloud App Control, DLP), flip individual rules, weakening warnings in Review/Dry Run and audit log |
+| **1.7.1** | Mobile Admin wording: templates renamed *Zscaler POV Best Practice*, steps explain what forwarding and app profiles are; macOS defaults to a new forwarding profile; tenant-specific notification template flagged REVIEW |
+| **1.7.0** | Mobile Admin: forwarding profile step before the app profile (POV best practice template, 8 settings), created first and linked, with rollback; forwarding profile delete with in-use guard |
+| **1.6.1** | Mobile Admin: macOS app profile create from the POV best practice template (platform picker, Modern UI as a manual step), macOS profiles listed for delete |
+| **1.6.0** | Mobile Admin: Windows app profile create from the POV best practice template; Allow / Block step: pick Allow or Block per policy type (URL, Firewall, DNS, File Type, Cloud App Control, DLP), flip individual rules, weakening warnings in Review/Dry Run and audit log |
 | **1.5.2** | DLP rules shown in Review step, wizard state resets between runs for multi-deploy sessions, DLP engines/dictionaries in Bulk Rule Manager |
 | **1.5.1** | Multi-user sessions (50 concurrent, 1hr TTL), Policy Catalog browser, ZCC rewrite to PATCH/POST edit workflow |
 | **1.5.0** | DLP module (dictionary-first, 14 rule defs, 9 compliance frameworks, custom engine creation) |
