@@ -1,5 +1,14 @@
 # Changelog
 
+## v1.8.1-standalone — 2026-10-12 (branch `standalone`)
+
+- Standalone downloads rebuilt as **1.8.1** with the macOS fix below.
+
+## v1.8.1 — 2026-10-12
+
+### 🐛 Fixed
+- **macOS profiles failed on every tenant except ZTH:** creating a macOS app profile, and with it the forwarding profile created in the same run, failed on other tenants. The macOS *Zscaler POV Best Practice* template set notification template ID 2221, which exists only in the ZTH lab tenant. ZCC rejects the whole profile (`{"success":"false"}`) when the ID doesn't exist, and the wizard then rolled back the new forwarding profile, so both looked broken. The setting is removed, and new macOS profiles keep the portal default (Legacy Notification Settings). The macOS template now has 16 settings. Reproduced and verified on a second tenant.
+
 ## v1.8.0-standalone — 2026-10-12 (branch `standalone`)
 
 - Standalone downloads rebuilt as **1.8.0** with the new Digital Experience (ZDX) module below.

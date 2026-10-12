@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ZeroTrustPanda ZS Policy Wizard v1.8.0 - Zscaler Template Policy Configuration</title>
+  <title>ZeroTrustPanda ZS Policy Wizard v1.8.1 - Zscaler Template Policy Configuration</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
   <style>
@@ -506,7 +506,7 @@
     // ========================
     // App Version
     // ========================
-    const APP_VERSION = '1.8.0';
+    const APP_VERSION = '1.8.1';
     const BUILD_DATE = '2026-03-30';
 
     // ========================
@@ -752,10 +752,11 @@
                     <p>HIPAA, HITRUST CSF, NIST 800-53, NIST 800-171, PCI-DSS, CJIS, SOX, FERPA, GDPR</p>
                     <h3 style={{fontSize:'15px', color:'var(--accent-cyan)', margin:'1.5rem 0 0.5rem'}}>Version History</h3>
                     <div style={{paddingLeft:'1rem', fontSize:'12px'}}>
+                      <div><strong>v1.8.1</strong> — Fix: macOS app profile (and its forwarding profile) failed to create on tenants other than the lab tenant because the macOS template set a tenant-specific notification template (ID 2221); removed, macOS template now 16 settings</div>
                       <div><strong>v1.8.0</strong> — New Digital Experience (ZDX) module: set up Web and CloudPath probes following the Zscaler POV best practice guide (Microsoft Login predefined app and zscaler.com custom app), add Zscaler predefined SaaS apps (with tenant prefix) or your own URLs, review, dry run, apply with read-back verification and rollback; Manage screen to turn apps and probes on or off and delete custom ones</div>
                       <div><strong>v1.7.1</strong> — Mobile Admin wording: templates renamed "Zscaler POV Best Practice", each step explains what a forwarding profile and an app profile are; macOS now also defaults to creating a new forwarding profile</div>
                       <div><strong>v1.7.0</strong> — Mobile Admin: forwarding profile step before the app profile. Create a new forwarding profile from the POV best practice template (8 settings) or Portal Default, or pick an existing one; Apply creates the forwarding profile first, links the app profile to it and verifies both (rolls the forwarding profile back if the app profile fails). Delete forwarding profiles from Mobile Admin (refused while an app profile uses them)</div>
-                      <div><strong>v1.6.1</strong> — Mobile Admin: create macOS app profiles from the POV best practice template (17 settings) with the same template, customize, review, dry run, apply and verify flow; Windows/macOS platform picker; macOS profiles listed for delete; Modern UI flagged as a manual portal step (the public API ignores it)</div>
+                      <div><strong>v1.6.1</strong> — Mobile Admin: create macOS app profiles from the POV best practice template with the same template, customize, review, dry run, apply and verify flow; Windows/macOS platform picker; macOS profiles listed for delete; Modern UI flagged as a manual portal step (the public API ignores it)</div>
                       <div><strong>v1.6.0</strong> — Mobile Admin: create Windows app profiles from the POV best practice template with customize, review, dry run, apply and read-back verification; delete profiles; fixed app-profile PATCH payload. Allow / Block step: choose Allow or Block per policy type (URL, Firewall, DNS, File Type, Cloud App Control, DLP) with per-rule overrides and weakening warnings</div>
                       <div><strong>v1.5.2</strong> — DLP rules shown in Review step, wizard state resets between runs for multi-deploy sessions</div>
                       <div><strong>v1.5.1</strong> — Multi-user sessions (50 concurrent, 1hr TTL), Policy Catalog browser (no auth needed)</div>

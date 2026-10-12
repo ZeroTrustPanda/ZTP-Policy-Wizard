@@ -1,4 +1,4 @@
-# 🐼 ZeroTrustPanda — ZTP Policy Wizard v1.8.0
+# 🐼 ZeroTrustPanda — ZTP Policy Wizard v1.8.1
 
 Automated Zscaler Internet Access (ZIA) and Zscaler Client Connector (ZCC) policy configuration for healthcare and enterprise environments.
 
@@ -8,9 +8,9 @@ No Node.js, no npm, nothing to install. Download the zip for your computer from 
 
 | Computer | Download |
 |---|---|
-| Windows 10/11 (64-bit) | [`ZTP-Wizard-1.8.0-windows-x64.zip`](standalone/release/ZTP-Wizard-1.8.0-windows-x64.zip) |
-| Mac with Apple Silicon (M1–M4) | [`ZTP-Wizard-1.8.0-macos-arm64.zip`](standalone/release/ZTP-Wizard-1.8.0-macos-arm64.zip) |
-| Intel Mac | [`ZTP-Wizard-1.8.0-macos-x64.zip`](standalone/release/ZTP-Wizard-1.8.0-macos-x64.zip) |
+| Windows 10/11 (64-bit) | [`ZTP-Wizard-1.8.1-windows-x64.zip`](standalone/release/ZTP-Wizard-1.8.1-windows-x64.zip) |
+| Mac with Apple Silicon (M1–M4) | [`ZTP-Wizard-1.8.1-macos-arm64.zip`](standalone/release/ZTP-Wizard-1.8.1-macos-arm64.zip) |
+| Intel Mac | [`ZTP-Wizard-1.8.1-macos-x64.zip`](standalone/release/ZTP-Wizard-1.8.1-macos-x64.zip) |
 
 The wizard starts on `http://127.0.0.1:3000` (or the next free port), opens your browser, and keeps your API credentials on your computer. Logs go to `ZTP-Wizard/logs` in your home folder.
 
@@ -18,7 +18,7 @@ The wizard starts on `http://127.0.0.1:3000` (or the next free port), opens your
 - **Windows:** SmartScreen → *More info* → *Run anyway*.
 - **Mac:** right-click `ZTP-Wizard` → *Open* → *Open*. If macOS still refuses, run `xattr -d com.apple.quarantine ZTP-Wizard` in the unzipped folder (and, if it reports "killed", `codesign --force --sign - ZTP-Wizard`).
 
-Same features as the v1.8.0 server version on `main`. The UI is compiled ahead of time with React and fonts built in, so it works without reaching any CDN; only the Zscaler API calls need the network.
+Same features as the v1.8.1 server version on `main`. The UI is compiled ahead of time with React and fonts built in, so it works without reaching any CDN; only the Zscaler API calls need the network.
 
 **Build it yourself** (any OS, needs Node 18+, python3 and zip):
 ```
@@ -78,13 +78,13 @@ Apply creates the forwarding profile first (`POST /webForwardingProfile/edit` wi
 
 App profile steps (v1.6.0 Windows, v1.6.1 macOS):
 
-1. **App Profile**: an app profile holds the Client Connector settings for the devices it applies to. Choose *Zscaler POV Best Practice* (12 settings on Windows, 17 on macOS, from the POV best practice guide) or *Portal Default* (blank).
+1. **App Profile**: an app profile holds the Client Connector settings for the devices it applies to. Choose *Zscaler POV Best Practice* (12 settings on Windows, 16 on macOS, from the POV best practice guide) or *Portal Default* (blank).
 2. **Customize**: name, description, forwarding profile, enable-after-create (off by default), and a toggle for each template setting.
 3. **Review**: every setting with its new value, the portal default, and what it does.
 4. **Dry Run**: read-only checks against the tenant (name unique, forwarding profile exists, bypass apps exist, placement above Default) and the resulting rule order.
 5. **Apply**: creates the profile with `PUT /zcc/papi/public/v1/web/policy/edit`, reads it back and verifies each setting. Logged as `ZCC_DRY_RUN` / `ZCC_APPLY`.
 
-macOS POV Best Practice: SSL certificate, block iCloud Private Relay, fail-close on tunnel exit off, recommended PAC URL, domain inclusions `*`, prioritize DNS exclusions off, flow-based tunnel, reconnect on wake, Teams/Zoom/W365-AVD IP bypass, notification framework, switch focus, notification template 2221 (tenant-specific, flagged REVIEW), re-enable Internet Security after 60 min, Modern UI, local packet capture, automatic packet capture extras off, all users.
+macOS POV Best Practice: SSL certificate, block iCloud Private Relay, fail-close on tunnel exit off, recommended PAC URL, domain inclusions `*`, prioritize DNS exclusions off, flow-based tunnel, reconnect on wake, Teams/Zoom/W365-AVD IP bypass, notification framework, switch focus, re-enable Internet Security after 60 min, Modern UI, local packet capture, automatic packet capture extras off, all users.
 
 **Manual step:** the public API ignores the macOS *Modern UI* setting on create, update and PATCH, so the wizard marks it MANUAL and reminds you to set it in the portal after creation.
 
@@ -228,6 +228,7 @@ The DLP module uses a **dictionary-first** approach:
 
 | Version | Changes |
 |---------|---------|
+| **1.8.1** | Fix: macOS app profile (and its forwarding profile) failed to create on any tenant other than ZTH; the tenant-specific notification template 2221 was removed from the macOS POV Best Practice template (now 16 settings) |
 | **1.8.0** | New Digital Experience (ZDX) module: POV best practice probes (Microsoft Login + zscaler.com), predefined and custom apps, dry run, apply with verification and rollback, Manage screen |
 | **1.7.1** | Mobile Admin wording: templates renamed *Zscaler POV Best Practice*, steps explain what forwarding and app profiles are; macOS defaults to a new forwarding profile; tenant-specific notification template flagged REVIEW |
 | **1.7.0** | Mobile Admin: forwarding profile step before the app profile (POV best practice template, 8 settings), created first and linked, with rollback; forwarding profile delete with in-use guard |
