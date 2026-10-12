@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ZeroTrustPanda ZS Policy Wizard v1.7.1 - Zscaler Template Policy Configuration</title>
+  <title>ZeroTrustPanda ZS Policy Wizard v1.8.0 - Zscaler Template Policy Configuration</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
   <style>
@@ -506,7 +506,7 @@
     // ========================
     // App Version
     // ========================
-    const APP_VERSION = '1.7.1';
+    const APP_VERSION = '1.8.0';
     const BUILD_DATE = '2026-03-30';
 
     // ========================
@@ -601,6 +601,7 @@
         }
         else if (mod === 'zia-bulk') setStep('bulk-delete');
         else if (mod === 'zcc') setStep('zcc');
+        else if (mod === 'zdx') setStep('zdx');
         else if (mod === 'about') setStep('about');
         else if (mod === 'catalog') setStep('catalog');
       };
@@ -609,6 +610,7 @@
       const showZiaWizard = auth.connected && activeModule === 'zia-wizard';
       const showZiaBulk = auth.connected && activeModule === 'zia-bulk';
       const showZcc = auth.connected && activeModule === 'zcc';
+      const showZdx = auth.connected && activeModule === 'zdx';
       const showAbout = activeModule === 'about';
       const showCatalog = activeModule === 'catalog';
       const ziaExpanded = activeModule === 'zia-wizard' || activeModule === 'zia-bulk';
@@ -671,6 +673,10 @@
                     onClick={() => switchModule('zcc')} style={{cursor:'pointer'}}>
                     <span className="step-num">📱</span> Mobile Admin Portal
                   </div>
+                  <div className={`sidebar-item ${activeModule === 'zdx' ? 'active' : ''}`}
+                    onClick={() => switchModule('zdx')} style={{cursor:'pointer'}}>
+                    <span className="step-num">📈</span> Digital Experience
+                  </div>
                   <div className="sidebar-item" style={{opacity:0.4, cursor:'default'}}>
                     <span className="step-num">🔒</span> Zscaler Private Access
                   </div>
@@ -702,6 +708,10 @@
                     <div className="tier-card" onClick={() => switchModule('zcc')} style={{cursor:'pointer'}}>
                       <div className="tier-icon">📱</div><div className="tier-name">Mobile Admin Portal</div>
                       <div className="tier-desc">Configure ZCC Forwarding Profiles and App Profiles with best-practice settings.</div>
+                    </div>
+                    <div className="tier-card" onClick={() => switchModule('zdx')} style={{cursor:'pointer'}}>
+                      <div className="tier-icon">📈</div><div className="tier-name">Digital Experience (ZDX)</div>
+                      <div className="tier-desc">Turn on ZDX Web and CloudPath probes following the Zscaler POV best practice guide, and manage existing apps and probes.</div>
                     </div>
                     <div className="tier-card" onClick={() => switchModule('catalog')} style={{cursor:'pointer'}}>
                       <div className="tier-icon">📖</div><div className="tier-name">Policy Catalog</div>
@@ -736,10 +746,13 @@
                     <p>View and delete rules across all ZIA policy categories for cleanup after testing.</p>
                     <h3 style={{fontSize:'15px', color:'var(--accent-cyan)', margin:'1.5rem 0 0.5rem'}}>Mobile Admin Portal (ZCC)</h3>
                     <p>Create ZCC Forwarding Profiles and Windows / macOS App Profiles from templates. Read supported; write requires ZCC API write permissions.</p>
+                    <h3 style={{fontSize:'15px', color:'var(--accent-cyan)', margin:'1.5rem 0 0.5rem'}}>Digital Experience (ZDX)</h3>
+                    <p>Set up ZDX Web and CloudPath probes for predefined and custom apps following the Zscaler POV best practice guide, and manage existing apps and probes. Requires the ZDX scope on the API client.</p>
                     <h3 style={{fontSize:'15px', color:'var(--accent-cyan)', margin:'1.5rem 0 0.5rem'}}>Compliance</h3>
                     <p>HIPAA, HITRUST CSF, NIST 800-53, NIST 800-171, PCI-DSS, CJIS, SOX, FERPA, GDPR</p>
                     <h3 style={{fontSize:'15px', color:'var(--accent-cyan)', margin:'1.5rem 0 0.5rem'}}>Version History</h3>
                     <div style={{paddingLeft:'1rem', fontSize:'12px'}}>
+                      <div><strong>v1.8.0</strong> — New Digital Experience (ZDX) module: set up Web and CloudPath probes following the Zscaler POV best practice guide (Microsoft Login predefined app and zscaler.com custom app), add Zscaler predefined SaaS apps (with tenant prefix) or your own URLs, review, dry run, apply with read-back verification and rollback; Manage screen to turn apps and probes on or off and delete custom ones</div>
                       <div><strong>v1.7.1</strong> — Mobile Admin wording: templates renamed "Zscaler POV Best Practice", each step explains what a forwarding profile and an app profile are; macOS now also defaults to creating a new forwarding profile</div>
                       <div><strong>v1.7.0</strong> — Mobile Admin: forwarding profile step before the app profile. Create a new forwarding profile from the POV best practice template (8 settings) or Portal Default, or pick an existing one; Apply creates the forwarding profile first, links the app profile to it and verifies both (rolls the forwarding profile back if the app profile fails). Delete forwarding profiles from Mobile Admin (refused while an app profile uses them)</div>
                       <div><strong>v1.6.1</strong> — Mobile Admin: create macOS app profiles from the POV best practice template (17 settings) with the same template, customize, review, dry run, apply and verify flow; Windows/macOS platform picker; macOS profiles listed for delete; Modern UI flagged as a manual portal step (the public API ignores it)</div>
@@ -775,6 +788,7 @@
               {showZiaWizard && step === 'audit' && (<AuditStep auditLogs={auditLogs} setAuditLogs={setAuditLogs} setError={setError} />)}
               {showZiaBulk && (<BulkDeleteStep setError={setError} loading={loading} setLoading={setLoading} />)}
               {showZcc && (<MobileAdminStep setError={setError} loading={loading} setLoading={setLoading} config={config} />)}
+              {showZdx && (<ZdxStep setError={setError} />)}
             </div>
           </div>
         </div>
@@ -815,7 +829,7 @@
 
             <div className="explainer">
               <strong>Prerequisites:</strong> You need an API client configured in ZIdentity → Integration → API Clients
-              with scopes for ZIA and ZCC. The Client ID and Client Secret are generated there.
+              with scopes for ZIA, ZCC and ZDX. The Client ID and Client Secret are generated there.
             </div>
 
             <div>
@@ -2449,6 +2463,401 @@
               )}
             </div>
           )}
+        </div>
+      );
+    }
+
+    // ========================
+    // Digital Experience (ZDX) module (v1.8.0)
+    // Template -> Applications -> Review -> Dry Run -> Apply, plus a Manage screen
+    // ========================
+    const ZDX_STEPS = [
+      { id: 'template', label: 'Template' },
+      { id: 'apps', label: 'Applications & Probes' },
+      { id: 'review', label: 'Review' },
+      { id: 'dryrun', label: 'Dry Run' },
+      { id: 'apply', label: 'Apply' }
+    ];
+    const zdxMin = (s) => `${Math.round(Number(s) / 60)} min`;
+    const ZDX_PROTOCOL_LABEL = { ADAPTIVE: 'Adaptive (recommended)', ICMP: 'ICMP', TCP: 'TCP', UDP: 'UDP' };
+
+    function ZdxStateBadge({ p }) {
+      if (!p.configured) return <span className="badge badge-category">NOT SET UP</span>;
+      return p.active ? <span className="badge badge-create">ON</span> : <span className="badge badge-risk">OFF</span>;
+    }
+
+    function ZdxWizard({ setError, onExit }) {
+      const [step, setStep] = useState('template');
+      const [catalog, setCatalog] = useState(null);
+      const [templateId, setTemplateId] = useState('POV_BEST_PRACTICE');
+      const [predef, setPredef] = useState({});   // provider -> { on, prefix, web, cloudpath }
+      const [custom, setCustom] = useState([]);   // [{ name, url, cloudpath, frequency, protocol }]
+      const [plan, setPlan] = useState(null);
+      const [busy, setBusy] = useState(false);
+      const [confirmed, setConfirmed] = useState(false);
+      const [result, setResult] = useState(null);
+
+      const applyTemplate = (cat, id) => {
+        const t = cat.templates.find(x => x.id === id);
+        const p = {};
+        cat.predefined.forEach(a => { p[a.provider] = { on: false, prefix: a.prefix || '', web: true, cloudpath: true }; });
+        t.predefined.forEach(x => { p[x.provider] = { ...(p[x.provider] || {}), on: true, web: x.web !== false, cloudpath: !!x.cloudpath }; });
+        setPredef(p);
+        setCustom(t.custom.map(c => ({ name: c.name, url: c.url, cloudpath: c.cloudpath !== false, frequency: c.frequency || 300, protocol: c.protocol || 'ADAPTIVE' })));
+        setPlan(null);
+      };
+
+      useEffect(() => {
+        api.call('GET', '/zdx/catalog').then(c => { setCatalog(c); applyTemplate(c, 'POV_BEST_PRACTICE'); })
+          .catch(e => setError('Could not load ZDX: ' + e.message));
+      }, []);
+
+      const reached = ZDX_STEPS.findIndex(s => s.id === step);
+      const chosenPredef = catalog ? catalog.predefined.filter(a => predef[a.provider]?.on) : [];
+      const payload = () => ({
+        templateId,
+        predefined: chosenPredef.map(a => ({ provider: a.provider, prefix: predef[a.provider].prefix, web: predef[a.provider].web, cloudpath: predef[a.provider].cloudpath })),
+        custom: custom.map(c => ({ ...c, name: c.name.trim(), url: c.url.trim() }))
+      });
+      const setP = (prov, patch) => { setPlan(null); setPredef(prev => ({ ...prev, [prov]: { ...prev[prov], ...patch } })); };
+      const setC = (i, patch) => { setPlan(null); setCustom(prev => prev.map((c, j) => j === i ? { ...c, ...patch } : c)); };
+      const addC = () => { setPlan(null); setCustom(prev => [...prev, { name: '', url: 'https://', cloudpath: true, frequency: 300, protocol: 'ADAPTIVE' }]); };
+      const delC = (i) => { setPlan(null); setCustom(prev => prev.filter((_, j) => j !== i)); };
+
+      const runDryRun = async () => {
+        setBusy(true); setError(null);
+        try { setPlan(await api.call('POST', '/zdx/dryrun', payload())); setStep('dryrun'); }
+        catch (e) { setError('Dry run failed: ' + e.message); }
+        setBusy(false);
+      };
+      const runApply = async () => {
+        setBusy(true); setError(null);
+        try { setResult(await api.call('POST', '/zdx/apply', payload())); }
+        catch (e) { setError('Apply failed: ' + e.message); }
+        setBusy(false);
+      };
+      const restart = () => { setStep('template'); setPlan(null); setResult(null); setConfirmed(false); api.call('GET', '/zdx/catalog').then(c => { setCatalog(c); applyTemplate(c, templateId); }).catch(() => {}); };
+      const statusIcon = { pass: '✅', warn: '⚠️', fail: '❌' };
+
+      const Stepper = () => (
+        <div style={{display:'flex', gap:'6px', marginBottom:'1.25rem', flexWrap:'wrap'}}>
+          {ZDX_STEPS.map((s, i) => {
+            const done = i < reached, cur = s.id === step, canGo = done && !result;
+            return (
+              <div key={s.id} onClick={() => canGo && setStep(s.id)}
+                style={{padding:'6px 12px', borderRadius:'999px', fontSize:'12px', cursor: canGo ? 'pointer' : 'default',
+                  background: cur ? 'var(--accent-blue)' : done ? 'var(--accent-green-dim)' : 'var(--bg-input)',
+                  color: cur ? '#fff' : done ? 'var(--accent-green)' : 'var(--text-muted)', border:'1px solid var(--border)'}}>
+                {done ? '✓' : `${i + 1}.`} {s.label}
+              </div>
+            );
+          })}
+        </div>
+      );
+
+      const header = (
+        <div className="card-header">
+          <h2>📈 Set Up Zscaler Digital Experience Probes</h2>
+          <p>Turns on the ZDX probes that show how users experience their key apps, following the Zscaler POV best practice guide. Review exactly what will change, dry run against your tenant, then apply.</p>
+        </div>
+      );
+      if (!catalog) return (<div className="card">{header}<div style={{textAlign:'center',padding:'2rem'}}><span className="spinner"></span></div></div>);
+
+      const probeSummary = (web, path) => [web && 'Web', path && 'CloudPath'].filter(Boolean).join(' + ') || 'No probes';
+
+      return (
+        <div className="card">
+          {header}
+          <Stepper />
+
+          {step === 'template' && (
+            <div>
+              <div className="explainer"><strong>What ZDX probes are:</strong> Client Connector runs small synthetic tests from each user's device. A <strong>Web probe</strong> loads the app's page and measures availability and page fetch time. A <strong>CloudPath probe</strong> traces the network path hop by hop (device, Wi-Fi, ISP, Zscaler, app) so you can see where slowness comes from. Probes belong to an application: a <strong>predefined app</strong> is one Zscaler maintains probes for (Microsoft 365, Zoom, Okta…); a <strong>custom app</strong> is any URL you add.</div>
+              <div className="tier-grid">
+                {catalog.templates.map(t => (
+                  <div key={t.id} className={`tier-card ${templateId === t.id ? 'selected' : ''}`} data-zdxtemplate={t.id}
+                    onClick={() => { setTemplateId(t.id); applyTemplate(catalog, t.id); }}>
+                    <div className="tier-icon">{t.icon}</div>
+                    <div className="tier-name">{t.name}</div>
+                    <div className="tier-desc">{t.description}</div>
+                    <div style={{fontSize:'11px', color:'var(--text-muted)', marginTop:'8px'}}>{t.predefined.length + t.custom.length} apps · Source: {t.source}</div>
+                  </div>
+                ))}
+              </div>
+              <div className="btn-group">
+                <button className="btn btn-ghost" onClick={onExit}>← Digital Experience</button>
+                <button className="btn btn-primary" onClick={() => setStep('apps')}>Applications & Probes →</button>
+              </div>
+            </div>
+          )}
+
+          {step === 'apps' && (
+            <div>
+              <h3 style={{fontSize:'14px', margin:'0 0 0.25rem'}}>Zscaler predefined apps</h3>
+              <div className="form-hint" style={{marginBottom:'0.75rem'}}>Zscaler maintains the Web and CloudPath probes for these. Apps marked NOT SET UP are created in the tenant first; some need the customer's tenant prefix (for example <em>contoso</em> for contoso.sharepoint.com).</div>
+              <div className="toggle-group">
+                {catalog.predefined.map(a => {
+                  const st = predef[a.provider] || {};
+                  return (
+                    <div className="toggle-item" key={a.provider} data-predef={a.provider} style={{alignItems:'flex-start'}}>
+                      <div style={{flex:1}}>
+                        <label onClick={() => setP(a.provider, { on: !st.on })}>{a.label} <ZdxStateBadge p={a} /></label>
+                        <div className="form-hint">{a.description}</div>
+                        {st.on && (
+                          <div style={{display:'flex', gap:'1rem', alignItems:'center', flexWrap:'wrap', marginTop:'0.5rem'}}>
+                            {a.needsPrefix && !a.configured && (
+                              <span style={{display:'flex', alignItems:'center', gap:'6px', fontSize:'12px'}}>
+                                <input type="text" value={st.prefix || ''} placeholder="prefix" style={{width:'140px'}} data-field="prefix"
+                                  onChange={e => setP(a.provider, { prefix: e.target.value.trim() })} />
+                                <span style={{color:'var(--text-muted)'}}>{String(a.host).replace('<prefix>', '')}</span>
+                              </span>
+                            )}
+                            {a.configured && a.configuredHost && <span className="form-hint">Probes {a.configuredHost}</span>}
+                            <label style={{fontSize:'12px', display:'flex', gap:'4px', alignItems:'center', cursor:'pointer'}}>
+                              <input type="checkbox" checked={st.web !== false} onChange={e => setP(a.provider, { web: e.target.checked, cloudpath: e.target.checked ? st.cloudpath : false })} /> Web probe
+                            </label>
+                            <label style={{fontSize:'12px', display:'flex', gap:'4px', alignItems:'center', cursor: st.web === false ? 'not-allowed' : 'pointer', opacity: st.web === false ? 0.5 : 1}}>
+                              <input type="checkbox" checked={!!st.cloudpath} disabled={st.web === false} onChange={e => setP(a.provider, { cloudpath: e.target.checked })} /> CloudPath probe
+                            </label>
+                          </div>
+                        )}
+                      </div>
+                      <div className={`toggle-switch ${st.on ? 'active' : ''}`} onClick={() => setP(a.provider, { on: !st.on })}><div className="toggle-knob"></div></div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <h3 style={{fontSize:'14px', margin:'1.5rem 0 0.25rem'}}>Custom apps</h3>
+              <div className="form-hint" style={{marginBottom:'0.75rem'}}>Any URL users depend on, such as an EHR, PACS viewer or intranet. Each gets a Web probe (ZDX needs one to turn the app on) and, by default, a CloudPath probe to the same host. Probes run for all users.</div>
+              {custom.length === 0 && <div className="alert alert-info"><span>ℹ No custom apps. Add one below or continue with predefined apps only.</span></div>}
+              {custom.map((c, i) => (
+                <div key={i} className="card" style={{background:'var(--bg-input)', padding:'0.9rem', marginBottom:'0.6rem'}} data-custom={i}>
+                  <div style={{display:'grid', gridTemplateColumns:'1fr 2fr auto', gap:'0.6rem', alignItems:'end'}}>
+                    <div className="form-group" style={{margin:0}}>
+                      <label className="form-label">App name</label>
+                      <input type="text" value={c.name} maxLength={64} onChange={e => setC(i, { name: e.target.value })} data-field="name" />
+                    </div>
+                    <div className="form-group" style={{margin:0}}>
+                      <label className="form-label">URL to probe</label>
+                      <input type="text" value={c.url} onChange={e => setC(i, { url: e.target.value })} data-field="url" />
+                    </div>
+                    <button className="btn btn-ghost btn-sm" onClick={() => delC(i)}>🗑 Remove</button>
+                  </div>
+                  <div style={{display:'flex', gap:'1rem', alignItems:'center', flexWrap:'wrap', marginTop:'0.6rem', fontSize:'12px'}}>
+                    <span>Every <select value={c.frequency} onChange={e => setC(i, { frequency: Number(e.target.value) })} style={{width:'auto', display:'inline-block', padding:'2px 6px'}}>
+                      {catalog.frequencies.map(f => <option key={f} value={f}>{zdxMin(f)}</option>)}
+                    </select></span>
+                    <label style={{display:'flex', gap:'4px', alignItems:'center', cursor:'pointer'}}>
+                      <input type="checkbox" checked={c.cloudpath} onChange={e => setC(i, { cloudpath: e.target.checked })} data-field="cloudpath" /> CloudPath probe
+                    </label>
+                    {c.cloudpath && (
+                      <span>Protocol <select value={c.protocol} onChange={e => setC(i, { protocol: e.target.value })} style={{width:'auto', display:'inline-block', padding:'2px 6px'}}>
+                        {catalog.protocols.map(p => <option key={p} value={p}>{ZDX_PROTOCOL_LABEL[p] || p}</option>)}
+                      </select></span>
+                    )}
+                  </div>
+                </div>
+              ))}
+              <button className="btn btn-ghost btn-sm" onClick={addC} style={{marginTop:'0.25rem'}}>➕ Add custom app</button>
+
+              <div className="btn-group">
+                <button className="btn btn-ghost" onClick={() => setStep('template')}>← Back</button>
+                <button className="btn btn-primary" onClick={() => setStep('review')} disabled={!chosenPredef.length && !custom.length}>Review →</button>
+              </div>
+            </div>
+          )}
+
+          {step === 'review' && (
+            <div>
+              <table className="diff-table">
+                <thead><tr><th>App</th><th>Type</th><th>Target</th><th>Probes</th><th>Tenant today</th></tr></thead>
+                <tbody>
+                  {chosenPredef.map(a => {
+                    const st = predef[a.provider];
+                    const host = a.configured ? (a.configuredHost || a.host) : String(a.host).replace('<prefix>', st.prefix || '<prefix>');
+                    return (<tr key={a.provider}><td style={{fontWeight:600}}>{a.label}</td><td><span className="badge badge-category">PREDEFINED</span></td><td>{host}</td><td>{probeSummary(st.web !== false, st.cloudpath && st.web !== false)} (Zscaler-managed)</td><td><ZdxStateBadge p={a} /></td></tr>);
+                  })}
+                  {custom.map((c, i) => (
+                    <tr key={'c' + i}><td style={{fontWeight:600}}>{c.name || '(unnamed)'}</td><td><span className="badge badge-create">CUSTOM</span></td><td>{c.url}</td><td>{probeSummary(true, c.cloudpath)} · every {zdxMin(c.frequency)}{c.cloudpath ? ` · ${c.protocol}` : ''}</td><td>New</td></tr>
+                  ))}
+                </tbody>
+              </table>
+              <div className="form-hint" style={{marginTop:'0.5rem'}}>All probes run for all users. Web probes accept HTTP 200–299 and 304, follow up to 5 redirects and time out after 60 seconds.</div>
+              <div className="btn-group">
+                <button className="btn btn-ghost" onClick={() => setStep('apps')}>← Back</button>
+                <button className="btn btn-primary" onClick={runDryRun} disabled={busy}>{busy ? <><span className="spinner"></span> Running...</> : 'Run Dry Run →'}</button>
+              </div>
+            </div>
+          )}
+
+          {step === 'dryrun' && plan && (
+            <div>
+              <div className={`alert ${plan.ok ? 'alert-success' : 'alert-danger'}`}>
+                <span>{plan.ok ? `✓ Dry run passed: ${plan.changes} change${plan.changes === 1 ? '' : 's'} planned. Nothing has been changed in your tenant yet.` : '✗ Dry run found problems. Fix them before applying.'}</span>
+              </div>
+              {plan.warnings.map((w, i) => <div key={i} className="alert alert-warning"><span>⚠ {w}</span></div>)}
+              <h3 style={{fontSize:'14px', margin:'1rem 0 0.5rem'}}>Pre-flight checks</h3>
+              <table className="diff-table"><tbody>
+                {plan.checks.map((c, i) => (<tr key={i}><td style={{width:'32px'}}>{statusIcon[c.status]}</td><td style={{fontWeight:600, width:'280px'}}>{c.name}</td><td style={{fontSize:'12px', color:'var(--text-secondary)'}}>{c.detail}</td></tr>))}
+              </tbody></table>
+              <h3 style={{fontSize:'14px', margin:'1.25rem 0 0.5rem'}}>What Apply will do, in order</h3>
+              {plan.apps.filter(a => a.steps.length).map((a, i) => (
+                <div key={i} style={{marginBottom:'0.6rem'}}>
+                  <div style={{fontWeight:600, fontSize:'13px'}}>{a.name} <span className="badge badge-category">{a.kind.toUpperCase()}</span></div>
+                  <ol style={{margin:'0.25rem 0 0', paddingLeft:'1.4rem', fontSize:'12px', color:'var(--text-secondary)'}}>
+                    {a.steps.map((s, j) => <li key={j}>{s.label}{s.detail ? ` — ${s.detail}` : ''}</li>)}
+                  </ol>
+                </div>
+              ))}
+              <div className="btn-group">
+                <button className="btn btn-ghost" onClick={() => setStep('review')}>← Back</button>
+                <button className="btn btn-ghost" onClick={runDryRun} disabled={busy}>↻ Re-run</button>
+                <button className="btn btn-success" onClick={() => { setConfirmed(false); setStep('apply'); }} disabled={!plan.ok || !plan.changes}>Proceed to Apply →</button>
+              </div>
+            </div>
+          )}
+
+          {step === 'apply' && (
+            <div>
+              {!result ? (
+                <div>
+                  <div className="alert alert-warning"><span>⚠ <strong>Caution:</strong> This makes {plan?.changes} change{plan?.changes === 1 ? '' : 's'} in your ZDX tenant. The probes start running for all users right away. If a custom app fails part way, what was created for it is removed again. You can turn probes off or delete custom apps afterwards from Digital Experience → Manage.</span></div>
+                  <div className="toggle-item" style={{marginBottom:'1rem'}}>
+                    <label onClick={() => setConfirmed(!confirmed)} style={{cursor:'pointer'}}>I understand this changes my ZDX tenant and have reviewed the dry run.</label>
+                    <div className={`toggle-switch ${confirmed ? 'active' : ''}`} onClick={() => setConfirmed(!confirmed)}><div className="toggle-knob"></div></div>
+                  </div>
+                  <div className="btn-group">
+                    <button className="btn btn-ghost" onClick={() => setStep('dryrun')} disabled={busy}>← Back</button>
+                    <button className="btn btn-success" onClick={runApply} disabled={!confirmed || busy}>{busy ? <><span className="spinner"></span> Applying...</> : '🚀 Apply ZDX Probes'}</button>
+                  </div>
+                </div>
+              ) : (
+                <div>
+                  <div className={`alert ${result.verified ? 'alert-success' : 'alert-warning'}`}>
+                    <span>{result.verified ? '✓ Done. Every app and probe was read back from ZDX and is on.' : '⚠ Finished with problems. See below.'}</span>
+                  </div>
+                  {result.results.map((r, i) => (
+                    <div key={i} style={{marginBottom:'0.75rem'}}>
+                      <div style={{fontWeight:600, fontSize:'13px'}}>{r.ok ? '✅' : '❌'} {r.name} <span className="badge badge-category">{r.kind.toUpperCase()}</span></div>
+                      <ul style={{margin:'0.25rem 0 0', paddingLeft:'1.4rem', fontSize:'12px', color:'var(--text-secondary)'}}>
+                        {r.steps.map((s, j) => <li key={j}>{s.ok ? (s.skipped ? '–' : '✓') : '✗'} {s.label}{s.error ? `: ${s.error}` : ''}</li>)}
+                      </ul>
+                      {r.rolledBack && <div className="form-hint" style={{color:'var(--accent-amber)'}}>Rolled back: {r.rolledBack} removed.</div>}
+                    </div>
+                  ))}
+                  {result.verification?.length > 0 && (
+                    <table className="diff-table" style={{marginTop:'0.75rem'}}>
+                      <thead><tr><th></th><th>App</th><th>Check</th><th>Read back</th></tr></thead>
+                      <tbody>{result.verification.map((v, i) => (<tr key={i}><td>{v.ok ? '✅' : '❌'}</td><td>{v.app}</td><td>{v.check}</td><td style={{fontSize:'12px'}}>{v.detail}</td></tr>))}</tbody>
+                    </table>
+                  )}
+                  <div className="form-hint" style={{marginTop:'0.75rem'}}>Probe data appears in the ZDX portal within a few probe intervals. Recorded in the audit log (ZDX_DRY_RUN and ZDX_APPLY entries).</div>
+                  <div className="btn-group">
+                    <button className="btn btn-ghost" onClick={onExit}>← Digital Experience</button>
+                    <button className="btn btn-primary" onClick={restart}>Start again</button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    function ZdxManage({ setError, onExit }) {
+      const [data, setData] = useState(null);
+      const [busy, setBusy] = useState(null);
+      const [confirm, setConfirm] = useState(null); // { kind:'app'|'probe', key, id, name }
+      const load = async () => { setError(null); try { setData(await api.call('GET', '/zdx/overview')); } catch (e) { setError('Could not load ZDX apps: ' + e.message); } };
+      useEffect(() => { load(); }, []);
+      const act = async (label, fn) => { setBusy(label); setError(null); try { await fn(); setConfirm(null); await load(); } catch (e) { setError(e.message); } setBusy(null); };
+      const isCustom = (a) => a.type !== 'PREDEFINED';
+
+      return (
+        <div className="card">
+          <div className="card-header">
+            <h2>🛠️ Manage ZDX Apps & Probes</h2>
+            <p>Every app and probe configured in this ZDX tenant. Turn them on or off, or delete custom apps and probes. Zscaler predefined apps and their probes can only be turned off.</p>
+          </div>
+          {!data ? <div style={{textAlign:'center',padding:'2rem'}}><span className="spinner"></span></div> : (
+            <div>
+              {data.apps.map(a => (
+                <div key={a.id} className="card" style={{background:'var(--bg-input)', padding:'0.9rem', marginBottom:'0.6rem'}} data-zdxapp={a.name}>
+                  <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', gap:'12px'}}>
+                    <div>
+                      <div style={{fontWeight:600, fontSize:'13px'}}>{a.name} <span className={`badge ${a.type === 'PREDEFINED' ? 'badge-category' : 'badge-create'}`}>{a.type}</span> {a.active ? <span className="badge badge-create">ON</span> : <span className="badge badge-risk">OFF</span>}</div>
+                      <div style={{fontSize:'11px', color:'var(--text-muted)'}}>ID {a.id}{a.host ? ` · ${a.host}` : ''} · {a.monitors.length} probe{a.monitors.length === 1 ? '' : 's'}</div>
+                    </div>
+                    <div style={{display:'flex', gap:'6px', alignItems:'center', flexShrink:0}}>
+                      <button className="btn btn-ghost btn-sm" disabled={!!busy} onClick={() => act('app', () => api.call('POST', `/zdx/apps/${encodeURIComponent(a.key)}/${a.active ? 'deactivate' : 'activate'}`))}>{a.active ? 'Turn off' : 'Turn on'}</button>
+                      {isCustom(a) && (confirm && confirm.kind === 'app' && confirm.id === a.id ? (
+                        <>
+                          <span style={{fontSize:'11px', color:'var(--accent-amber)'}}>Delete "{a.name}" and its probes?</span>
+                          <button className="btn btn-sm" style={{background:'var(--accent-red)', color:'#fff'}} disabled={!!busy} onClick={() => act('del', () => api.call('DELETE', `/zdx/apps/${a.id}?confirmName=${encodeURIComponent(a.name)}`))}>Yes, delete</button>
+                          <button className="btn btn-ghost btn-sm" onClick={() => setConfirm(null)}>Cancel</button>
+                        </>
+                      ) : <button className="btn btn-ghost btn-sm" disabled={!!busy} onClick={() => setConfirm({ kind: 'app', id: a.id })}>🗑 Delete</button>)}
+                    </div>
+                  </div>
+                  {a.monitors.length > 0 && (
+                    <table className="diff-table" style={{marginTop:'0.6rem'}}>
+                      <tbody>
+                        {a.monitors.map(m => (
+                          <tr key={m.id}>
+                            <td style={{width:'80px'}}><span className="badge badge-category">{m.type === 'WEB' ? 'WEB' : 'CLOUDPATH'}</span></td>
+                            <td style={{fontWeight:500}}>{m.name}</td>
+                            <td style={{fontSize:'12px', color:'var(--text-secondary)'}}>{m.target}{m.frequency ? ` · every ${zdxMin(m.frequency)}` : ''}</td>
+                            <td style={{width:'60px'}}>{m.active ? <span className="badge badge-create">ON</span> : <span className="badge badge-risk">OFF</span>}</td>
+                            <td style={{width:'240px', textAlign:'right'}}>
+                              <button className="btn btn-ghost btn-sm" disabled={!!busy} onClick={() => act('probe', () => api.call('POST', `/zdx/apps/${encodeURIComponent(a.key)}/monitors/${m.id}/${m.active ? 'deactivate' : 'activate'}`))}>{m.active ? 'Turn off' : 'Turn on'}</button>
+                              {isCustom(a) && (confirm && confirm.kind === 'probe' && confirm.id === m.id ? (
+                                <>
+                                  <button className="btn btn-sm" style={{background:'var(--accent-red)', color:'#fff', marginLeft:'4px'}} disabled={!!busy} onClick={() => act('delp', () => api.call('DELETE', `/zdx/apps/${a.id}/monitors/${m.id}?confirmName=${encodeURIComponent(m.name)}`))}>Yes, delete</button>
+                                  <button className="btn btn-ghost btn-sm" onClick={() => setConfirm(null)}>Cancel</button>
+                                </>
+                              ) : <button className="btn btn-ghost btn-sm" style={{marginLeft:'4px'}} disabled={!!busy} onClick={() => setConfirm({ kind: 'probe', id: m.id })}>🗑</button>)}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
+                </div>
+              ))}
+              <div className="form-hint">A CloudPath probe follows its app's Web probe: turn off or delete the CloudPath probe before its Web probe.</div>
+            </div>
+          )}
+          <div className="btn-group">
+            <button className="btn btn-ghost" onClick={onExit}>← Digital Experience</button>
+            <button className="btn btn-ghost" onClick={load} disabled={!!busy}>🔄 Refresh</button>
+          </div>
+        </div>
+      );
+    }
+
+    function ZdxStep({ setError }) {
+      const [mode, setMode] = useState('home');
+      if (mode === 'create') return <ZdxWizard setError={setError} onExit={() => setMode('home')} />;
+      if (mode === 'manage') return <ZdxManage setError={setError} onExit={() => setMode('home')} />;
+      return (
+        <div className="card">
+          <div className="card-header">
+            <h2>📈 Digital Experience (ZDX)</h2>
+            <p>Zscaler Digital Experience probes via OneAPI: see how users experience their key apps, from the device to the app.</p>
+          </div>
+          <div className="tier-grid">
+            <div className="tier-card" onClick={() => setMode('create')} style={{cursor:'pointer'}}>
+              <div className="tier-icon">➕</div>
+              <div className="tier-name">Set up probes</div>
+              <div className="tier-desc">Turn on the probes from the Zscaler POV best practice guide (Microsoft Login and zscaler.com), add predefined SaaS apps or your own URLs: review, dry run, apply.</div>
+            </div>
+            <div className="tier-card" onClick={() => setMode('manage')} style={{cursor:'pointer'}}>
+              <div className="tier-icon">🛠️</div>
+              <div className="tier-name">Manage apps & probes</div>
+              <div className="tier-desc">See every ZDX app and probe in the tenant; turn them on or off, or delete custom ones.</div>
+            </div>
+          </div>
         </div>
       );
     }

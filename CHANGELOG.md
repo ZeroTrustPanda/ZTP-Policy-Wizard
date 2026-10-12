@@ -1,5 +1,23 @@
 # Changelog
 
+## v1.8.0-standalone — 2026-10-12 (branch `standalone`)
+
+- Standalone downloads rebuilt as **1.8.0** with the new Digital Experience (ZDX) module below.
+
+## v1.8.0 — 2026-10-12
+
+### ✨ New: Digital Experience (ZDX) module
+- **Set up probes:** a guided Template → Applications & Probes → Review → Dry Run → Apply flow, the same as the ZIA and Mobile Admin wizards.
+- **Zscaler POV Best Practice template:** Microsoft Login (Zscaler predefined app) and zscaler.com (custom app), each with a Web probe and a CloudPath probe, for all users.
+- **Predefined apps:** turn on any Zscaler-maintained app (Microsoft 365, Teams, SharePoint, OneDrive, Zoom, Okta, Box, Salesforce, ServiceNow, Webex). Apps not yet set up are created with the customer's tenant prefix, and ZDX adds its own probes.
+- **Custom apps:** add any URL with a Web probe and an optional CloudPath probe; choose the interval and CloudPath protocol.
+- **Dry run:** shows the tenant's current state and the exact steps in order; anything already on is skipped.
+- **Apply:** reads every app and probe back to verify it, and removes a custom app again if any of its steps fail.
+- **Manage apps & probes:** turn apps and probes on or off, delete custom apps and probes (name confirmation, CloudPath before Web).
+- **API routes:** `/api/zdx/catalog`, `/api/zdx/dryrun`, `/api/zdx/apply`, `/api/zdx/overview`, plus app and probe activate / deactivate / delete.
+
+Requires the ZDX scope on the OneAPI client.
+
 ## v1.7.1-standalone — 2026-10-12 (branch `standalone`)
 
 - Standalone downloads rebuilt as **1.7.1** with the Zscaler POV best practice wording below. No other changes.

@@ -19,10 +19,11 @@ const { generateFullTemplate, COMPLIANCE_FRAMEWORKS, getActionCatalog } = requir
 const { generateZCCTemplate, buildAppProfileBody } = require('./zcc-templates');
 const { getTemplateCatalog, getTemplate, getPlatform, BYPASS_APPS } = require('./zcc-app-profile-templates');
 const { getFwdTemplateCatalog, getFwdTemplate, buildForwardingProfileBody } = require('./zcc-fwd-profile-templates');
+const { registerZdxRoutes, ZDXClient } = require('./zdx-routes');
 const { AuditLogger } = require('./audit-logger');
 
 const app = express();
-const APP_VERSION = '1.7.1';
+const APP_VERSION = '1.8.0';
 const PORT = process.env.ZTP_PORT || 3000;
 const HOST = process.env.ZTP_HOST || '0.0.0.0';
 const SESSION_TTL_MS = 60 * 60 * 1000;   // 1 hour
@@ -158,6 +159,8 @@ app.post('/api/auth/oneapi', async (req, res) => {
 
     // Create ZCC client sharing the same token — routes through api.zsapi.net/zcc/
     const zccClient = new ZCCClient(client);
+    // ZDX client shares the same token — routes through api.zsapi.net/zdx/ (v1.8.0)
+    const zdxClient = new ZDXClient(client);
 
     // Enforce max concurrent sessions
     if (sessions.size >= MAX_SESSIONS) {
@@ -177,6 +180,7 @@ app.post('/api/auth/oneapi', async (req, res) => {
     sessions.set(sessionId, {
       client,
       zccClient,
+      zdxClient,
       logger,
       snapshots: {},
       appliedChanges: [],
@@ -2563,6 +2567,12 @@ app.get('/api/zcc/diag', requireAuth, async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 });
+
+
+// ========================
+// Digital Experience (ZDX) module (v1.8.0) — see server/zdx-routes.js
+// ========================
+registerZdxRoutes(app, requireAuth);
 
 
 // ========================
