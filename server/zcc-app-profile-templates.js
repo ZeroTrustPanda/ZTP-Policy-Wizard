@@ -266,15 +266,10 @@ const MAC_BEST_PRACTICE_SETTINGS = [
     apply: (b) => { b.policyExtension.switchFocusToNotification = '1'; },
     verify: (p) => String(p.policyExtension?.switchFocusToNotification) === '1'
   },
-  {
-    key: 'notificationTemplate',
-    label: 'Notification Template (ID 2221)',
-    category: 'User Experience',
-    description: 'Uses notification template 2221 instead of the legacy notification settings. Template IDs are tenant-specific: change it or switch this off on other tenants.',
-    value: 'Template 2221', portalDefault: 'Legacy Notification Settings', impact: 'caution',
-    apply: (b) => { b.notificationTemplateId = 2221; b.notificationTemplateSelected = [{ label: '2221', value: 2221 }]; },
-    verify: (p) => num(p.notificationTemplateContract?.id ?? p.notificationTemplateId) === 2221
-  },
+  // v1.8.1: the "Notification Template (ID 2221)" setting was removed. Notification template IDs are
+  // tenant-specific (2221 exists only in the ZTH lab tenant) and ZCC rejects the whole macOS profile with
+  // {"success":"false"} when the ID doesn't exist (reproduced on another tenant 2026-10-12). There is no
+  // public API to list a tenant's templates, so new profiles keep the portal default (Legacy Notification Settings).
   {
     key: 'reactivateZia',
     label: 'Re-enable Internet Security After 60 Minutes',
