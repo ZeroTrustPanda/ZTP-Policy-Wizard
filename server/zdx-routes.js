@@ -14,12 +14,19 @@
  *   - custom apps: create inactive -> Web probe -> CloudPath probe (followWebMonitor) -> activate app
  *   - predefined apps: create with prefix (ZDX adds its own Web + CloudPath probes) -> activate app -> Web -> CloudPath
  *   - deactivate / delete in reverse: CloudPath before Web (an active CloudPath probe blocks its Web probe)
+ *   - a brand-new ZDX tenant has no "Custom Apps Collection" (the portal creates it with the first custom
+ *     app), so the plan starts with a setup step that creates it (v1.8.2, proven on a fresh tenant)
  */
 const { ZDXClient } = require('./zdx-client');
 const T = require('./zdx-templates');
 
 const PREFIX_RE = /^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$/i;
 const NAME_RE = /^[\w .()\-:/&+]{1,64}$/;
+
+const COLLECTION_DEFAULTS = {
+  custom: { name: 'Custom Apps Collection', description: 'Custom applications (created by ZTP Policy Wizard)' },
+  predefined: { name: 'Predefined Apps Collection', description: 'Collection for Predefined Applications (created by ZTP Policy Wizard)' }
+};
 
 function findCollection(collections, kind) {
   const want = kind === 'custom' ? 'custom apps collection' : 'predefined apps collection';
@@ -57,6 +64,7 @@ async function planZdx(zdx, input) {
 
   const colPre = findCollection(collections, 'predefined');
   const colCus = findCollection(collections, 'custom');
+  const missingCol = new Set();   // collections a new ZDX tenant doesn't have yet; created by a setup step
 
   // ---- Predefined apps
   for (const p of predefinedIn) {
@@ -81,7 +89,7 @@ async function planZdx(zdx, input) {
         checks.push({ name: `${label}: tenant prefix`, status: 'fail', detail: `Enter the customer's ${label} prefix (the part before ${String(sup.host).replace('<prefix>', '')}).` });
         continue;
       }
-      if (!colPre) { checks.push({ name: `${label}: collection`, status: 'fail', detail: 'No "Predefined Apps Collection" in this tenant' }); continue; }
+      if (!colPre) missingCol.add('predefined');
       entry.prefix = prefix;
       entry.steps.push({ op: 'createPredefined', label: `Set up ${label} (${entry.host})`, detail: 'ZDX adds its own Web and CloudPath probes for this app' });
       entry.steps.push({ op: 'activateApp', label: `Turn on ${label}` });
@@ -143,12 +151,22 @@ async function planZdx(zdx, input) {
     }
     const otherHost = monitors.find(m => isWeb(m) && T.hostOf(m.url) === host);
     if (otherHost) warnings.push(`${host} is already probed by "${otherHost.name}" in app "${otherHost.application?.name}". A second app will probe it too.`);
-    if (!colCus) { checks.push({ name: `Custom app "${name}": collection`, status: 'fail', detail: 'No "Custom Apps Collection" in this tenant' }); continue; }
+    if (!colCus) missingCol.add('custom');
     entry.steps.push({ op: 'createCustom', label: `Create custom app "${name}" (inactive)` });
     entry.steps.push({ op: 'createWeb', label: `Create Web probe for ${url}`, body: T.buildWebMonitor({ appName: name, url, frequency }) });
     if (entry.cloudpath) entry.steps.push({ op: 'createCloudPath', label: `Create CloudPath probe to ${host} (${protocol})`, body: T.buildCloudPathMonitor({ appName: name, host, frequency, protocol }) });
     entry.steps.push({ op: 'activateApp', label: `Turn on "${name}"` });
     checks.push({ name: `Custom app "${name}"`, status: 'pass', detail: `${host} · Web${entry.cloudpath ? ' + CloudPath' : ''} · every ${frequency / 60} min · all users` });
+  }
+
+  if (missingCol.size) {
+    const setup = { kind: 'setup', key: 'collections', name: 'ZDX tenant setup', steps: [] };
+    for (const k of ['predefined', 'custom']) {
+      if (!missingCol.has(k)) continue;
+      setup.steps.push({ op: 'createCollection', collectionKind: k, label: `Create the "${COLLECTION_DEFAULTS[k].name}" (new ZDX tenant)` });
+      checks.splice(1, 0, { name: `"${COLLECTION_DEFAULTS[k].name}"`, status: 'pass', detail: 'Not in this tenant yet (new ZDX tenant) — will be created first' });
+    }
+    out.unshift(setup);
   }
 
   checks.push({ name: 'Who the probes run for', status: 'pass', detail: 'All users (no department, location or group scoping)' });
@@ -168,6 +186,17 @@ async function runApp(zdx, entry, ctx) {
     catch (e) { res.steps.push({ label, ok: false, error: e.zdxMessage || e.message }); res.ok = false; throw e; }
   };
   try {
+    if (entry.kind === 'setup') {
+      for (const s of entry.steps) {
+        if (s.op !== 'createCollection') continue;
+        const d = COLLECTION_DEFAULTS[s.collectionKind];
+        const col = await step(s.label, () => zdx.createCollection({ name: d.name, type: 'END_USER', active: true, description: d.description, tags: [], filters: {} }));
+        if (!col?.id) throw Object.assign(new Error('ZDX did not return the new collection'), { zdxMessage: 'ZDX did not return the new collection' });
+        res.created[s.collectionKind === 'custom' ? 'customCollectionId' : 'predefinedCollectionId'] = col.id;
+        ctx[s.collectionKind === 'custom' ? 'colCus' : 'colPre'] = { id: col.id, name: col.name || d.name };
+      }
+      return res;
+    }
     if (entry.kind === 'predefined') {
       const key = entry.key;
       let monsById = entry.monitors || {};
@@ -230,6 +259,7 @@ async function verifyZdx(zdx, plan, results) {
   const [apps, monitors] = await Promise.all([zdx.listApps(), zdx.listAllMonitors()]);
   const rows = [];
   for (const entry of plan.apps) {
+    if (entry.kind === 'setup') continue;
     const r = results.find(x => x.name === entry.name && x.kind === entry.kind);
     if (!r || !r.ok) continue;
     const app = entry.kind === 'predefined'
@@ -292,7 +322,12 @@ function registerZdxRoutes(app, requireAuth) {
       const plan = await planZdx(zdx, req.body);
       if (!plan.ok) return res.status(409).json({ error: 'Pre-flight checks failed: ' + plan.checks.filter(c => c.status === 'fail').map(c => `${c.name}: ${c.detail}`).join('; '), checks: plan.checks });
       const results = [];
-      for (const entry of plan.apps) results.push(await runApp(zdx, entry, plan._ctx));
+      for (const entry of plan.apps) {
+        // Apps need their collection: if tenant setup failed, don't try them (nothing half-built is left behind)
+        const setupFailed = results.some(r => r.kind === 'setup' && !r.ok);
+        if (setupFailed) { results.push({ name: entry.name, kind: entry.kind, ok: false, steps: [{ label: 'Not started — ZDX tenant setup failed', ok: false, error: 'Skipped' }], created: {} }); continue; }
+        results.push(await runApp(zdx, entry, plan._ctx));
+      }
       let verification = [];
       try { verification = await verifyZdx(zdx, plan, results); }
       catch (e) { verification = [{ app: '—', check: 'Read back from ZDX', ok: false, detail: e.message }]; }
