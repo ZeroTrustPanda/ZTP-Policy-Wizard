@@ -1,4 +1,4 @@
-# 🐼 ZeroTrustPanda — ZTP Policy Wizard v1.7.1
+# 🐼 ZeroTrustPanda — ZTP Policy Wizard v1.8.0
 
 Automated Zscaler Internet Access (ZIA) and Zscaler Client Connector (ZCC) policy configuration for healthcare and enterprise environments.
 
@@ -20,6 +20,7 @@ Deploy a complete Zscaler security policy stack in minutes instead of hours. Sel
 - **Policy Catalog** — Browse all 1,098 rules across 4 tiers × 9 frameworks without connecting
 - **Bulk Rule Manager** — Delete rules, DLP engines, and custom dictionaries across all categories
 - **Mobile Admin Portal** — Configure ZCC forwarding profiles and app profiles via PATCH/POST edit
+- **Digital Experience (ZDX)** — Set up ZDX Web and CloudPath probes from the Zscaler POV best practice guide, and manage existing apps and probes
 
 ## Allow / Block Step (v1.6.0)
 
@@ -59,6 +60,20 @@ macOS POV Best Practice: SSL certificate, block iCloud Private Relay, fail-close
 **Manual step:** the public API ignores the macOS *Modern UI* setting on create, update and PATCH, so the wizard marks it MANUAL and reminds you to set it in the portal after creation.
 
 The create body is the full payload the Mobile Admin portal sends (`server/zcc-windows-profile-template.json`, `server/zcc-mac-profile-template.json`); minimal bodies are rejected by ZCC with HTTP 200 + `success:"false"`. Template settings live in `server/zcc-app-profile-templates.js`.
+
+## Digital Experience (ZDX) (v1.8.0)
+
+Digital Experience → **Set up probes** turns on ZDX probes following the **Zscaler POV best practice guide**, with the same flow as the other wizards: **Template → Applications & Probes → Review → Dry Run → Apply**.
+
+- A **Web probe** loads an app's page from each user's device and measures availability and page fetch time. A **CloudPath probe** traces the network path hop by hop (device, Wi-Fi, ISP, Zscaler, app).
+- **Zscaler POV Best Practice** template: *Microsoft Login* (Zscaler predefined app, login.microsoftonline.com) and *zscaler.com* (custom app), each with a Web and a CloudPath probe, for all users.
+- **Predefined apps** (Microsoft 365, Teams, SharePoint, OneDrive, Zoom, Okta, Box, Salesforce, ServiceNow, Webex): Zscaler maintains their probes. Apps not yet set up in the tenant are created first; some need the customer's tenant prefix (e.g. `contoso` for contoso.sharepoint.com).
+- **Custom apps**: any URL (EHR, PACS viewer, intranet). Each gets a Web probe and, by default, a CloudPath probe to the same host; probe interval 5–30 min, CloudPath protocol Adaptive / ICMP / TCP / UDP.
+- **Dry run** shows tenant state and the exact ordered steps; apps already set up are skipped or only the missing probes are turned on.
+- **Apply** creates and turns on everything in the order ZDX requires, reads it back and verifies each app and probe, and removes a half-created custom app if any step fails. Logged as `ZDX_DRY_RUN` / `ZDX_APPLY`.
+- **Manage apps & probes** lists every app and probe in the tenant; turn them on or off, delete custom apps (probes first) and custom probes. Zscaler predefined apps can only be turned off.
+
+The API client needs the ZDX scope. ZDX refuses some hosts (for example `www.zscaler.com`); the error appears in the Apply results and nothing is left behind.
 
 ## Security Tiers
 
@@ -161,6 +176,14 @@ The DLP module uses a **dictionary-first** approach:
 | POST | `/api/bulk-delete` | Delete selected rules across all categories |
 | GET | `/api/zcc/profiles` | Fetch ZCC forwarding + app profiles |
 | POST | `/api/zcc/apply` | Apply ZCC changes (PATCH app, POST edit forwarding) |
+| GET | `/api/zdx/catalog` | ZDX templates and predefined apps with tenant state |
+| POST | `/api/zdx/dryrun` | Read-only ZDX plan: checks and ordered steps |
+| POST | `/api/zdx/apply` | Create/turn on ZDX apps and probes, verify, roll back failures |
+| GET | `/api/zdx/overview` | ZDX apps with their probes |
+| POST | `/api/zdx/apps/:key/:action` | Turn a ZDX app on or off (`activate` / `deactivate`) |
+| POST | `/api/zdx/apps/:key/monitors/:mid/:action` | Turn a probe on or off |
+| DELETE | `/api/zdx/apps/:id?confirmName=` | Delete a custom ZDX app and its probes |
+| DELETE | `/api/zdx/apps/:key/monitors/:mid?confirmName=` | Delete a custom probe |
 | GET | `/api/zcc/fwd-templates` | Forwarding profile template catalog |
 | POST | `/api/zcc/forwarding-profiles/dryrun` | Read-only plan for a new forwarding profile |
 | POST | `/api/zcc/forwarding-profiles` | Create forwarding profile, read back and verify |
@@ -176,6 +199,7 @@ The DLP module uses a **dictionary-first** approach:
 
 | Version | Changes |
 |---------|---------|
+| **1.8.0** | New Digital Experience (ZDX) module: POV best practice probes (Microsoft Login + zscaler.com), predefined and custom apps, dry run, apply with verification and rollback, Manage screen |
 | **1.7.1** | Mobile Admin wording: templates renamed *Zscaler POV Best Practice*, steps explain what forwarding and app profiles are; macOS defaults to a new forwarding profile; tenant-specific notification template flagged REVIEW |
 | **1.7.0** | Mobile Admin: forwarding profile step before the app profile (POV best practice template, 8 settings), created first and linked, with rollback; forwarding profile delete with in-use guard |
 | **1.6.1** | Mobile Admin: macOS app profile create from the POV best practice template (platform picker, Modern UI as a manual step), macOS profiles listed for delete |
