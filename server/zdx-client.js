@@ -18,6 +18,10 @@
  *               DELETE /config/applications/{key}/monitors/{mid}
  *               GET  /config/monitors                          every monitor in the tenant
  *   Collections GET  /config/collections
+ *               POST /config/collections                       {name, type END_USER, active, description}
+ *                                                              (new ZDX tenants have no "Custom Apps Collection"
+ *                                                              until the first custom app is added)
+ *               DELETE /config/collections/{id}
  *
  * {key} is the numeric app id for custom/network apps and the provider name
  * (e.g. MICROSOFT_LOGIN) for predefined apps.
@@ -100,6 +104,8 @@ class ZDXClient {
 
   // Collections
   listCollections() { return this.apiCall('GET', '/config/collections').then(ZDXClient.list); }
+  createCollection(body) { return this.apiCall('POST', '/config/collections', body); }
+  deleteCollection(id) { return this.apiCall('DELETE', `/config/collections/${encodeURIComponent(id)}`); }
 }
 
 module.exports = { ZDXClient };

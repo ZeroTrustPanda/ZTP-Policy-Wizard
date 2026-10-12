@@ -1,4 +1,4 @@
-# 🐼 ZeroTrustPanda — ZTP Policy Wizard v1.8.1
+# 🐼 ZeroTrustPanda — ZTP Policy Wizard v1.8.2
 
 Automated Zscaler Internet Access (ZIA) and Zscaler Client Connector (ZCC) policy configuration for healthcare and enterprise environments.
 
@@ -8,9 +8,9 @@ No Node.js, no npm, nothing to install. Download the zip for your computer from 
 
 | Computer | Download |
 |---|---|
-| Windows 10/11 (64-bit) | [`ZTP-Wizard-1.8.1-windows-x64.zip`](standalone/release/ZTP-Wizard-1.8.1-windows-x64.zip) |
-| Mac with Apple Silicon (M1–M4) | [`ZTP-Wizard-1.8.1-macos-arm64.zip`](standalone/release/ZTP-Wizard-1.8.1-macos-arm64.zip) |
-| Intel Mac | [`ZTP-Wizard-1.8.1-macos-x64.zip`](standalone/release/ZTP-Wizard-1.8.1-macos-x64.zip) |
+| Windows 10/11 (64-bit) | [`ZTP-Wizard-1.8.2-windows-x64.zip`](standalone/release/ZTP-Wizard-1.8.2-windows-x64.zip) |
+| Mac with Apple Silicon (M1–M4) | [`ZTP-Wizard-1.8.2-macos-arm64.zip`](standalone/release/ZTP-Wizard-1.8.2-macos-arm64.zip) |
+| Intel Mac | [`ZTP-Wizard-1.8.2-macos-x64.zip`](standalone/release/ZTP-Wizard-1.8.2-macos-x64.zip) |
 
 The wizard starts on `http://127.0.0.1:3000` (or the next free port), opens your browser, and keeps your API credentials on your computer. Logs go to `ZTP-Wizard/logs` in your home folder.
 
@@ -18,7 +18,7 @@ The wizard starts on `http://127.0.0.1:3000` (or the next free port), opens your
 - **Windows:** SmartScreen → *More info* → *Run anyway*.
 - **Mac:** right-click `ZTP-Wizard` → *Open* → *Open*. If macOS still refuses, run `xattr -d com.apple.quarantine ZTP-Wizard` in the unzipped folder (and, if it reports "killed", `codesign --force --sign - ZTP-Wizard`).
 
-Same features as the v1.8.1 server version on `main`. The UI is compiled ahead of time with React and fonts built in, so it works without reaching any CDN; only the Zscaler API calls need the network.
+Same features as the v1.8.2 server version on `main`. The UI is compiled ahead of time with React and fonts built in, so it works without reaching any CDN; only the Zscaler API calls need the network.
 
 **Build it yourself** (any OS, needs Node 18+, python3 and zip):
 ```
@@ -228,6 +228,7 @@ The DLP module uses a **dictionary-first** approach:
 
 | Version | Changes |
 |---------|---------|
+| **1.8.2** | Fix: ZDX wizard failed on brand-new ZDX tenants ("No Custom Apps Collection in this tenant"); the wizard now creates the collection as a first setup step |
 | **1.8.1** | Fix: macOS app profile (and its forwarding profile) failed to create on any tenant other than ZTH; the tenant-specific notification template 2221 was removed from the macOS POV Best Practice template (now 16 settings) |
 | **1.8.0** | New Digital Experience (ZDX) module: POV best practice probes (Microsoft Login + zscaler.com), predefined and custom apps, dry run, apply with verification and rollback, Manage screen |
 | **1.7.1** | Mobile Admin wording: templates renamed *Zscaler POV Best Practice*, steps explain what forwarding and app profiles are; macOS defaults to a new forwarding profile; tenant-specific notification template flagged REVIEW |

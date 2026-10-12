@@ -1,5 +1,14 @@
 # Changelog
 
+## v1.8.2-standalone — 2026-10-12 (branch `standalone`)
+
+- Standalone downloads rebuilt as **1.8.2** with the ZDX new-tenant fix below.
+
+## v1.8.2 — 2026-10-12
+
+### 🐛 Fixed
+- **ZDX wizard failed on brand-new ZDX tenants:** the dry run stopped with `Custom app "zscaler.com": collection — No "Custom Apps Collection" in this tenant`. A new ZDX tenant only has the *Unified Communication* and *Predefined Apps* collections; ZDX creates the *Custom Apps Collection* when the first custom app is added in the portal, and the API requires every custom app to belong to a collection. The wizard now plans a **ZDX tenant setup** step that creates the missing collection first (`POST /zdx/v1/config/collections`), then creates the apps in it. If the setup step fails, the apps are skipped so nothing half-built is left behind. The same applies to a missing *Predefined Apps Collection*. Verified live on a fresh tenant.
+
 ## v1.8.1-standalone — 2026-10-12 (branch `standalone`)
 
 - Standalone downloads rebuilt as **1.8.1** with the macOS fix below.
