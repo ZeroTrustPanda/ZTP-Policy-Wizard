@@ -1,4 +1,4 @@
-# 🐼 ZeroTrustPanda — ZTP Policy Wizard v1.8.2
+# 🐼 ZeroTrustPanda — ZTP Policy Wizard v1.9.0
 
 Automated Zscaler Internet Access (ZIA) and Zscaler Client Connector (ZCC) policy configuration for healthcare and enterprise environments.
 
@@ -22,9 +22,22 @@ Deploy a complete Zscaler security policy stack in minutes instead of hours. Sel
 - **Mobile Admin Portal** — Configure ZCC forwarding profiles and app profiles via PATCH/POST edit
 - **Digital Experience (ZDX)** — Set up ZDX Web and CloudPath probes from the Zscaler POV best practice guide, and manage existing apps and probes
 
-## Allow / Block Step (v1.6.0)
+## Rules Step (v1.6.0, extended in v1.9.0)
 
-After **Customize**, the wizard lists each policy type (URL Filtering, Cloud Firewall, DNS Security, File Type Control, Cloud App Control, DLP) with **Tier default / Allow all / Block all**. Expand a type to flip individual rules. Rules set to Allow that the tier would restrict are flagged as WEAKENED in Review and the dry run, and logged as `ACTION_OVERRIDES` at apply time. `ZTP-Allow-Web` and `ZTP-Allow-NTP` are locked so baseline internet access can't be blocked by accident.
+After **Customize**, the wizard lists every policy type (URL Filtering, Cloud Firewall, SSL Inspection, Sandbox, DNS Security, File Type Control, Cloud App Control, DLP).
+
+- **On/off switch for every rule** (v1.9.0), plus *All on / All off* per policy type. Switched-off rules are not created.
+- **Tier default / Allow all / Block all** where the policy type supports it, with per-rule overrides. Rules set to Allow that the tier would restrict are flagged as WEAKENED in Review and the dry run, and logged as `ACTION_OVERRIDES` at apply time. `ZTP-Allow-Web` and `ZTP-Allow-NTP` are locked so baseline internet access can't be blocked by accident.
+- **Isolate** (v1.9.0): any URL rule can be set to Isolate. It opens those categories in Cloud Browser Isolation with the profile chosen on Customize (HTTP/HTTPS, GET + CONNECT, browser types copied from an existing Isolate rule).
+
+## Isolation Profile, Certificate and Frameworks (v1.9.0)
+
+- **Isolation profile** (Customize): the tenant's *Default Isolation Profile* unless you pick another; **↻ Refresh** picks up profiles created in the Isolation portal since the page loaded (the ZIA API can only read profiles). Used by URL rules set to Isolate and by Sandbox *Quarantine & Isolate*.
+- **SSL interception certificate** (Customize): choose the certificate the Inspect rules this run creates sign with, instead of the Zscaler default. Certificates come from `GET /intermediateCaCertificate/readyToUse`, plus any already used by SSL rules, or enter an ID by hand.
+- **SSL Certificate Manager** (ZIA › SSL Certificate Manager): every SSL rule and the certificate it uses. Select Inspect rules (for example "rules on the default certificate"), preview, then move them to another certificate (or back) and activate in one step.
+- **Frameworks**: on the Rules step, **Save framework** downloads a `.ztp-framework.json` with tier, compliance, modules, rule switches, Allow / Block / Isolate choices, isolation profile and certificate (by name). On the Security Tier step, **Load a saved framework** applies it in any tenant, and **Capture this tenant's policies** reads URL Filtering (with custom categories), Cloud Firewall, SSL, Sandbox, DNS and File Type rules into a framework (read-only) that can be saved and applied elsewhere. User / group / location scoping, firewall network objects, Cloud App Control and DLP are not captured.
+
+**Live-tenant fixes in v1.9.0:** rule names are kept within ZIA's 31-character limit; URL categories and deprecated firewall network applications the tenant doesn't have are left out (a firewall rule left with none is skipped); new SSL rules go right after Zscaler's predefined rules; Sandbox rules name their file types and protocols instead of `ANY`; the isolation profile lookup uses `/browserIsolation/profiles`.
 
 ## Mobile Admin: Create Forwarding + App Profile (v1.7.0)
 
@@ -218,6 +231,7 @@ The DLP module uses a **dictionary-first** approach:
 
 | Version | Changes |
 |---------|---------|
+| **1.9.0** | Rules step: on/off switch for every rule, Isolate for URL rules. Isolation profile picker (default + refresh) for Isolate and Sandbox Quarantine & Isolate. SSL certificate picker and SSL Certificate Manager (bulk certificate change). Frameworks: save, load, capture from tenant. Live-tenant fixes (31-character names, missing categories / deprecated firewall apps, SSL rule order, Sandbox file types, isolation profile endpoint) |
 | **1.8.2** | Fix: ZDX wizard failed on brand-new ZDX tenants ("No Custom Apps Collection in this tenant"); the wizard now creates the collection as a first setup step |
 | **1.8.1** | Fix: macOS app profile (and its forwarding profile) failed to create on any tenant other than ZTH; the tenant-specific notification template 2221 was removed from the macOS POV Best Practice template (now 16 settings) |
 | **1.8.0** | New Digital Experience (ZDX) module: POV best practice probes (Microsoft Login + zscaler.com), predefined and custom apps, dry run, apply with verification and rollback, Manage screen |
