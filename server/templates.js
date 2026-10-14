@@ -1874,9 +1874,10 @@ function applyActionSettings(policyKey, rules, actionSettings, prefix) {
     const defaultAction = summarizeAction(policyKey, rule);
 
     let choice = null;
+    const okChoice = (c) => c === 'ALLOW' || c === 'BLOCK' || (c === 'ISOLATE' && policyKey === 'urlFiltering');
     if (!locked) {
-      if (ruleChoices[key] === 'ALLOW' || ruleChoices[key] === 'BLOCK') choice = ruleChoices[key];
-      else if (policyChoice === 'ALLOW' || policyChoice === 'BLOCK') choice = policyChoice;
+      if (okChoice(ruleChoices[key])) choice = ruleChoices[key];
+      else if (okChoice(policyChoice)) choice = policyChoice;
     }
 
     const out = { ...rule, actionKey: key, actionPolicyType: policyKey, defaultAction, locked };
@@ -1884,6 +1885,10 @@ function applyActionSettings(policyKey, rules, actionSettings, prefix) {
     if (choice && policyKey === 'cloudAppControl') {
       out.defaultActions = rule.actions;
       out.actions = uniq((rule.actions || []).map(choice === 'ALLOW' ? cacToAllow : cacToBlock));
+    } else if (choice === 'ISOLATE') {
+      // Open these categories in Cloud Browser Isolation (profile chosen on the Customize step)
+      out.action = 'ISOLATE';
+      out.protocols = ['HTTPS_RULE', 'HTTP_RULE'];
     } else if (choice === 'ALLOW') {
       out[meta.field] = meta.allow;
     } else if (choice === 'BLOCK') {
@@ -1922,26 +1927,105 @@ function applyAllActionSettings(template, actionSettings) {
 }
 
 /**
- * Rules per policy type with tier defaults, for the wizard's Allow / Block step.
+ * Every rule with its default, for the wizard's Rules step: an on/off switch for every rule,
+ * Allow / Block overrides where the policy type supports them, and Isolate for URL rules.
  */
 function getActionCatalog(config) {
-  const full = generateFullTemplate({ ...config, actionSettings: null });
+  const full = generateFullTemplate({ ...config, actionSettings: null, disabledRules: {} });
+  const prefix = full.metadata.prefix;
   const out = [];
-  for (const [policyKey, meta] of Object.entries(ACTION_POLICY_TYPES)) {
+  for (const [policyKey, label] of Object.entries(RULE_POLICY_TYPES)) {
     const rules = full.policies[policyKey];
     if (!Array.isArray(rules) || rules.length === 0) continue;
+    const canOverride = !!ACTION_POLICY_TYPES[policyKey];
     out.push({
-      type: policyKey,
-      label: meta.label,
+      type: policyKey, label, canOverride, canIsolate: policyKey === 'urlFiltering',
       rules: rules.map(r => ({
-        key: r.actionKey, name: r.name, description: r.description,
-        defaultAction: r.defaultAction,
+        key: r.toggleKey || ruleKey(policyKey, r, prefix), name: r.name, description: r.description,
+        defaultAction: canOverride ? r.defaultAction
+          : (typeof r.action === 'string' ? r.action : (r.action && r.action.type) || r.baRuleAction || r.filteringAction || ''),
         defaultActions: policyKey === 'cloudAppControl' ? r.actions : undefined,
-        locked: r.locked
+        locked: !!r.locked,
+        categoryCount: Array.isArray(r.urlCategories) ? r.urlCategories.length : undefined
       }))
     });
   }
   return out;
+}
+
+// Every rule-based policy type gets toggle keys (`policy:Suffix`); Allow/Block overrides stay limited to ACTION_POLICY_TYPES.
+const RULE_POLICY_TYPES = {
+  urlFiltering: 'URL Filtering', firewallFiltering: 'Cloud Firewall', sslInspection: 'SSL Inspection', sandbox: 'Sandbox',
+  dnsSecurity: 'DNS Security', fileTypeControl: 'File Type Control', cloudAppControl: 'Cloud App Control', dlp: 'Data Loss Prevention'
+};
+const ruleKey = (policyKey, rule, prefix) => `${policyKey}:${rule.name.startsWith(`${prefix}-`) ? rule.name.slice(prefix.length + 1) : rule.name}`;
+
+/**
+ * Turn off the rules the user switched off and attach the isolation profile / interception certificate.
+ * disabledRules: { 'urlFiltering:Block-Security-Risk': true }
+ * cbiProfile {id,name,url}: used by URL Isolate rules and Sandbox "Quarantine & Isolate"; cbiProfileName comes from a framework file.
+ * sslCertificate {id,name}: used by the SSL Inspect (DECRYPT) rules this tool creates; none = Zscaler default certificate.
+ */
+function applyToggles(template, { disabledRules = {}, cbiProfile = null, cbiProfileName = null, sslCertificate = null } = {}) {
+  const prefix = template.metadata.prefix;
+  const off = [];
+  disabledRules = disabledRules || {};
+  for (const policyKey of Object.keys(RULE_POLICY_TYPES)) {
+    const rules = template.policies[policyKey];
+    if (!Array.isArray(rules)) continue;
+    template.policies[policyKey] = rules.filter(r => {
+      const key = r.actionKey || ruleKey(policyKey, r, prefix);
+      r.toggleKey = key;
+      if (disabledRules[key]) { off.push({ key, name: r.name, policyType: policyKey }); return false; }
+      return true;
+    });
+    if (!template.policies[policyKey].length) delete template.policies[policyKey];
+  }
+  const cbi = cbiProfile || (cbiProfileName ? { name: cbiProfileName } : null);
+  if (cbi) {
+    for (const r of (template.policies.urlFiltering || [])) if (r.action === 'ISOLATE') r.cbiProfile = cbi;
+    for (const r of (template.policies.sandbox || [])) if (r.firstTimeOperation === 'QUARANTINE_ISOLATE') r.cbiProfile = cbi;
+  }
+  if (sslCertificate && sslCertificate.id !== undefined && template.policies.sslInspection) {
+    for (const r of template.policies.sslInspection) if (r.action === 'DECRYPT' || r.action === 'INSPECT') r.sslInterceptionCert = { id: sslCertificate.id, name: sslCertificate.name };
+  }
+  template.disabledItems = off;
+  return template;
+}
+
+// ZIA rejects rule names longer than 31 characters ("Name exceeds the max length 31 characters").
+const MAX_RULE_NAME = 31;
+const NAME_ABBREV = [[/Advanced-Threat-Protection/g, 'ATP'], [/Inspection/g, 'Insp'], [/Inspect/g, 'Insp'], [/Ransomware/g, 'Ransom'],
+  [/Malware/g, 'Mal'], [/Exemptions?/g, 'Exempt'], [/Communication/g, 'Comm'], [/Applications?/g, 'Apps'], [/Recommended/g, 'Rec'],
+  [/Unknown/g, 'Unk'], [/Suspicious/g, 'Susp'], [/Newly-Registered/g, 'NRD'], [/Remaining/g, 'Rest'], [/Control/g, 'Ctl'],
+  [/Security/g, 'Sec'], [/Category/g, 'Cat'], [/Block/g, 'Blk'], [/Allow/g, 'Alw']];
+function shortRuleName(name) {
+  let n = String(name || '');
+  for (const [re, to] of NAME_ABBREV) { if (n.length <= MAX_RULE_NAME) break; n = n.replace(re, to); }
+  return n.length <= MAX_RULE_NAME ? n : n.substring(0, MAX_RULE_NAME).replace(/[-_ ]+$/, '');
+}
+function clampRuleNames(template) {
+  for (const rules of Object.values(template.policies || {})) {
+    if (!Array.isArray(rules)) continue;
+    const used = new Set();
+    for (const r of rules) {
+      if (!r || typeof r.name !== 'string') continue;
+      let n = shortRuleName(r.name);
+      for (let i = 2; used.has(n); i++) n = n.substring(0, MAX_RULE_NAME - String(i).length - 1).replace(/[-_ ]+$/, '') + '-' + i;
+      if (n !== r.name) { r.fullName = r.fullName || r.name; r.name = n; }
+      used.add(n);
+    }
+  }
+  return template;
+}
+
+// Turn-off switches, isolation profile / certificate, 31-character names, checklist
+function finishTemplate(template, config) {
+  applyAllActionSettings(template, config.actionSettings || null);
+  applyToggles(template, config);
+  clampRuleNames(template);
+  template.implementationChecklist = generateChecklist(template);
+  return template;
 }
 
 function generateFullTemplate(config) {
@@ -1959,7 +2043,8 @@ function generateFullTemplate(config) {
     enableFileTypeControl = true,
     enableCloudAppControl = true,
     enableDlp = true,
-    actionSettings = null
+    actionSettings = null,
+    baseTemplate = null
   } = config;
 
   const template = {
@@ -1969,11 +2054,24 @@ function generateFullTemplate(config) {
       complianceFramework: complianceFramework ? COMPLIANCE_FRAMEWORKS[complianceFramework] : null,
       prefix,
       generatedAt: new Date().toISOString(),
-      version: '1.6.0',
+      version: '1.9.0',
+      source: baseTemplate ? (baseTemplate.metadata?.source || 'framework file') : 'built-in',
       actionSettings: actionSettings || null
     },
     policies: {}
   };
+
+  // A framework captured from a tenant (or loaded from a file that carries policies) is used as-is
+  if (baseTemplate) {
+    const base = JSON.parse(JSON.stringify(baseTemplate.policies || {}));
+    const gate = { urlFiltering: enableUrlFiltering, firewallFiltering: enableFirewall, sslInspection: enableSslInspection, sandbox: enableSandbox,
+      dnsSecurity: enableDnsSecurity, fileTypeControl: enableFileTypeControl, cloudAppControl: enableCloudAppControl, dlp: enableDlp,
+      malwareProtection: enableMalwareProtection, advancedSettings: enableAdvancedSettings };
+    for (const [k, v] of Object.entries(base)) if (gate[k] !== false) template.policies[k] = v;
+    if (Array.isArray(baseTemplate.customCategories) && baseTemplate.customCategories.length) template.customCategories = JSON.parse(JSON.stringify(baseTemplate.customCategories));
+    template.metadata.name = baseTemplate.metadata?.name || template.metadata.name;
+    return finishTemplate(template, config);
+  }
 
   // ZTH Ebook tier uses its own dedicated rule generators for URL/FW/SSL
   // but shares the new module generators with standard tiers
@@ -2004,9 +2102,7 @@ function generateFullTemplate(config) {
     if (enableDlp) {
       template.policies.dlp = generateDlpRules('ZTH_EBOOK', complianceFramework, prefix);
     }
-    applyAllActionSettings(template, actionSettings);
-    template.implementationChecklist = generateChecklist(template);
-    return template;
+    return finishTemplate(template, config);
   }
 
   // Standard tiers (STRICT, BALANCED, PERMISSIVE)
@@ -2042,10 +2138,7 @@ function generateFullTemplate(config) {
     template.policies.dlp = generateDlpRules(tier, complianceFramework, prefix);
   }
 
-  applyAllActionSettings(template, actionSettings);
-  template.implementationChecklist = generateChecklist(template);
-
-  return template;
+  return finishTemplate(template, config);
 }
 
 function generateChecklist(template) {
@@ -2123,6 +2216,11 @@ function generateChecklist(template) {
 
 module.exports = {
   ACTION_POLICY_TYPES,
+  RULE_POLICY_TYPES,
+  ruleKey,
+  applyToggles,
+  clampRuleNames,
+  shortRuleName,
   applyActionSettings,
   getActionCatalog,
   COMPLIANCE_FRAMEWORKS,

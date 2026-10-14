@@ -16,6 +16,8 @@ const { v4: uuidv4 } = require('uuid');
 const { ZIAClient, ZIA_CLOUDS } = require('./zia-client');
 const { ZCCClient } = require('./zcc-client');
 const { generateFullTemplate, COMPLIANCE_FRAMEWORKS, getActionCatalog } = require('./templates');
+const { resolveForTenant } = require('./tenant-resolve');
+const { buildFrameworkFile, readFrameworkFile, captureFromTenant } = require('./framework-io');
 const { generateZCCTemplate, buildAppProfileBody } = require('./zcc-templates');
 const { getTemplateCatalog, getTemplate, getPlatform, BYPASS_APPS } = require('./zcc-app-profile-templates');
 const { getFwdTemplateCatalog, getFwdTemplate, buildForwardingProfileBody } = require('./zcc-fwd-profile-templates');
@@ -23,7 +25,7 @@ const { registerZdxRoutes, ZDXClient } = require('./zdx-routes');
 const { AuditLogger } = require('./audit-logger');
 
 const app = express();
-const APP_VERSION = '1.8.2';
+const APP_VERSION = '1.9.0';
 const PORT = process.env.ZTP_PORT || 3000;
 const HOST = process.env.ZTP_HOST || '0.0.0.0';
 const SESSION_TTL_MS = 60 * 60 * 1000;   // 1 hour
@@ -231,6 +233,27 @@ app.get('/api/templates/clouds', (req, res) => {
   res.json(ZIA_CLOUDS);
 });
 
+/**
+ * Checks for the options added in 1.6–1.9: Allow / Block / Isolate choices, rule on/off switches,
+ * isolation profile, interception certificate and a framework's own policies. Returns an error message or null.
+ */
+function validateExtras(config) {
+  if (config.actionSettings) {
+    const ok = (v, key) => v === 'ALLOW' || v === 'BLOCK' || (v === 'ISOLATE' && String(key).startsWith('urlFiltering'));
+    for (const [k, v] of Object.entries(config.actionSettings.policy || {})) {
+      if (!(ok(v, k) || v === 'DEFAULT')) return `Invalid action for policy type ${k}: ${v}`;
+    }
+    for (const [k, v] of Object.entries(config.actionSettings.rules || {})) {
+      if (!ok(v, k)) return `Invalid action for rule ${k}: ${v}`;
+    }
+  }
+  if (config.disabledRules != null && (typeof config.disabledRules !== 'object' || Array.isArray(config.disabledRules))) return 'disabledRules must be an object';
+  if (config.cbiProfile != null && (typeof config.cbiProfile !== 'object' || !(config.cbiProfile.id || config.cbiProfile.name))) return 'cbiProfile needs an id or name';
+  if (config.sslCertificate != null && (typeof config.sslCertificate !== 'object' || config.sslCertificate.id === undefined || !config.sslCertificate.name)) return 'sslCertificate needs an id and a name';
+  if (config.baseTemplate != null && (typeof config.baseTemplate !== 'object' || typeof config.baseTemplate.policies !== 'object')) return 'baseTemplate has no policies';
+  return null;
+}
+
 app.post('/api/templates/generate', (req, res) => {
   try {
     const config = req.body;
@@ -250,18 +273,8 @@ app.post('/api/templates/generate', (req, res) => {
       return res.status(400).json({ error: 'Prefix must contain only letters, numbers, hyphens, and underscores' });
     }
 
-    // Validate Allow/Block action settings (v1.6.0)
-    if (config.actionSettings) {
-      const ok = v => v === 'ALLOW' || v === 'BLOCK';
-      for (const [k, v] of Object.entries(config.actionSettings.policy || {})) {
-        if (!(ok(v) || v === 'DEFAULT')) {
-          return res.status(400).json({ error: `Invalid action for policy type ${k}: ${v}` });
-        }
-      }
-      for (const [k, v] of Object.entries(config.actionSettings.rules || {})) {
-        if (!ok(v)) return res.status(400).json({ error: `Invalid action for rule ${k}: ${v}` });
-      }
-    }
+    const bad = validateExtras(config);
+    if (bad) return res.status(400).json({ error: bad });
 
     const template = generateFullTemplate(config);
 
@@ -288,6 +301,8 @@ app.post('/api/templates/action-catalog', (req, res) => {
     if (config.complianceFramework && !COMPLIANCE_FRAMEWORKS[config.complianceFramework]) {
       return res.status(400).json({ error: `Invalid compliance framework: ${config.complianceFramework}` });
     }
+    const bad = validateExtras(config);
+    if (bad) return res.status(400).json({ error: bad });
     res.json(getActionCatalog(config));
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -398,18 +413,163 @@ app.get('/api/catalog/:tier', (req, res) => {
 });
 
 // ========================
+// Frameworks: save / load / capture from tenant (v1.9.0)
+// ========================
+function validateFrameworkConfig(config) {
+  if (!config || typeof config !== 'object') return 'No configuration';
+  if (config.tier && !['STRICT', 'BALANCED', 'PERMISSIVE', 'ZTH_EBOOK'].includes(config.tier)) return `Invalid tier: ${config.tier}`;
+  if (config.complianceFramework && !COMPLIANCE_FRAMEWORKS[config.complianceFramework]) return `Invalid compliance framework: ${config.complianceFramework}`;
+  if (config.prefix && !/^[A-Za-z0-9_-]+$/.test(config.prefix)) return 'Prefix must contain only letters, numbers, hyphens, and underscores';
+  return validateExtras(config);
+}
+const validateConfig = validateFrameworkConfig;
+
+// Build the file for the current wizard choices (the browser downloads it)
+app.post('/api/frameworks/build', (req, res) => {
+  try {
+    const { name, description, config } = req.body || {};
+    const err = validateConfig(config);
+    if (err) return res.status(400).json({ error: err });
+    const { baseTemplate, ...rest } = config;
+    res.json(buildFrameworkFile({ name, description, config: rest, baseTemplate: baseTemplate || null, appVersion: APP_VERSION }));
+  } catch (error) { res.status(500).json({ error: error.message }); }
+});
+
+// Check an uploaded framework file and return the wizard config it describes
+app.post('/api/frameworks/read', (req, res) => {
+  try {
+    const out = readFrameworkFile(req.body && req.body.framework);
+    const err = validateConfig({ tier: 'STRICT', ...out.config });
+    if (err) return res.status(400).json({ error: err });
+    res.json(out);
+  } catch (error) { res.status(400).json({ error: error.message }); }
+});
+
+// Read the connected tenant's policies into a framework (read-only)
+app.post('/api/frameworks/capture', requireAuth, async (req, res) => {
+  try {
+    const { client, logger } = req.session;
+    const host = client.vanityDomain ? `${client.vanityDomain} (OneAPI)` : client.baseUrl;
+    const name = (req.body && req.body.name) || `Captured from ${host}`;
+    const cap = await captureFromTenant(client, { name, host });
+    const file = buildFrameworkFile({ name, description: (req.body && req.body.description) || `Policies captured from ${host} on ${new Date().toISOString().substring(0, 10)}`,
+      config: { tier: 'STRICT', prefix: '', enableUrlFiltering: true }, baseTemplate: cap.baseTemplate, appVersion: APP_VERSION });
+    logger.log('FRAMEWORK_CAPTURE', { host, counts: Object.fromEntries(Object.entries(cap.baseTemplate.policies).map(([k, v]) => [k, Array.isArray(v) ? v.length : 1])), notes: cap.notes.length });
+    res.json({ framework: file, notes: cap.notes, skipped: cap.skipped });
+  } catch (error) { res.status(500).json({ error: error.message }); }
+});
+
+// Isolation profiles in the connected tenant (URL Isolate rules, Sandbox Quarantine & Isolate)
+app.get('/api/isolation-profiles', requireAuth, async (req, res) => {
+  try {
+    const r = await req.session.client.getCbiProfiles();
+    res.json((Array.isArray(r) ? r : []).map(p => ({ id: p.id, name: p.name, url: p.url, defaultProfile: !!p.defaultProfile })));
+  } catch (error) { res.status(502).json({ error: error.message }); }
+});
+
+// ========================
+// SSL interception certificates + bulk certificate change (v1.9.0)
+// ========================
+// Zscaler's SDKs use the singular path; the plural one is kept as a fallback
+const SSL_CERT_PATHS = ['/api/v1/intermediateCaCertificate/readyToUse', '/api/v1/intermediateCaCertificate',
+  '/api/v1/intermediateCaCertificate/lite', '/api/v1/intermediateCaCertificates'];
+
+/** Certificates that SSL rules can use: the intermediate CA list when the API offers it, plus any already used by rules. */
+async function listSslCertificates(client) {
+  const out = { certificates: [], source: null, tried: [] };
+  const seen = new Map();
+  for (const p of SSL_CERT_PATHS) {
+    try {
+      const v = await client.apiCall('GET', p);
+      const arr = Array.isArray(v) ? v : (v && (v.list || v.items)) || [];
+      out.tried.push({ path: p, ok: true, count: arr.length });
+      for (const c of arr) if (c && c.id !== undefined) seen.set(String(c.id), { id: c.id, name: c.name || `Certificate ${c.id}`, type: c.type || null, status: c.status || null, defaultCertificate: !!c.defaultCertificate, from: 'certificate list' });
+      out.source = p; break;
+    } catch (e) { out.tried.push({ path: p, ok: false, error: String(e.message).substring(0, 120) }); }
+  }
+  try {
+    const rules = await client.getSslInspectionRules();
+    for (const r of (Array.isArray(rules) ? rules : [])) {
+      const c = r.action && r.action.sslInterceptionCert;
+      if (c && c.id !== undefined && !seen.has(String(c.id))) seen.set(String(c.id), { id: c.id, name: c.name || `Certificate ${c.id}`, defaultCertificate: !!c.defaultCertificate, from: `used by rule "${r.name}"` });
+    }
+  } catch (e) { /* best-effort */ }
+  out.certificates = [...seen.values()];
+  return out;
+}
+
+app.get('/api/ssl/certificates', requireAuth, async (req, res) => {
+  try { res.json(await listSslCertificates(req.session.client)); } catch (e) { res.status(502).json({ error: e.message }); }
+});
+
+// Every SSL inspection rule with the certificate it uses
+app.get('/api/ssl/rules', requireAuth, async (req, res) => {
+  try {
+    const rules = await req.session.client.getSslInspectionRules();
+    res.json((Array.isArray(rules) ? rules : []).sort((a, b) => (a.order || 0) - (b.order || 0)).map(r => ({
+      id: r.id, name: r.name, order: r.order, state: r.state, predefined: !!r.predefined, defaultRule: !!r.defaultRule,
+      action: r.action && r.action.type, override: !!(r.action && r.action.overrideDefaultCertificate),
+      certificate: r.action && r.action.overrideDefaultCertificate && r.action.sslInterceptionCert ? { id: r.action.sslInterceptionCert.id, name: r.action.sslInterceptionCert.name } : null,
+      changeable: !!(r.action && r.action.type === 'DECRYPT')
+    })));
+  } catch (e) { res.status(502).json({ error: e.message }); }
+});
+
+// Bulk change: point the selected Inspect (DECRYPT) rules at a certificate, or back to the Zscaler default (certificate = null)
+app.post('/api/ssl/bulk-certificate', requireAuth, async (req, res) => {
+  const { client, logger } = req.session;
+  const { ruleIds = [], certificate = null, dryRun = false } = req.body || {};
+  if (!Array.isArray(ruleIds) || !ruleIds.length) return res.status(400).json({ error: 'Choose at least one rule.' });
+  if (certificate && (certificate.id === undefined || !certificate.name)) return res.status(400).json({ error: 'Certificate needs an id and a name.' });
+  try {
+    const rules = await client.getSslInspectionRules();
+    const results = [];
+    for (const id of ruleIds) {
+      const r = (Array.isArray(rules) ? rules : []).find(x => String(x.id) === String(id));
+      if (!r) { results.push({ id, ok: false, error: 'Rule not found' }); continue; }
+      if (!r.action || r.action.type !== 'DECRYPT') { results.push({ id, name: r.name, ok: false, error: 'Only Inspect (DECRYPT) rules use an interception certificate' }); continue; }
+      const before = r.action.overrideDefaultCertificate && r.action.sslInterceptionCert ? r.action.sslInterceptionCert.name : 'Zscaler default';
+      const after = certificate ? certificate.name : 'Zscaler default';
+      if (before === after) { results.push({ id, name: r.name, ok: true, unchanged: true, before, after }); continue; }
+      if (dryRun) { results.push({ id, name: r.name, ok: true, before, after, dryRun: true }); continue; }
+      const body = JSON.parse(JSON.stringify(r));
+      delete body.lastModifiedTime; delete body.lastModifiedBy;
+      body.action.overrideDefaultCertificate = !!certificate;
+      if (certificate) body.action.sslInterceptionCert = { id: certificate.id, name: certificate.name };
+      else delete body.action.sslInterceptionCert;
+      try {
+        await client.updateSslInspectionRule(r.id, body);
+        results.push({ id, name: r.name, ok: true, before, after });
+        logger.logPolicyApply('SSL Inspection', r.name, 'UPDATE', { certificate: after, before });
+      } catch (e) { results.push({ id, name: r.name, ok: false, before, after, error: e.message }); }
+    }
+    let activated = null;
+    if (!dryRun && results.some(r => r.ok && !r.unchanged && !r.dryRun)) {
+      try { await client.activateChanges(); activated = true; } catch (e) { activated = false; results.push({ ok: false, name: 'Activation', error: e.message }); }
+    }
+    res.json({ results, activated, dryRun: !!dryRun });
+  } catch (e) { res.status(502).json({ error: e.message }); }
+});
+
+// ========================
 // Plan / Dry Run Routes
 // ========================
 
 app.post('/api/plan/dryrun', requireAuth, async (req, res) => {
   try {
-    const { template } = req.body;
-    if (!template) {
+    const { template: templateIn, cbiProfile = null } = req.body;
+    if (!templateIn) {
       return res.status(400).json({ error: 'No template provided' });
     }
 
     const { client, logger } = req.session;
     const plan = { actions: [], warnings: [], errors: [] };
+    // v1.9.0: match isolation profile, Isolate browser types and firewall applications to this tenant
+    const resolved = await resolveForTenant(client, templateIn, { cbiProfile });
+    const template = resolved.template;
+    plan.resolved = resolved.info;
+    plan.warnings.push(...resolved.warnings);
+    plan.errors.push(...resolved.errors);
 
     // Fetch current state
     let currentUrlRules = [];
@@ -709,13 +869,17 @@ app.post('/api/plan/dryrun', requireAuth, async (req, res) => {
 
 app.post('/api/apply', requireAuth, async (req, res) => {
   try {
-    const { template, snapshotId } = req.body;
-    if (!template) {
+    const { template: templateIn, snapshotId, cbiProfile = null } = req.body;
+    if (!templateIn) {
       return res.status(400).json({ error: 'No template provided' });
     }
 
     const { client, logger } = req.session;
     const results = { applied: [], errors: [], warnings: [] };
+    // v1.9.0: match again right before writing (the tenant may have changed since the dry run)
+    const resolved = await resolveForTenant(client, templateIn, { cbiProfile });
+    const template = resolved.template;
+    results.warnings.push(...resolved.warnings);
     if (template.actionChanges?.length) {
       logger.log('ACTION_OVERRIDES', { changes: template.actionChanges });
     }
@@ -765,6 +929,25 @@ app.post('/api/apply', requireAuth, async (req, res) => {
         }
       }
 
+      // Custom categories carried in a captured framework: create (or reuse) them, then point the rules at the new IDs
+      for (const cc of (template.customCategories || [])) {
+        try {
+          let existing = null;
+          try { existing = (await client.getUrlCategories(true) || []).find(c => c.configuredName === cc.configuredName); } catch (e) { /* create below */ }
+          let newId = existing && existing.id;
+          if (!newId) {
+            const created = await client.createUrlCategory({ configuredName: cc.configuredName, superCategory: cc.superCategory || 'USER_DEFINED',
+              urls: cc.urls || [], dbCategorizedUrls: cc.dbCategorizedUrls || [], keywords: cc.keywords || [],
+              keywordsRetainingParentCategory: cc.keywordsRetainingParentCategory || [], customCategory: true, description: cc.description || '' });
+            newId = created && created.id;
+            results.applied.push({ type: 'CREATE', category: 'URL Category', name: cc.configuredName, id: newId });
+          } else results.warnings.push(`Custom category "${cc.configuredName}" already exists here (${newId}); it was reused, not changed.`);
+          if (newId) customCategoryIds[cc.id] = newId;
+        } catch (e) {
+          results.errors.push({ category: 'URL Category', name: cc.configuredName, error: e.message });
+        }
+      }
+
       // Create URL filtering rules — track successful order for next rule
       let urlOrderTracker = 1;
       try {
@@ -777,10 +960,15 @@ app.post('/api/apply', requireAuth, async (req, res) => {
       } catch(e) { /* use order 1 */ }
 
       for (const rule of template.policies.urlFiltering) {
+        if (rule.action === 'ISOLATE' && !(rule.cbiProfile && rule.cbiProfile.id)) {
+          results.errors.push({ category: 'URL Filtering', name: rule.name, error: 'Skipped: Isolate needs a Cloud Browser Isolation profile and this tenant has none (create one in the Isolation portal).' });
+          continue;
+        }
         try {
-          // CAUTION action only supports CONNECT/GET/HEAD request methods
+          // CAUTION supports CONNECT/GET/HEAD; ISOLATE rules (seen live) use GET + CONNECT
           const requestMethods = rule.action === 'CAUTION'
             ? ['CONNECT', 'GET', 'HEAD']
+            : rule.action === 'ISOLATE' ? ['CONNECT', 'GET']
             : ['OPTIONS', 'GET', 'HEAD', 'POST', 'PUT', 'DELETE', 'TRACE',
                'CONNECT', 'OTHER', 'PROPFIND', 'PROPPATCH', 'MOVE', 'MKCOL',
                'LOCK', 'COPY', 'UNLOCK', 'PATCH'];
@@ -801,11 +989,16 @@ app.post('/api/apply', requireAuth, async (req, res) => {
             rank: 7,
             action: rule.action,
             urlCategories,
-            protocols: ['ANY_RULE'],
+            protocols: rule.action === 'ISOLATE' ? ['HTTPS_RULE', 'HTTP_RULE'] : (rule.protocols && rule.protocols.length ? rule.protocols : ['ANY_RULE']),
             requestMethods,
             blockOverride: false,
             enforceTimeValidity: false
           };
+          if (rule.action === 'ISOLATE') {
+            apiRule.userAgentTypes = rule.userAgentTypes && rule.userAgentTypes.length ? rule.userAgentTypes : ['OPERA', 'FIREFOX', 'MSIE', 'MSEDGE', 'CHROME', 'SAFARI', 'MSCHREDGE'];
+            apiRule.cbiProfile = { id: rule.cbiProfile.id, name: rule.cbiProfile.name, url: rule.cbiProfile.url,
+              ...(rule.cbiProfile.profileSeq !== undefined ? { profileSeq: rule.cbiProfile.profileSeq } : {}) };
+          }
 
           const result = await client.createUrlFilteringRule(apiRule);
           results.applied.push({ type: 'CREATE', category: 'URL Filtering', name: rule.name, id: result?.id });
@@ -874,7 +1067,22 @@ app.post('/api/apply', requireAuth, async (req, res) => {
 
     // Apply SSL Inspection Rules
     if (template.policies?.sslInspection) {
+      // v1.9.0: place new rules right after Zscaler's predefined rules (tenants refuse "rank 7 at order 1");
+      // if the tenant refuses that position, append after the last rule.
+      let sslOrder = 1, sslLast = 1;
+      try {
+        const existingSsl = (await client.getSslInspectionRules()) || [];
+        const nonDefault = existingSsl.filter(r => !r.defaultRule);
+        sslLast = Math.max(...nonDefault.map(r => r.order || 0), 0) + 1;
+        sslOrder = Math.max(...nonDefault.filter(r => r.predefined).map(r => r.order || 0), 0) + 1;
+      } catch (e) { /* order 1 */ }
       for (const rule of template.policies.sslInspection) {
+        // A Do Not Inspect rule whose category list ended up empty would exempt ALL traffic — never create it.
+        // (An explicit ['ANY'] — the Permissive tier's choice — is kept.)
+        if (rule.action !== 'INSPECT' && rule.action !== 'DECRYPT' && Array.isArray(rule.urlCategories) && rule.urlCategories.length === 0) {
+          results.warnings.push(`${rule.name}: Do Not Inspect with no categories left would exempt all traffic — skipped.`);
+          continue;
+        }
         try {
           // Per Zscaler API docs (automate.zscaler.com):
           // - action is a nested object: { type, decryptSubActions/doNotDecryptSubActions, showEUN, etc }
@@ -886,7 +1094,7 @@ app.post('/api/apply', requireAuth, async (req, res) => {
           const apiRule = {
             name: rule.name,
             description: rule.description || '',
-            order: rule.order,
+            order: sslOrder,
             state: rule.state,
             rank: 7,
             roadWarriorForKerberos: false
@@ -936,8 +1144,21 @@ app.post('/api/apply', requireAuth, async (req, res) => {
           }
           // When urlCategories is ["ANY"] or empty, we omit it — matches all traffic
 
-          const result = await client.createSslInspectionRule(apiRule);
-          results.applied.push({ type: 'CREATE', category: 'SSL Inspection', name: rule.name, id: result?.id });
+          // Interception certificate chosen on the Customize step (none = Zscaler default certificate)
+          if (apiRule.action && apiRule.action.type === 'DECRYPT' && rule.sslInterceptionCert && rule.sslInterceptionCert.id !== undefined) {
+            apiRule.action.overrideDefaultCertificate = true;
+            apiRule.action.sslInterceptionCert = { id: rule.sslInterceptionCert.id, name: rule.sslInterceptionCert.name };
+          }
+          let result;
+          try { result = await client.createSslInspectionRule(apiRule); }
+          catch (e) {
+            if (!/not allowed at order/i.test(String(e.message))) throw e;
+            apiRule.order = sslOrder = Math.max(sslOrder, sslLast);
+            result = await client.createSslInspectionRule(apiRule);
+            results.warnings.push(`${rule.name}: placed at order ${apiRule.order} (the tenant did not allow it higher). Check that rules above it don't catch the same traffic.`);
+          }
+          sslOrder = apiRule.order + 1; sslLast = Math.max(sslLast, apiRule.order) + 1;
+          results.applied.push({ type: 'CREATE', category: 'SSL Inspection', name: rule.name, id: result?.id, order: apiRule.order });
           logger.logPolicyApply('SSL Inspection', rule.name, 'CREATE', { success: true, id: result?.id });
         } catch (e) {
           results.errors.push({ category: 'SSL Inspection', name: rule.name, error: e.message });
@@ -957,31 +1178,21 @@ app.post('/api/apply', requireAuth, async (req, res) => {
         }
       } catch(e) { /* use 1 */ }
 
-      // Look up CBI isolation profile if any rule needs QUARANTINE_ISOLATE
-      let cbiProfileId = null;
-      const needsCbi = template.policies.sandbox.some(r => r.firstTimeOperation === 'QUARANTINE_ISOLATE');
-      if (needsCbi) {
-        try {
-          // Fetch isolation profiles from the API
-          const profiles = await client.apiCall('GET', '/api/v1/browserIsolationProfile');
-          if (Array.isArray(profiles)) {
-            const defaultProfile = profiles.find(p =>
-              p.name === 'Default Isolation Profile' || p.defaultProfile === true
-            );
-            if (defaultProfile) {
-              cbiProfileId = defaultProfile.id;
-              console.log(`[APPLY] Found CBI profile: "${defaultProfile.name}" -> ID: ${cbiProfileId}`);
-            } else if (profiles.length > 0) {
-              // Use first available profile as fallback
-              cbiProfileId = profiles[0].id;
-              console.log(`[APPLY] Using first CBI profile: "${profiles[0].name}" -> ID: ${cbiProfileId}`);
-            }
-          }
-        } catch(e) {
-          results.warnings.push(`Could not fetch CBI profiles: ${e.message}. QUARANTINE_ISOLATE rules will fall back to QUARANTINE.`);
-          console.log(`[APPLY] CBI profile lookup failed: ${e.message}`);
-        }
-      }
+      // v1.9.0: the isolation profile for "Quarantine & Isolate" is matched to the tenant before apply
+      // (Customize step choice, else the default profile) and carried on each rule as cbiProfile.
+      // Some tenants refuse ANY / NONE ("ANY/NONE/null are not valid entries"): name file types and protocols.
+      let sbDefaultTypes = null;
+      try {
+        const def = ((await client.getSandboxRules()) || []).find(r => r.defaultRule && Array.isArray(r.fileTypes));
+        const t = def ? def.fileTypes.filter(x => !/^(ANY|NONE)$/.test(x)) : [];
+        if (t.length) sbDefaultTypes = t;
+      } catch (e) { /* built-in list */ }
+      const SANDBOX_FILE_TYPES = ['FTCATEGORY_FLASH', 'FTCATEGORY_JAVA_APPLET', 'FTCATEGORY_HTA', 'FTCATEGORY_ZIP', 'FTCATEGORY_TAR',
+        'FTCATEGORY_BZIP2', 'FTCATEGORY_RAR', 'FTCATEGORY_ISO', 'FTCATEGORY_P7Z', 'FTCATEGORY_SCZIP', 'FTCATEGORY_DMG',
+        'FTCATEGORY_WINDOWS_EXECUTABLES', 'FTCATEGORY_MICROSOFT_INSTALLER', 'FTCATEGORY_WINDOWS_LIBRARY', 'FTCATEGORY_PYTHON',
+        'FTCATEGORY_POWERSHELL', 'FTCATEGORY_VISUAL_BASIC_SCRIPT', 'FTCATEGORY_BAT', 'FTCATEGORY_WINDOWS_SCRIPT_FILES', 'FTCATEGORY_APK',
+        'FTCATEGORY_MS_POWERPOINT', 'FTCATEGORY_MS_WORD', 'FTCATEGORY_MS_EXCEL', 'FTCATEGORY_MS_RTF', 'FTCATEGORY_PDF_DOCUMENT'];
+      const SANDBOX_PROTOCOLS = ['FOHTTP_RULE', 'FTP_RULE', 'HTTPS_RULE', 'HTTP_RULE'];
 
       for (const rule of template.policies.sandbox) {
         try {
@@ -992,22 +1203,21 @@ app.post('/api/apply', requireAuth, async (req, res) => {
             order: sbOrderTracker,
             state: rule.state,
             rank: 7,
-            protocols: rule.protocols || ['ANY_RULE'],
-            fileTypes: rule.fileTypes,
+            protocols: (() => { const p = (rule.protocols || []).filter(x => x !== 'ANY_RULE' && x !== 'ANY'); return p.length ? p : SANDBOX_PROTOCOLS; })(),
+            fileTypes: (() => { const f = (rule.fileTypes || []).filter(x => !/^(ANY|NONE)$/.test(x)); return f.length ? f : (sbDefaultTypes || SANDBOX_FILE_TYPES); })(),
             baPolicyCategories: rule.baPolicyCategories || [],
             baRuleAction: rule.baRuleAction || 'BLOCK',
             firstTimeEnable: rule.firstTimeEnable || false,
             mlActionEnabled: rule.mlActionEnabled || false
           };
 
-          // Handle QUARANTINE_ISOLATE — needs cbiProfile
-          if (firstTimeOp === 'QUARANTINE_ISOLATE' && cbiProfileId) {
+          // Quarantine & Isolate needs the isolation profile (resolved for this tenant before apply)
+          if (firstTimeOp === 'QUARANTINE_ISOLATE' && rule.cbiProfile && rule.cbiProfile.id) {
             apiRule.firstTimeOperation = 'QUARANTINE_ISOLATE';
-            apiRule.cbiProfileId = cbiProfileId;
-          } else if (firstTimeOp === 'QUARANTINE_ISOLATE' && !cbiProfileId) {
-            // Fall back to plain QUARANTINE if no CBI profile found
+            apiRule.cbiProfile = { id: rule.cbiProfile.id, name: rule.cbiProfile.name, url: rule.cbiProfile.url };
+          } else if (firstTimeOp === 'QUARANTINE_ISOLATE') {
             apiRule.firstTimeOperation = 'QUARANTINE';
-            results.warnings.push(`${rule.name}: Fell back to QUARANTINE (no CBI profile available for QUARANTINE_ISOLATE)`);
+            results.warnings.push(`${rule.name}: Fell back to QUARANTINE (no isolation profile available for Quarantine & Isolate)`);
           } else {
             apiRule.firstTimeOperation = firstTimeOp;
           }
