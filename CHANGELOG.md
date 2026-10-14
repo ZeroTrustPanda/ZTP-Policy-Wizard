@@ -1,5 +1,29 @@
 # Changelog
 
+## v1.9.0-standalone — 2026-10-14 (branch `standalone`)
+
+- Standalone downloads rebuilt as **1.9.0** with everything below.
+
+## v1.9.0 — 2026-10-14
+
+### ✨ New
+- **Rules step (was Allow / Block):** every rule in every ZIA policy type has an on/off switch, with *All on / All off* per type. Switched-off rules are not created, and the plan lists them.
+- **Isolate for URL rules:** next to Allow / Block, any URL rule can be set to Isolate (Cloud Browser Isolation).
+- **Isolation profile picker** on Customize. It defaults to the tenant's Default Isolation Profile; **↻ Refresh** loads profiles created later in the Isolation portal. It is used by Isolate rules and Sandbox *Quarantine & Isolate*. 1.8 picked a profile on its own, through an endpoint that returns 404, so Quarantine & Isolate always fell back to Quarantine.
+- **SSL interception certificate picker** on Customize, for the Inspect rules the run creates. The list comes from the tenant's intermediate CA certificates, plus certificates already used by rules, plus manual ID entry.
+- **SSL Certificate Manager** (new ZIA page): shows each SSL rule's certificate. Select rules, preview, then move them between certificates in bulk and activate.
+- **Frameworks:**
+  - *Save framework* downloads `.ztp-framework.json`.
+  - *Load a saved framework* applies it in another tenant; isolation profile and certificate are matched by name.
+  - *Capture this tenant's policies* reads the tenant's rules (URL with custom categories, Firewall, SSL, Sandbox, DNS, File Type) into a framework (read-only).
+
+### 🐛 Fixed (found on live tenants)
+- Rule names longer than 31 characters were rejected; names are now shortened.
+- A URL category the tenant doesn't have failed the whole rule; missing categories are now left out with a warning.
+- Deprecated firewall network applications were rejected ("Deprecated network applications are not allowed"); they are dropped, and a rule left with no applications is skipped rather than created as match-all.
+- SSL rules failed with "Rule with rank 7 is not allowed at order 1"; they now go right after Zscaler's predefined rules, or at the end if the tenant refuses that spot.
+- Sandbox rules failed with "ANY/NONE/null are not valid entries"; file types and protocols are now named explicitly.
+- A Do Not Inspect rule left with no categories is skipped (it would have exempted all traffic).
 ## v1.8.2-standalone — 2026-10-12 (branch `standalone`)
 
 - Standalone downloads rebuilt as **1.8.2** with the ZDX new-tenant fix below.
