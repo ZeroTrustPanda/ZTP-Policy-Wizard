@@ -294,6 +294,21 @@ class ZIAClient {
     return this.apiCall('GET', '/api/v1/networkServices');
   }
 
+  // --- Network Applications (predefined; each has a deprecated flag) ---
+  async getNetworkApplications() {
+    return this.apiCall('GET', '/api/v1/networkApplications');
+  }
+
+  // --- Cloud Browser Isolation profiles (read-only in the ZIA API) ---
+  async getCbiProfiles() {
+    let lastErr = null;
+    for (const p of ['/api/v1/browserIsolation/profiles', '/api/v1/browserIsolationProfile']) {
+      try { const r = await this.apiCall('GET', p); if (Array.isArray(r)) return r; } catch (e) { lastErr = e; }
+    }
+    if (lastErr) throw lastErr;
+    return [];
+  }
+
   // --- Network Application Groups ---
   async getNetworkApplicationGroups() {
     return this.apiCall('GET', '/api/v1/networkApplicationGroups');
