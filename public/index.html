@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ZeroTrustPanda ZS Policy Wizard v1.8.2 - Zscaler Template Policy Configuration</title>
+  <title>ZeroTrustPanda ZS Policy Wizard v1.9.0 - Zscaler Template Policy Configuration</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
   <style>
@@ -506,7 +506,7 @@
     // ========================
     // App Version
     // ========================
-    const APP_VERSION = '1.8.2';
+    const APP_VERSION = '1.9.0';
     const BUILD_DATE = '2026-03-30';
 
     // ========================
@@ -533,7 +533,7 @@
       { id: 'tier', label: 'Security Tier', icon: '🛡️' },
       { id: 'compliance', label: 'Compliance', icon: '📋' },
       { id: 'customize', label: 'Customize', icon: '⚙️' },
-      { id: 'actions', label: 'Allow / Block', icon: '🚦' },
+      { id: 'actions', label: 'Rules', icon: '🚦' },
       { id: 'review', label: 'Review Plan', icon: '🔍' },
       { id: 'apply', label: 'Apply', icon: '🚀' },
       { id: 'audit', label: 'Audit Log', icon: '📄' }
@@ -562,8 +562,14 @@
         enableFileTypeControl: true,
         enableCloudAppControl: true,
         enableDlp: true,
-        // v1.6.0 Allow/Block choices: policy-level ('DEFAULT'|'ALLOW'|'BLOCK') + per-rule overrides
-        actionSettings: { policy: {}, rules: {} }
+        // v1.6.0 Allow/Block choices: policy-level ('DEFAULT'|'ALLOW'|'BLOCK') + per-rule overrides ('ISOLATE' for URL rules, v1.9.0)
+        actionSettings: { policy: {}, rules: {} },
+        // v1.9.0: rule on/off switches, isolation profile, interception certificate, framework loaded from a file / capture
+        disabledRules: {},
+        cbiProfile: null,
+        sslCertificate: null,
+        baseTemplate: null,
+        frameworkName: null
       });
       const [template, setTemplate] = useState(null);
       const [plan, setPlan] = useState(null);
@@ -600,6 +606,7 @@
           setCompletedSteps(new Set());
         }
         else if (mod === 'zia-bulk') setStep('bulk-delete');
+        else if (mod === 'zia-ssl') setStep('ssl');
         else if (mod === 'zcc') setStep('zcc');
         else if (mod === 'zdx') setStep('zdx');
         else if (mod === 'about') setStep('about');
@@ -613,7 +620,8 @@
       const showZdx = auth.connected && activeModule === 'zdx';
       const showAbout = activeModule === 'about';
       const showCatalog = activeModule === 'catalog';
-      const ziaExpanded = activeModule === 'zia-wizard' || activeModule === 'zia-bulk';
+      const showZiaSsl = auth.connected && activeModule === 'zia-ssl';
+      const ziaExpanded = activeModule === 'zia-wizard' || activeModule === 'zia-bulk' || activeModule === 'zia-ssl';
 
       return (
         <div className="app">
@@ -656,6 +664,10 @@
                     <div className={`sidebar-item ${activeModule === 'zia-wizard' ? 'active' : ''}`}
                       onClick={() => switchModule('zia-wizard')} style={{paddingLeft:'2.2rem', fontSize:'12px', cursor:'pointer'}}>
                       <span className="step-num" style={{fontSize:'10px', width:'16px', height:'16px'}}>🛡️</span> Security Tier Wizard
+                    </div>
+                    <div className={`sidebar-item ${activeModule === 'zia-ssl' ? 'active' : ''}`} data-nav="ssl"
+                      onClick={() => switchModule('zia-ssl')} style={{paddingLeft:'2.2rem', fontSize:'12px', cursor:'pointer'}}>
+                      <span className="step-num" style={{fontSize:'10px', width:'16px', height:'16px'}}>🔐</span> SSL Certificate Manager
                     </div>
                     <div className={`sidebar-item ${activeModule === 'zia-bulk' ? 'active' : ''}`}
                       onClick={() => switchModule('zia-bulk')} style={{paddingLeft:'2.2rem', fontSize:'12px', cursor:'pointer'}}>
@@ -742,6 +754,10 @@
                       <div>• <strong>File Type Control</strong> — Block database uploads, password-protected archives, scripts</div>
                       <div>• <strong>Cloud App Control</strong> — Restrict DoH, file sharing, webmail, streaming, IM, AI/ML</div>
                     </div>
+                    <h3 style={{fontSize:'15px', color:'var(--accent-cyan)', margin:'1.5rem 0 0.5rem'}}>Rules, isolation and certificates (v1.9.0)</h3>
+                    <p>Switch any rule off before it is created, set URL rules to Isolate with the isolation profile you pick, and choose the interception certificate for new Inspect rules. Save the whole configuration as a framework file and load it in another tenant, or capture a tenant's current policies as a framework.</p>
+                    <h3 style={{fontSize:'15px', color:'var(--accent-cyan)', margin:'1.5rem 0 0.5rem'}}>SSL Certificate Manager</h3>
+                    <p>See which certificate every SSL Inspect rule signs with, and move rules off the Zscaler default certificate onto your imported intermediate CA (or back) in one change.</p>
                     <h3 style={{fontSize:'15px', color:'var(--accent-cyan)', margin:'1.5rem 0 0.5rem'}}>Bulk Rule Manager</h3>
                     <p>View and delete rules across all ZIA policy categories for cleanup after testing.</p>
                     <h3 style={{fontSize:'15px', color:'var(--accent-cyan)', margin:'1.5rem 0 0.5rem'}}>Mobile Admin Portal (ZCC)</h3>
@@ -752,6 +768,7 @@
                     <p>HIPAA, HITRUST CSF, NIST 800-53, NIST 800-171, PCI-DSS, CJIS, SOX, FERPA, GDPR</p>
                     <h3 style={{fontSize:'15px', color:'var(--accent-cyan)', margin:'1.5rem 0 0.5rem'}}>Version History</h3>
                     <div style={{paddingLeft:'1rem', fontSize:'12px'}}>
+                      <div><strong>v1.9.0</strong> — Rules step: an on/off switch for every rule in every policy type, and URL rules can be set to Isolate. Isolation profile picker (Default Isolation Profile, ↻ Refresh for new ones) used by Isolate rules and Sandbox Quarantine & Isolate. SSL interception certificate picker for the Inspect rules this creates, plus a new SSL Certificate Manager page to move existing rules between certificates in bulk. Frameworks: save your choices to a file, load it in another tenant, or capture a tenant's current policies (with custom categories). Live-tenant fixes: rule names kept to 31 characters, URL categories / deprecated firewall apps the tenant doesn't have are left out, SSL rules placed after Zscaler's predefined rules, Sandbox file types named instead of ANY, isolation profile endpoint fixed.</div>
                       <div><strong>v1.8.2</strong> — Fix: the ZDX wizard failed on brand-new ZDX tenants with "No Custom Apps Collection in this tenant". ZDX only creates that collection when the first custom app is added in the portal, so the wizard now creates it first as a setup step (and skips the apps if that step fails).</div>
                       <div><strong>v1.8.1</strong> — Fix: macOS app profile (and its forwarding profile) failed to create on tenants other than the lab tenant because the macOS template set a tenant-specific notification template (ID 2221); removed, macOS template now 16 settings</div>
                       <div><strong>v1.8.0</strong> — New Digital Experience (ZDX) module: set up Web and CloudPath probes following the Zscaler POV best practice guide (Microsoft Login predefined app and zscaler.com custom app), add Zscaler predefined SaaS apps (with tenant prefix) or your own URLs, review, dry run, apply with read-back verification and rollback; Manage screen to turn apps and probes on or off and delete custom ones</div>
@@ -770,13 +787,15 @@
                   </div>
                 </div>
               )}
+              {showZiaWizard && step === 'tier' && (<FrameworkPanel setConfig={setConfig} setError={setError} auth={auth}
+                onLoaded={(captured) => { markComplete('tier'); markComplete('compliance'); goTo('customize'); }} />)}
               {showZiaWizard && step === 'tier' && (<TierStep config={config} setConfig={setConfig}
-                onNext={() => { markComplete('tier'); if (config.tier === 'ZTH_EBOOK') { setConfig(c => ({...c, complianceFramework: null})); markComplete('compliance'); goTo('customize'); } else { goTo('compliance'); } }} />)}
+                onNext={() => { markComplete('tier'); if (config.baseTemplate) setConfig(c => ({ ...c, baseTemplate: null, frameworkName: null })); if (config.tier === 'ZTH_EBOOK') { setConfig(c => ({...c, complianceFramework: null})); markComplete('compliance'); goTo('customize'); } else { goTo('compliance'); } }} />)}
               {showZiaWizard && step === 'compliance' && (<ComplianceStep config={config} setConfig={setConfig}
                 onNext={() => { markComplete('compliance'); goTo('customize'); }} onBack={() => goTo('tier')} />)}
-              {showZiaWizard && step === 'customize' && (<CustomizeStep config={config} setConfig={setConfig}
+              {showZiaWizard && step === 'customize' && (<CustomizeStep config={config} setConfig={setConfig} auth={auth}
                 setTemplate={setTemplate} setError={setError} loading={loading} setLoading={setLoading}
-                onNext={() => { markComplete('customize'); goTo('actions'); }} onBack={() => goTo('compliance')} />)}
+                onNext={() => { markComplete('customize'); goTo('actions'); }} onBack={() => goTo(config.baseTemplate ? 'tier' : 'compliance')} />)}
               {showZiaWizard && step === 'actions' && (<ActionsStep config={config} setConfig={setConfig}
                 setTemplate={setTemplate} setError={setError} loading={loading} setLoading={setLoading}
                 onNext={() => { markComplete('actions'); goTo('review'); }} onBack={() => goTo('customize')} />)}
@@ -789,6 +808,7 @@
                 onNext={() => { markComplete('apply'); goTo('audit'); }} />)}
               {showZiaWizard && step === 'audit' && (<AuditStep auditLogs={auditLogs} setAuditLogs={setAuditLogs} setError={setError} />)}
               {showZiaBulk && (<BulkDeleteStep setError={setError} loading={loading} setLoading={setLoading} />)}
+              {showZiaSsl && (<SslCertStep setError={setError} />)}
               {showZcc && (<MobileAdminStep setError={setError} loading={loading} setLoading={setLoading} config={config} />)}
               {showZdx && (<ZdxStep setError={setError} />)}
             </div>
@@ -1096,7 +1116,16 @@
     // ========================
     // Step: Customize
     // ========================
-    function CustomizeStep({ config, setConfig, setTemplate, setError, loading, setLoading, onNext, onBack }) {
+    function CustomizeStep({ config, setConfig, setTemplate, setError, loading, setLoading, onNext, onBack, auth }) {
+      const needsCert = config.enableSslInspection !== false;
+      const [certs, reloadCerts] = useSslCertificates(needsCert && auth.connected);
+      useEffect(() => {
+        // a framework file carries the certificate by name; match it once the tenant's list is in
+        if (certs && certs.certificates && config.sslCertificateName && !config.sslCertificate) {
+          const c = certs.certificates.find(x => x.name === config.sslCertificateName);
+          if (c) setConfig(cfg => ({ ...cfg, sslCertificate: { id: c.id, name: c.name } }));
+        }
+      }, [certs]);
       const toggles = [
         { key: 'enableUrlFiltering', label: 'URL Filtering', desc: 'Block/allow web categories, create custom URL rules' },
         { key: 'enableFirewall', label: 'Cloud Firewall', desc: 'Network-level firewall filtering rules' },
@@ -1130,6 +1159,16 @@
               <p>Fine-tune the naming prefix and which policy areas to include.</p>
             </div>
 
+            {config.baseTemplate && (
+              <div className="alert alert-info" style={{display:'block'}} data-frameworkbanner>
+                📁 Using the framework <strong>{config.frameworkName || config.baseTemplate.metadata?.name || 'from file'}</strong> — its rules are created with their own names; the tier and compliance steps don't apply.
+                <button className="btn btn-ghost btn-sm" style={{marginLeft:'8px'}} onClick={() => setConfig({ ...config, baseTemplate: null, frameworkName: null })}>Use tiers instead</button>
+              </div>
+            )}
+            {config.frameworkName && !config.baseTemplate && (
+              <div className="alert alert-info" data-frameworkbanner>📁 Settings loaded from the framework <strong>{config.frameworkName}</strong>.</div>
+            )}
+
             <div className="form-group">
               <label className="form-label">Naming Prefix</label>
               <input type="text" value={config.prefix}
@@ -1140,6 +1179,18 @@
                 Letters, numbers, hyphens, and underscores only.
               </div>
             </div>
+
+            <IsolationProfilePicker config={config} setConfig={setConfig} auth={auth} />
+
+            {needsCert && (
+              <div className="form-group" data-sslcert>
+                <label className="form-label">SSL interception certificate (for the Inspect rules this creates)</label>
+                {!auth.connected ? <div className="form-hint">Connect to list certificates.</div> : (
+                  <CertificatePicker value={config.sslCertificate || null} onChange={(c) => setConfig({ ...config, sslCertificate: c })} certs={certs} reload={reloadCerts} testId="customize" />
+                )}
+                <div className="form-hint">Leave on "Zscaler default certificate" to keep Zscaler's. To change existing SSL rules in bulk, use ZIA › SSL Certificate Manager.</div>
+              </div>
+            )}
 
             <div className="form-group">
               <label className="form-label">Policy Modules</label>
@@ -1160,12 +1211,12 @@
             </div>
 
             <div className="alert alert-info">
-              ℹ Template: <strong>{config.prefix}-{config.complianceFramework || 'General'}-{config.tier}</strong>
+              ℹ Template: <strong>{config.baseTemplate ? (config.frameworkName || config.baseTemplate.metadata?.name) : `${config.prefix}-${config.complianceFramework || 'General'}-${config.tier}`}</strong>
             </div>
 
             <div className="btn-group">
               <button className="btn btn-ghost" onClick={onBack}>← Back</button>
-              <button className="btn btn-primary" onClick={onNext}>Next: Allow / Block →</button>
+              <button className="btn btn-primary" onClick={onNext}>Next: Rules →</button>
             </div>
           </div>
         </div>
@@ -1173,7 +1224,270 @@
     }
 
     // ========================
-    // Step: Allow / Block (v1.6.0)
+    // v1.9.0: frameworks (save / load / capture), isolation profile + certificate pickers, SSL Certificate Manager
+    // ========================
+    function downloadJson(filename, data) {
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href = url; a.download = filename;
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    }
+    const safeFileName = (s) => String(s || 'framework').replace(/[^\w.-]+/g, '_');
+
+    // Config keys a framework replaces when it is loaded (everything else keeps its current value)
+    const FRAMEWORK_RESET = { actionSettings: { policy: {}, rules: {} }, disabledRules: {}, baseTemplate: null, frameworkName: null,
+      cbiProfile: null, cbiProfileName: null, sslCertificate: null, sslCertificateName: null };
+
+    function FrameworkPanel({ setConfig, setError, onLoaded, auth }) {
+      const [busy, setBusy] = useState(false);
+      const [loaded, setLoaded] = useState(null);
+      const [capture, setCapture] = useState(null);
+      const fileRef = React.useRef(null);
+
+      const useFramework = (out) => {
+        setConfig(c => ({ ...c, ...FRAMEWORK_RESET, ...out.config, frameworkName: out.name || null }));
+        onLoaded(!!out.config.baseTemplate);
+      };
+      const readFile = async (file) => {
+        setError(null); setBusy(true);
+        try {
+          const text = await file.text();
+          let json; try { json = JSON.parse(text); } catch (e) { throw new Error('That file is not JSON.'); }
+          const out = await api.call('POST', '/frameworks/read', { framework: json });
+          setLoaded(out);
+        } catch (e) { setError(e.message); }
+        setBusy(false);
+        if (fileRef.current) fileRef.current.value = '';
+      };
+      const doCapture = async () => {
+        setError(null); setBusy(true);
+        try { setCapture(await api.call('POST', '/frameworks/capture', {})); } catch (e) { setError(e.message); }
+        setBusy(false);
+      };
+
+      return (
+        <div className="card" data-frameworkpanel>
+          <div className="card-header">
+            <h2>📁 Start from a framework (optional)</h2>
+            <p>Load a framework file you saved earlier (tier, compliance, rule switches, Allow / Block / Isolate choices, isolation profile and certificate), or capture this tenant's current policies so you can apply them to another tenant.</p>
+          </div>
+          <div style={{display:'flex', gap:'8px', flexWrap:'wrap'}}>
+            <input ref={fileRef} type="file" accept=".json,application/json" style={{display:'none'}} data-frameworkfile
+              onChange={e => e.target.files[0] && readFile(e.target.files[0])} />
+            <button className="btn btn-ghost" disabled={busy} onClick={() => fileRef.current && fileRef.current.click()}>📂 Load a saved framework…</button>
+            <button className="btn btn-ghost" disabled={busy || !auth.connected} onClick={doCapture} data-capture>📸 Capture this tenant's policies</button>
+            {busy && <span className="spinner"></span>}
+          </div>
+          {loaded && (
+            <div className="alert alert-info" style={{display:'block', marginTop:'1rem'}} data-loadedframework>
+              <strong>{loaded.name}</strong> {loaded.kind === 'captured' ? '(captured policies)' : '(built-in framework settings)'}
+              {loaded.savedAt && <> · saved {String(loaded.savedAt).substring(0, 10)}</>}
+              {loaded.description && <div style={{fontSize:'12px', marginTop:'4px'}}>{loaded.description}</div>}
+              {loaded.counts && <div style={{fontSize:'12px', marginTop:'4px'}}>{Object.entries(loaded.counts).map(([k, v]) => `${k}: ${v}`).join(' · ')}</div>}
+              <div style={{marginTop:'8px'}}><button className="btn btn-primary btn-sm" onClick={() => useFramework(loaded)} data-useframework>Use this framework →</button></div>
+            </div>
+          )}
+          {capture && (
+            <div className="alert alert-info" style={{display:'block', marginTop:'1rem'}} data-captured>
+              <strong>Captured {Object.values(capture.framework.baseTemplate.policies).reduce((n, v) => n + (Array.isArray(v) ? v.length : 1), 0)} rules</strong>
+              {' '}({Object.entries(capture.framework.baseTemplate.policies).map(([k, v]) => `${k}: ${Array.isArray(v) ? v.length : 1}`).join(' · ')}
+              {capture.framework.baseTemplate.customCategories.length > 0 && <> · custom categories: {capture.framework.baseTemplate.customCategories.length}</>}). Nothing in the tenant was changed.
+              {[...capture.notes, ...capture.skipped].slice(0, 8).map((n, i) => <div key={i} style={{fontSize:'12px'}}>• {n}</div>)}
+              {capture.notes.length + capture.skipped.length > 8 && <div style={{fontSize:'12px'}}>• … {capture.notes.length + capture.skipped.length - 8} more</div>}
+              <div style={{marginTop:'8px', display:'flex', gap:'8px'}}>
+                <button className="btn btn-primary btn-sm" onClick={() => downloadJson(`${safeFileName(capture.framework.name)}.ztp-framework.json`, capture.framework)} data-downloadcapture>⬇ Save framework file</button>
+                <button className="btn btn-ghost btn-sm" onClick={async () => { try { useFramework(await api.call('POST', '/frameworks/read', { framework: capture.framework })); } catch (e) { setError(e.message); } }}>Use it in this session</button>
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    function SaveFrameworkButton({ config, setError }) {
+      const [name, setName] = useState(config.frameworkName || `${config.prefix || 'ZTP'} ${config.complianceFramework || 'General'} ${config.tier}`);
+      const [open, setOpen] = useState(false);
+      const save = async () => {
+        setError(null);
+        try {
+          const { module, frameworkName, ...rest } = config;
+          const file = await api.call('POST', '/frameworks/build', { name, config: rest });
+          downloadJson(`${safeFileName(name)}.ztp-framework.json`, file);
+          setOpen(false);
+        } catch (e) { setError(e.message); }
+      };
+      if (!open) return <button className="btn btn-ghost" onClick={() => setOpen(true)} data-saveframework>💾 Save framework…</button>;
+      return (
+        <span style={{display:'inline-flex', gap:'6px', alignItems:'center'}}>
+          <input type="text" value={name} onChange={e => setName(e.target.value)} style={{width:'240px'}} data-frameworkname />
+          <button className="btn btn-primary btn-sm" disabled={!name.trim()} onClick={save} data-saveframeworkgo>Download</button>
+          <button className="btn btn-ghost btn-sm" onClick={() => setOpen(false)}>Cancel</button>
+        </span>
+      );
+    }
+
+    function IsolationProfilePicker({ config, setConfig, auth }) {
+      const [profiles, setProfiles] = useState(null);
+      const [tick, setTick] = useState(0);
+      useEffect(() => {
+        if (!auth.connected) return;
+        setProfiles(null);
+        api.call('GET', '/isolation-profiles').then(ps => {
+          setProfiles(ps);
+          const still = config.cbiProfile && ps.find(p => String(p.id) === String(config.cbiProfile.id));
+          if (!still && ps.length) {
+            // "Default Isolation Profile" is always there; use it unless a framework file named another one
+            const byName = config.cbiProfileName && ps.find(p => p.name === config.cbiProfileName);
+            const pick = byName || ps.find(p => p.defaultProfile) || ps.find(p => /default isolation profile/i.test(p.name)) || ps[0];
+            setConfig(c => ({ ...c, cbiProfile: { id: pick.id, name: pick.name, url: pick.url } }));
+          }
+        }).catch(e => setProfiles({ error: e.message }));
+      }, [auth.connected, tick]);
+      return (
+        <div className="form-group" data-isolation>
+          <label className="form-label">Cloud Browser Isolation profile</label>
+          {!auth.connected ? <div className="form-hint">Connect to pick a profile.</div>
+           : !profiles ? <div className="form-hint"><span className="spinner"></span> Reading profiles…</div>
+           : profiles.error ? <div className="alert alert-warning">Could not read isolation profiles: {profiles.error}</div>
+           : profiles.length === 0 ? <div className="alert alert-warning" style={{display:'block'}}>This tenant has no isolation profile yet. Create one in the Isolation admin portal (the ZIA API can only read profiles) and click Refresh. Until then Sandbox "Quarantine & Isolate" falls back to Quarantine and URL rules can't be set to Isolate.
+               <div><button className="btn btn-ghost btn-sm" style={{marginTop:'6px'}} onClick={() => setTick(t => t + 1)} data-refreshprofiles>↻ Refresh</button></div></div>
+           : (
+            <div style={{display:'flex', gap:'8px'}}>
+              <select style={{flex:1}} value={config.cbiProfile ? config.cbiProfile.id : ''} onChange={e => { const p = profiles.find(x => String(x.id) === e.target.value); setConfig({ ...config, cbiProfile: p ? { id: p.id, name: p.name, url: p.url } : null }); }}>
+                {profiles.map(p => <option key={p.id} value={p.id}>{p.name}{p.defaultProfile ? ' (default)' : ''}</option>)}
+              </select>
+              <button className="btn btn-ghost btn-sm" onClick={() => setTick(t => t + 1)} title="Fetch the profiles again (picks up ones created in the Isolation portal)" data-refreshprofiles>↻ Refresh</button>
+            </div>
+          )}
+          <div className="form-hint">Used by Sandbox "Quarantine & Isolate" and by any URL rule you set to Isolate on the Rules step. The Default Isolation Profile is used unless you pick another; created a new one in the Isolation portal? Click Refresh.</div>
+        </div>
+      );
+    }
+
+    // ========================
+    // SSL interception certificate picker (Customize) + SSL Certificate Manager page (special edition)
+    // ========================
+    function useSslCertificates(enabled) {
+      const [state, setState] = useState(null);
+      const load = () => { setState(null); api.call('GET', '/ssl/certificates').then(setState).catch(e => setState({ error: e.message, certificates: [] })); };
+      useEffect(() => { if (enabled) load(); }, [enabled]);
+      return [state, load];
+    }
+
+    function CertificatePicker({ value, onChange, certs, reload, testId }) {
+      const [manual, setManual] = useState(false);
+      const [mId, setMId] = useState(''); const [mName, setMName] = useState('');
+      const list = (certs && certs.certificates) || [];
+      return (
+        <div data-certpicker={testId || 'cert'}>
+          <div style={{display:'flex', gap:'8px', alignItems:'center'}}>
+            <select style={{flex:1}} value={value ? String(value.id) : ''} onChange={e => {
+              if (e.target.value === '__manual') { setManual(true); return; }
+              setManual(false);
+              const c = list.find(x => String(x.id) === e.target.value);
+              onChange(c ? { id: c.id, name: c.name } : null);
+            }}>
+              <option value="">Zscaler default certificate</option>
+              {list.filter(c => !c.defaultCertificate).map(c => <option key={c.id} value={String(c.id)}>{c.name}{c.type ? ` (${c.type})` : ''}{c.from && c.from !== 'certificate list' ? ` — ${c.from}` : ''}</option>)}
+              {value && !list.some(c => String(c.id) === String(value.id)) && <option value={String(value.id)}>{value.name} (entered)</option>}
+              <option value="__manual">Enter a certificate ID…</option>
+            </select>
+            <button className="btn btn-ghost btn-sm" onClick={reload} title="Fetch certificates again (picks up newly imported ones)">↻ Refresh</button>
+          </div>
+          {!certs ? <div className="form-hint"><span className="spinner"></span> Reading certificates…</div>
+            : certs.error ? <div className="form-hint" style={{color:'var(--accent-amber)'}}>Could not read certificates: {certs.error}</div>
+            : !certs.source && <div className="form-hint">This tenant's API didn't return a certificate list{list.length ? '; showing certificates already used by SSL rules' : ''}. You can enter the certificate ID and name from Administration › Intermediate Root Certificates.</div>}
+          {manual && (
+            <div style={{display:'flex', gap:'6px', marginTop:'6px'}}>
+              <input type="text" placeholder="Certificate ID" value={mId} onChange={e => setMId(e.target.value.replace(/[^0-9]/g, ''))} style={{width:'140px'}} />
+              <input type="text" placeholder="Certificate name (as in the portal)" value={mName} onChange={e => setMName(e.target.value)} style={{flex:1}} />
+              <button className="btn btn-ghost btn-sm" disabled={!mId || !mName} onClick={() => { onChange({ id: Number(mId), name: mName.trim() }); setManual(false); }}>Use</button>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    function SslCertStep({ setError }) {
+      const [rules, setRules] = useState(null);
+      const [certs, reloadCerts] = useSslCertificates(true);
+      const [selected, setSelected] = useState({});
+      const [target, setTarget] = useState(null);
+      const [preview, setPreview] = useState(null);
+      const [result, setResult] = useState(null);
+      const [busy, setBusy] = useState(false);
+      const loadRules = () => { setRules(null); api.call('GET', '/ssl/rules').then(setRules).catch(e => setError(e.message)); };
+      useEffect(() => { loadRules(); }, []);
+      const ids = Object.keys(selected).filter(k => selected[k]);
+      const changeable = (rules || []).filter(r => r.changeable);
+      const run = async (dryRun) => {
+        setBusy(true); setError(null);
+        try {
+          const r = await api.call('POST', '/ssl/bulk-certificate', { ruleIds: ids, certificate: target, dryRun });
+          if (dryRun) setPreview(r); else { setResult(r); setPreview(null); loadRules(); }
+        } catch (e) { setError(e.message); }
+        setBusy(false);
+      };
+      return (
+        <div className="card">
+          <div className="card-header">
+            <h2>🔐 SSL Certificate Manager</h2>
+            <p>Choose which interception certificate your SSL Inspect rules use — for example, stop using the Zscaler default certificate and sign with your imported intermediate CA. Only Inspect (DECRYPT) rules use a certificate.</p>
+          </div>
+          <div className="form-group">
+            <label className="form-label">Certificate to use</label>
+            <CertificatePicker value={target} onChange={(c) => { setTarget(c); setPreview(null); setResult(null); }} certs={certs} reload={reloadCerts} testId="bulk" />
+          </div>
+          {!rules ? <div style={{textAlign:'center', padding:'1rem'}}><span className="spinner"></span></div> : (
+            <>
+              <div style={{display:'flex', gap:'8px', marginBottom:'8px'}}>
+                <button className="btn btn-ghost btn-sm" onClick={() => setSelected(Object.fromEntries(changeable.map(r => [r.id, true])))}>Select all Inspect rules ({changeable.length})</button>
+                <button className="btn btn-ghost btn-sm" onClick={() => setSelected(Object.fromEntries(changeable.filter(r => !r.override).map(r => [r.id, true])))}>Select rules on the default certificate</button>
+                <button className="btn btn-ghost btn-sm" onClick={() => setSelected({})}>Clear</button>
+                <button className="btn btn-ghost btn-sm" onClick={loadRules}>↻ Reload rules</button>
+              </div>
+              <table className="diff-table" data-sslrules>
+                <thead><tr><th></th><th>Order</th><th>Rule</th><th>Action</th><th>Certificate</th></tr></thead>
+                <tbody>
+                  {rules.map(r => (
+                    <tr key={r.id} style={{opacity: r.changeable ? 1 : 0.5}}>
+                      <td><input type="checkbox" disabled={!r.changeable} checked={!!selected[r.id]} onChange={e => { setSelected({ ...selected, [r.id]: e.target.checked }); setPreview(null); }} /></td>
+                      <td>{r.order}</td>
+                      <td style={{fontFamily:'IBM Plex Mono', fontSize:'12px'}}>{r.name}{r.predefined && <span className="badge badge-category" style={{marginLeft:'6px'}}>PREDEFINED</span>}{r.defaultRule && <span className="badge badge-category" style={{marginLeft:'6px'}}>DEFAULT RULE</span>}</td>
+                      <td><span className={`badge ${r.action === 'DECRYPT' ? 'badge-update' : 'badge-category'}`}>{r.action === 'DECRYPT' ? 'INSPECT' : r.action}</span></td>
+                      <td style={{fontSize:'12px'}}>{r.changeable ? (r.certificate ? r.certificate.name : <span style={{color:'var(--accent-amber)'}}>Zscaler default</span>) : '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </>
+          )}
+          {preview && (
+            <div className="alert alert-info" style={{display:'block', marginTop:'1rem'}} data-sslpreview>
+              <strong>Preview — nothing changed yet:</strong>
+              {preview.results.map((r, i) => <div key={i} style={{fontSize:'12px'}}>{r.ok ? (r.unchanged ? '= ' : '→ ') : '✕ '}{r.name}: {r.unchanged ? `already ${r.after}` : r.ok ? `${r.before} → ${r.after}` : r.error}</div>)}
+            </div>
+          )}
+          {result && (
+            <div className={`alert ${result.results.every(r => r.ok) ? 'alert-success' : 'alert-warning'}`} style={{display:'block', marginTop:'1rem'}} data-sslresult>
+              <strong>{result.results.filter(r => r.ok && !r.unchanged).length} rule(s) changed{result.activated ? ' and activated' : ''}.</strong>
+              {result.results.map((r, i) => <div key={i} style={{fontSize:'12px'}}>{r.ok ? '✓' : '✕'} {r.name}: {r.ok ? `${r.before} → ${r.after}` : r.error}</div>)}
+            </div>
+          )}
+          <div className="btn-group">
+            <button className="btn btn-ghost" disabled={!ids.length || busy} onClick={() => run(true)} data-sslpreviewbtn>Preview change ({ids.length})</button>
+            <button className="btn btn-success" disabled={!ids.length || busy || !preview} onClick={() => run(false)} data-sslapply>
+              {busy ? <><span className="spinner"></span> Working…</> : `Apply to ${ids.length} rule${ids.length === 1 ? '' : 's'} and activate`}
+            </button>
+          </div>
+          <div className="form-hint">To go back, choose "Zscaler default certificate", select the rules and apply. Every change is in the audit log.</div>
+        </div>
+      );
+    }
+
+    // ========================
+    // Step: Rules — on/off switch per rule, Allow / Block / Isolate (v1.6.0, v1.9.0)
     // ========================
     const isRestrictiveAction = (a) => /(^|,\s*)(BLOCK|DENY|CAUTION|ISOLATE)/.test(a || '');
     const isBlockAction = (a) => /(^|,\s*)(BLOCK|DENY)/.test(a || '');
@@ -1182,21 +1496,32 @@
       const [catalog, setCatalog] = useState(null);
       const [open, setOpen] = useState({});
       const settings = config.actionSettings || { policy: {}, rules: {} };
+      const disabled = config.disabledRules || {};
+      const base = config.baseTemplate;
+      const defaultLabel = base ? 'Framework default' : 'Tier default';
 
+      // The catalog depends on what is generated, not on the switches / choices made here
       const catalogKey = JSON.stringify([config.tier, config.complianceFramework, config.prefix,
-        config.enableUrlFiltering, config.enableFirewall, config.enableDnsSecurity,
-        config.enableFileTypeControl, config.enableCloudAppControl, config.enableDlp]);
+        config.enableUrlFiltering, config.enableFirewall, config.enableSslInspection, config.enableSandbox, config.enableDnsSecurity,
+        config.enableFileTypeControl, config.enableCloudAppControl, config.enableDlp, base ? (base.metadata?.capturedAt || base.metadata?.name || 'base') : null]);
 
       useEffect(() => {
         let cancelled = false;
         setCatalog(null);
-        api.call('POST', '/templates/action-catalog', config)
+        api.call('POST', '/templates/action-catalog', { ...config, actionSettings: null, disabledRules: {} })
           .then(c => { if (!cancelled) setCatalog(c); })
           .catch(e => setError(e.message));
         return () => { cancelled = true; };
       }, [catalogKey]);
 
       const update = (policy, rules) => setConfig({ ...config, actionSettings: { policy, rules } });
+      const setDisabled = (next) => setConfig({ ...config, disabledRules: next });
+      const toggleRule = (key) => { const next = { ...disabled }; if (next[key]) delete next[key]; else next[key] = true; setDisabled(next); };
+      const setGroupOn = (g, on) => {
+        const next = { ...disabled };
+        for (const r of g.rules) { if (on) delete next[r.key]; else next[r.key] = true; }
+        setDisabled(next);
+      };
 
       // A policy-level choice clears that type's per-rule overrides so the two never disagree
       const setPolicy = (type, value) => {
@@ -1205,7 +1530,7 @@
         update({ ...settings.policy, [type]: value }, rules);
       };
 
-      const baseFor = (r) => r.defaultAction === 'ALLOW' ? 'ALLOW' : isBlockAction(r.defaultAction) ? 'BLOCK' : null;
+      const baseFor = (r) => r.defaultAction === 'ALLOW' ? 'ALLOW' : isBlockAction(r.defaultAction) ? 'BLOCK' : r.defaultAction === 'ISOLATE' ? 'ISOLATE' : null;
 
       const setRule = (type, rule, value) => {
         const rules = { ...settings.rules };
@@ -1220,15 +1545,19 @@
         if (settings.rules[r.key]) return settings.rules[r.key];
         const p = settings.policy[type];
         if (p === 'ALLOW' || p === 'BLOCK') return p;
-        return baseFor(r); // null = Caution/Isolate tier default
+        return baseFor(r); // null = Caution tier default
       };
 
       const isWeakened = (type, r) => !r.locked && isRestrictiveAction(r.defaultAction) && effective(type, r) === 'ALLOW';
-      const weakenedCount = (catalog || []).reduce((n, g) => n + g.rules.filter(r => isWeakened(g.type, r)).length, 0);
+      const groups = catalog || [];
+      const weakenedCount = groups.reduce((n, g) => n + (g.canOverride ? g.rules.filter(r => !disabled[r.key] && isWeakened(g.type, r)).length : 0), 0);
+      const offCount = groups.reduce((n, g) => n + g.rules.filter(r => disabled[r.key]).length, 0);
+      const totalRules = groups.reduce((n, g) => n + g.rules.length, 0);
+      const isolateCount = groups.reduce((n, g) => n + (g.canIsolate ? g.rules.filter(r => !disabled[r.key] && effective(g.type, r) === 'ISOLATE').length : 0), 0);
       const overrideCount = Object.keys(settings.rules).length +
         Object.values(settings.policy).filter(v => v === 'ALLOW' || v === 'BLOCK').length;
 
-      const resetAll = () => update({}, {});
+      const resetAll = () => setConfig({ ...config, actionSettings: { policy: {}, rules: {} }, disabledRules: {} });
 
       const handleGenerate = async () => {
         setLoading(true); setError(null);
@@ -1244,18 +1573,25 @@
         <div>
           <div className="card">
             <div className="card-header">
-              <h2>Allow or Block</h2>
-              <p>Choose whether each policy type allows or blocks. Expand a policy type to flip individual rules.</p>
+              <h2>Rules</h2>
+              <p>Every rule has an on/off switch. Where the policy type supports it, choose Allow or Block per policy type or per rule — URL rules can also be set to Isolate (Cloud Browser Isolation).</p>
             </div>
 
             <div className="alert alert-info">
-              <span>ℹ <strong>Tier default</strong> keeps exactly what the {config.tier} tier creates (including Caution pages).
-              <strong> Allow all</strong> / <strong>Block all</strong> applies to every rule in that policy type; you can then change single rules.</span>
+              <span>ℹ <strong>{defaultLabel}</strong> keeps exactly what {base ? 'the framework file' : `the ${config.tier} tier`} creates (including Caution pages).
+              <strong> Allow all</strong> / <strong>Block all</strong> applies to every rule in that policy type; you can then change single rules.
+              Switched-off rules are not created.</span>
             </div>
+
+            {(offCount > 0 || isolateCount > 0) && (
+              <div className="alert alert-info" data-rulesummary>
+                <span>{totalRules - offCount} of {totalRules} rules on{isolateCount > 0 && <> · {isolateCount} URL rule{isolateCount === 1 ? '' : 's'} set to Isolate (profile: <strong>{config.cbiProfile ? config.cbiProfile.name : 'tenant default'}</strong>)</>}</span>
+              </div>
+            )}
 
             {weakenedCount > 0 && (
               <div className="alert alert-warning">
-                <span>⚠ {weakenedCount} rule{weakenedCount === 1 ? '' : 's'} that the {config.tier} tier would restrict {weakenedCount === 1 ? 'is' : 'are'} set to Allow.
+                <span>⚠ {weakenedCount} rule{weakenedCount === 1 ? '' : 's'} that {base ? 'the framework' : `the ${config.tier} tier`} would restrict {weakenedCount === 1 ? 'is' : 'are'} set to Allow.
                 This reduces protection; it is flagged in the plan and recorded in the audit log.</span>
               </div>
             )}
@@ -1263,46 +1599,67 @@
             {!catalog ? (
               <div style={{textAlign:'center', padding:'2rem'}}><div className="spinner" style={{margin:'0 auto'}}></div></div>
             ) : catalog.length === 0 ? (
-              <div className="alert alert-warning">None of the Allow/Block policy types are enabled. Go back to Customize.</div>
+              <div className="alert alert-warning">No rule-based policy types are enabled. Go back to Customize.</div>
             ) : catalog.map(g => {
               const pol = settings.policy[g.type] || 'DEFAULT';
               const overrides = g.rules.filter(r => settings.rules[r.key]).length;
-              const blocking = g.rules.filter(r => effective(g.type, r) === 'BLOCK').length;
+              const on = g.rules.filter(r => !disabled[r.key]).length;
+              const blocking = g.canOverride ? g.rules.filter(r => !disabled[r.key] && effective(g.type, r) === 'BLOCK').length : null;
               return (
-                <div className="ab-group" key={g.type}>
+                <div className="ab-group" key={g.type} data-rulegroup={g.type}>
                   <div className="ab-group-header" onClick={() => setOpen({ ...open, [g.type]: !open[g.type] })}>
                     <div>
                       <div className="ab-group-title">{open[g.type] ? '▾' : '▸'} {g.label}</div>
                       <div className="ab-group-sub">
-                        {g.rules.length} rule{g.rules.length === 1 ? '' : 's'} · {blocking} blocking
+                        {on} of {g.rules.length} on
+                        {blocking !== null && <> · {blocking} blocking</>}
                         {overrides > 0 && <> · {overrides} individually changed</>}
                       </div>
                     </div>
-                    <div className="ab-seg" onClick={e => e.stopPropagation()}>
-                      <button className={pol === 'DEFAULT' ? 'on-default' : ''} onClick={() => setPolicy(g.type, 'DEFAULT')}>Tier default</button>
-                      <button className={pol === 'ALLOW' ? 'on-allow' : ''} onClick={() => setPolicy(g.type, 'ALLOW')}>Allow all</button>
-                      <button className={pol === 'BLOCK' ? 'on-block' : ''} onClick={() => setPolicy(g.type, 'BLOCK')}>Block all</button>
+                    <div style={{display:'flex', gap:'8px', alignItems:'center'}} onClick={e => e.stopPropagation()}>
+                      <div className="ab-seg">
+                        <button className={on === g.rules.length ? 'on-default' : ''} onClick={() => setGroupOn(g, true)} data-allon>All on</button>
+                        <button className={on === 0 ? 'on-block' : ''} onClick={() => setGroupOn(g, false)} data-alloff>All off</button>
+                      </div>
+                      {g.canOverride && (
+                        <div className="ab-seg">
+                          <button className={pol === 'DEFAULT' ? 'on-default' : ''} onClick={() => setPolicy(g.type, 'DEFAULT')}>{defaultLabel}</button>
+                          <button className={pol === 'ALLOW' ? 'on-allow' : ''} onClick={() => setPolicy(g.type, 'ALLOW')}>Allow all</button>
+                          <button className={pol === 'BLOCK' ? 'on-block' : ''} onClick={() => setPolicy(g.type, 'BLOCK')}>Block all</button>
+                        </div>
+                      )}
                     </div>
                   </div>
                   {open[g.type] && (
                     <div className="ab-rows">
                       {g.rules.map(r => {
                         const eff = effective(g.type, r);
+                        const isOff = !!disabled[r.key];
                         return (
-                          <div className="ab-row" key={r.key}>
-                            <div>
-                              <div className="ab-row-name">{r.name}</div>
-                              <div className="ab-row-desc">{r.description}</div>
-                              <div className="ab-row-desc">
-                                Tier default: <strong>{r.defaultActions ? r.defaultActions.join(', ') : r.defaultAction}</strong>
+                          <div className="ab-row" key={r.key} data-rule={r.key} style={{opacity: isOff ? 0.5 : 1}}>
+                            <div style={{display:'flex', gap:'12px', alignItems:'flex-start'}}>
+                              <div className={`toggle-switch ${isOff ? '' : 'active'}`} style={{flexShrink:0, marginTop:'2px'}} onClick={() => toggleRule(r.key)} title={isOff ? 'Off — this rule will not be created' : 'On'} data-ruletoggle={r.key}>
+                                <div className="toggle-knob"></div>
                               </div>
-                              {isWeakened(g.type, r) && <div className="ab-warn">⚠ Weaker than the {config.tier} tier default</div>}
-                              {r.locked && <div className="ab-row-desc">🔒 Required for baseline internet access; cannot be changed</div>}
+                              <div>
+                                <div className="ab-row-name">{r.name}</div>
+                                <div className="ab-row-desc">{r.description}</div>
+                                <div className="ab-row-desc">
+                                  {defaultLabel}: <strong>{r.defaultActions ? r.defaultActions.join(', ') : r.defaultAction}</strong>
+                                  {r.categoryCount !== undefined && <> · {r.categoryCount} categor{r.categoryCount === 1 ? 'y' : 'ies'}</>}
+                                </div>
+                                {!isOff && g.canOverride && isWeakened(g.type, r) && <div className="ab-warn">⚠ Weaker than the default</div>}
+                                {!isOff && eff === 'ISOLATE' && <div className="ab-row-desc">🖥 Opens in Cloud Browser Isolation ({config.cbiProfile ? config.cbiProfile.name : 'tenant default profile'})</div>}
+                                {r.locked && <div className="ab-row-desc">🔒 Required for baseline internet access; Allow / Block cannot be changed</div>}
+                              </div>
                             </div>
-                            <div className="ab-seg">
-                              <button disabled={r.locked} className={eff === 'ALLOW' ? 'on-allow' : ''} onClick={() => setRule(g.type, r, 'ALLOW')}>Allow</button>
-                              <button disabled={r.locked} className={eff === 'BLOCK' ? 'on-block' : ''} onClick={() => setRule(g.type, r, 'BLOCK')}>Block</button>
-                            </div>
+                            {g.canOverride && (
+                              <div className="ab-seg">
+                                <button disabled={r.locked || isOff} className={eff === 'ALLOW' ? 'on-allow' : ''} onClick={() => setRule(g.type, r, 'ALLOW')}>Allow</button>
+                                <button disabled={r.locked || isOff} className={eff === 'BLOCK' ? 'on-block' : ''} onClick={() => setRule(g.type, r, 'BLOCK')}>Block</button>
+                                {g.canIsolate && <button disabled={r.locked || isOff} className={eff === 'ISOLATE' ? 'on-default' : ''} onClick={() => setRule(g.type, r, 'ISOLATE')} data-isolatebtn>Isolate</button>}
+                              </div>
+                            )}
                           </div>
                         );
                       })}
@@ -1314,7 +1671,8 @@
 
             <div className="btn-group">
               <button className="btn btn-ghost" onClick={onBack}>← Back</button>
-              {overrideCount > 0 && <button className="btn btn-ghost" onClick={resetAll}>Reset to tier defaults</button>}
+              {(overrideCount > 0 || offCount > 0) && <button className="btn btn-ghost" onClick={resetAll}>Reset to defaults</button>}
+              <SaveFrameworkButton config={config} setError={setError} />
               <button className="btn btn-primary" onClick={handleGenerate} disabled={loading || !catalog}>
                 {loading ? <><span className="spinner"></span> Generating...</> : 'Generate Template & Review →'}
               </button>
@@ -1503,6 +1861,12 @@
                       {plan.summary.actionOverrides > 0 && <>, <strong>{plan.summary.actionOverrides} Allow/Block overrides</strong></>}
                       {plan.summary.riskyActions > 0 && <>, <span style={{color:'var(--accent-red)'}}>{plan.summary.riskyActions} risky actions</span></>}
                     </div>
+                    {plan.errors?.length > 0 && plan.errors.map((w,i) => (
+                      <div key={'e' + i} className="alert alert-danger">✕ {typeof w === 'string' ? w : (w.error || JSON.stringify(w))}</div>
+                    ))}
+                    {plan.resolved?.cbi?.name && (
+                      <div className="alert alert-info" data-resolvedcbi>🖥 Isolation profile: <strong>{plan.resolved.cbi.name}</strong>{plan.resolved.cbi.defaultProfile ? ' (default)' : ''}</div>
+                    )}
                     {plan.warnings?.length > 0 && plan.warnings.map((w,i) => (
                       <div key={i} className="alert alert-warning">⚠ {w}</div>
                     ))}
