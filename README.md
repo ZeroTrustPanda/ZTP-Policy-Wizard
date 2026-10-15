@@ -106,10 +106,27 @@ Each framework maps specific controls to the generated rules. Compliance evidenc
 ## Quick Start
 
 ### Prerequisites
-- Node.js 18+
+- Docker (or Node.js 18+ for a non-container install)
 - Zscaler OneAPI OAuth2 credentials (client ID + secret from ZIdentity)
 
-### Install & Run
+### Run with Docker (recommended)
+
+```bash
+docker compose up -d --build
+```
+
+Open `http://localhost:8000` in your browser. Audit/HTTP/error logs are written to `./logs` on the host (mounted into the container).
+
+To change the port, edit both `ZTP_PORT` and the `ports` mapping in `docker-compose.yml` to the same value (e.g. `ZTP_PORT=9000` and `"9000:9000"`), then re-run the command above. Keeping them matched means the server's own startup log reports the port you actually browse to.
+
+Without Compose:
+
+```bash
+docker build -t ztp-policy-wizard .
+docker run -d --name ztp-policy-wizard -p 8000:8000 -e ZTP_PORT=8000 -v "$(pwd)/logs:/app/logs" ztp-policy-wizard
+```
+
+### Install & Run without Docker
 
 ```bash
 npm install
@@ -148,6 +165,8 @@ server/zia-client.js  — ZIA API client (OneAPI OAuth2, rate limiting, retry)
 server/zcc-client.js  — ZCC API client (PATCH app profiles, POST edit forwarding)
 server/zcc-templates.js — ZCC best-practice templates
 server/audit-logger.js — Structured audit logging (JSONL + CSV export)
+Dockerfile             — Container image (Node 20 Alpine, runs server/index.js)
+docker-compose.yml     — Local Docker run with logs volume and port mapping
 ```
 
 ### Multi-User Sessions

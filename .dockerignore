@@ -1,0 +1,12 @@
+node_modules
+npm-debug.log
+logs
+.env
+*.tar.gz
+*.bundle
+.git
+.gitignore
+README.md
+CHANGELOG.md
+install.bat
+service-install.js
