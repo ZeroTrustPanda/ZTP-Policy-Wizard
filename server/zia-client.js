@@ -37,6 +37,8 @@ const ONEAPI_BASE = 'api.zsapi.net';
 const ZIDENTITY_TOKEN_PATH = '/oauth2/v1/token';
 
 const redactBody = (s) => String(s).replace(/("[^"]*(?:password|secret|provisioningKey|token|apiKey)[^"]*"\s*:\s*)"[^"]*"/gi, '$1"<redacted>"');
+const SESSION_ENDED = /Resource Access Blocked|SESSION_NOT_VALID|Session already invalidated/i;
+
 class ZIAClient {
   constructor() {
     this.authMode = null; // 'legacy' or 'oneapi'
@@ -71,6 +73,7 @@ class ZIAClient {
    * Initialize with Legacy API credentials
    */
   async authenticateLegacy({ username, password, apiKey, cloud }) {
+    this._reauth = () => this.authenticateLegacy({ username, password, apiKey, cloud });
     this.authMode = 'legacy';
     this.cloud = cloud;
     this.baseUrl = ZIA_ADMIN_URLS[cloud] || cloud;
@@ -120,6 +123,7 @@ class ZIAClient {
    *   Non-prod:   https://{vanityDomain}.{cloud}.zslogin.net/oauth2/v1/token
    */
   async authenticateOneAPI({ clientId, clientSecret, vanityDomain, cloud }) {
+    this._reauth = () => this.authenticateOneAPI({ clientId, clientSecret, vanityDomain, cloud });
     this.authMode = 'oneapi';
     this.cloud = cloud || 'production';
     this.vanityDomain = vanityDomain;
@@ -210,6 +214,7 @@ class ZIAClient {
     }
     this.accessToken = null;
     this.tokenExpiry = null;
+    this._reauth = null;
   }
 
   /**
@@ -524,6 +529,15 @@ class ZIAClient {
       console.log(`[API] Rate limited (429). Retrying in ${retryAfter}s (attempt ${retryCount + 1}/5)`);
       await this._sleep(retryAfter * 1000);
       return this.apiCall(method, path, body, retryCount + 1);
+    }
+
+    // The ZIA API session can end before the OAuth token expires (ZIA API session timeout).
+    // ZIA then answers 401/403 "Resource Access Blocked" / SESSION_NOT_VALID; signing in again restores access.
+    if ((response.statusCode === 401 || response.statusCode === 403) && !retryCount && this._reauth
+        && SESSION_ENDED.test(typeof response.body === 'string' ? response.body : JSON.stringify(response.body || ''))) {
+      console.log('[API] ZIA API session ended; signing in again and retrying once');
+      await this._reauth();
+      return this.apiCall(method, path, body, 1);
     }
 
     if (response.statusCode >= 200 && response.statusCode < 300) {

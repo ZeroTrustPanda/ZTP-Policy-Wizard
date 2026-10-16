@@ -1720,10 +1720,10 @@ function generateCloudAppControlRules(tier, complianceFramework, prefix = 'ZTP')
     ruleType: 'SOCIAL_NETWORKING',
     actions: tier === 'STRICT' || tier === 'ZTH_EBOOK'
       ? ['BLOCK_SOCIAL_NETWORKING_VIEW', 'BLOCK_SOCIAL_NETWORKING_POST']
-      : ['BLOCK_SOCIAL_NETWORKING_UPLOAD', 'BLOCK_SOCIAL_NETWORKING_CHAT', 'BLOCK_SOCIAL_NETWORKING_POST'],
+      : ['ALLOW_SOCIAL_NETWORKING_VIEW', 'BLOCK_SOCIAL_NETWORKING_POST'],
     description: tier === 'STRICT' || tier === 'ZTH_EBOOK'
       ? 'Block all 81 social networking apps. Add exceptions above for marketing/communications.'
-      : 'Block uploads/chat/posts on 81 social apps. Read-only viewing allowed.',
+      : 'Block posting on 81 social apps. Read-only viewing allowed.',
     tier,
     complianceMapping: mapToCompliance('cac_social', complianceFramework)
   });
@@ -1793,10 +1793,10 @@ function generateCloudAppControlRules(tier, complianceFramework, prefix = 'ZTP')
     ruleType: 'AI_ML',
     actions: tier === 'STRICT' || tier === 'ZTH_EBOOK'
       ? ['DENY_AI_ML_WEB_USE']
-      : ['CAUTION_AI_ML_WEB_USE', 'DENY_AI_ML_UPLOAD'],
+      : ['ALLOW_AI_ML_WEB_USE', 'DENY_AI_ML_UPLOAD'],   // ZIA: DENY_AI_ML_UPLOAD requires ALLOW_AI_ML_WEB_USE
     description: tier === 'STRICT' || tier === 'ZTH_EBOOK'
       ? 'Block all 144 AI/ML apps (ChatGPT, Claude, Gemini, DALL-E, etc.). Add exceptions above for approved research teams with DLP.'
-      : 'Caution on 144 AI/ML apps, block uploads. Prevents PHI/PII leakage to AI platforms.',
+      : 'Allow 144 AI/ML apps but block uploads. Prevents PHI/PII leakage to AI platforms.',
     tier,
     complianceMapping: mapToCompliance('cac_aiml', complianceFramework)
   });

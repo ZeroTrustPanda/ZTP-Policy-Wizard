@@ -2977,6 +2977,7 @@
           const c = classifyHostEntry(e);
           if (!c.ok) out[k].push(`"${e}": ${c.why}`);
           else if (k === 'vpnGateways' && c.type === 'wildcard') out[k].push(`"${e}": wildcards are not allowed for VPN gateways`);
+          else if ((k === 'ipInclusions' || k === 'ipExclusions') && (c.type === 'fqdn' || c.type === 'wildcard')) out[k].push(`"${e}": IP lists take an IP address or CIDR only (put domain names in the DNS lists)`);
         }
       }
       return out;

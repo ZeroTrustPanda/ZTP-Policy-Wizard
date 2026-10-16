@@ -43,6 +43,14 @@ function diff(desired, existing, path = '') {
   return out;
 }
 
+// ZIA rejects descriptions over 255 bytes on several object types (e.g. DLP dictionaries).
+function clampDescription(b) {
+  if (!b || typeof b.description !== 'string' || Buffer.byteLength(b.description) <= 255) return b;
+  let d = b.description;
+  while (Buffer.byteLength(d + '…') > 255) d = d.slice(0, -1);
+  return { ...b, description: d.trimEnd() + '…' };
+}
+
 class ZiaEngine {
   constructor(client, { dryRun = true, logger = null } = {}) {
     this.client = client;
@@ -81,6 +89,11 @@ class ZiaEngine {
     return this.cache[key]++;
   }
 
+  releaseOrder(path, order) {
+    const key = `order:${path}`;
+    if (this.cache[key] === order + 1) this.cache[key] = order;
+  }
+
   /**
    * Create-or-update one object.
    * spec: { category, name, listPath, createPath, updatePath(id), body | build(order), orderPath?, orderOpts?, match?(obj), createFallback?(err, body) }
@@ -88,7 +101,7 @@ class ZiaEngine {
    */
   async upsert(spec) {
     const { category, name } = spec;
-    const body = spec.build ? spec.build(0) : spec.body;
+    const body = clampDescription(spec.build ? spec.build(0) : spec.body);
     let existing = null;
     try {
       const items = await this.get(spec.listPath);
@@ -97,10 +110,11 @@ class ZiaEngine {
       return this.record({ category, name, action: 'FAILED', error: `Could not read existing ${category}: ${e.message}` });
     }
     if (existing) {
-      const changes = diff(body, existing);
+      const want = spec.adjust ? spec.adjust(body, existing) : body;
+      const changes = diff(want, existing);
       if (!changes.length) return this.record({ category, name, action: 'NO_CHANGE', id: existing.id });
       if (this.dryRun) return this.record({ category, name, action: 'UPDATE', id: existing.id, changes });
-      const merged = { ...existing, ...body, id: existing.id };
+      const merged = clampDescription({ ...existing, ...want, id: existing.id });
       if (existing.order !== undefined) merged.order = existing.order;   // re-runs never move rules
       for (const k of READ_ONLY) delete merged[k];
       try {
@@ -116,9 +130,12 @@ class ZiaEngine {
       if (spec.build) await this.nextOrder(spec.orderPath || spec.listPath, spec.orderOpts);
       return this.record({ category, name, action: 'CREATE', id: `new:${++this.seq}` });
     }
+    let takenOrder;
+    const orderPath = spec.orderPath || spec.listPath;
     try {
       let created;
-      const createBody = spec.build ? spec.build(await this.nextOrder(spec.orderPath || spec.listPath, spec.orderOpts)) : body;
+      if (spec.build) takenOrder = await this.nextOrder(orderPath, spec.orderOpts);
+      const createBody = spec.build ? clampDescription(spec.build(takenOrder)) : clampDescription(body);
       try { created = await this.client.apiCall('POST', spec.createPath, createBody); }
       catch (e) {
         if (!spec.createFallback) throw e;
@@ -131,6 +148,7 @@ class ZiaEngine {
       this.cache[spec.listPath] = null;
       return this.record({ category, name, action: 'CREATE', id: created && (created.id !== undefined ? created.id : created.configuredName) });
     } catch (e) {
+      if (takenOrder !== undefined) this.releaseOrder(orderPath, takenOrder);
       return this.record({ category, name, action: 'FAILED', error: e.message });
     }
   }
@@ -279,7 +297,18 @@ async function runZia(client, template, { dryRun, logger }) {
   }
   for (const r of P.sandbox || []) {
     await eng.upsert({ category: 'Cloud Sandbox', name: r.name, listPath: '/api/v1/sandboxRules', createPath: '/api/v1/sandboxRules',
-      updatePath: id => `/api/v1/sandboxRules/${id}`, orderPath: '/api/v1/sandboxRules', build: order => sandboxBody(r, order) });
+      updatePath: id => `/api/v1/sandboxRules/${id}`, orderPath: '/api/v1/sandboxRules', build: order => sandboxBody(r, order),
+        // A rule created without a type the tenant can't sandbox (e.g. DMG without Sandbox macOS) stays as created.
+        adjust: (body, existing) => (body.fileTypes || []).includes('FTCATEGORY_DMG') && !(existing.fileTypes || []).includes('FTCATEGORY_DMG')
+          ? { ...body, fileTypes: body.fileTypes.filter(t => t !== 'FTCATEGORY_DMG') } : body,
+        createFallback: (e, body) => {
+          const m = String(e.message).match(/(\w+) file type is only available when subscribed to ([^."]+)/i);
+          if (!m) return null;
+          const ft = `FTCATEGORY_${m[1].toUpperCase()}`;
+          const types = (body.fileTypes || []).filter(t => t !== ft);
+          if (!types.length || types.length === (body.fileTypes || []).length) return null;
+          return { body: { ...body, fileTypes: types }, warning: `${m[1].toUpperCase()} left out (needs ${m[2].trim()}).` };
+        } });
   }
   for (const r of P.dnsSecurity || []) {
     await eng.upsert({ category: 'DNS Security', name: r.name, listPath: '/api/v1/firewallDnsRules', createPath: '/api/v1/firewallDnsRules',

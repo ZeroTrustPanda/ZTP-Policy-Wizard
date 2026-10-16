@@ -1,7 +1,9 @@
 /**
  * Input validation shared by the server routes (VAL-01). The UI runs the same rules inline (public/index.html).
  * ZCC-08: VPN Gateway Bypasses take CIDR or FQDN (no wildcards; a plain IPv4 address is accepted as a /32).
- *         IP / DNS inclusions and exclusions take wildcard FQDN (*.example.com), FQDN, IP or CIDR.
+ *         DNS inclusions and exclusions take wildcard FQDN (*.example.com), FQDN, IP or CIDR.
+ *         IP inclusions and exclusions take IP or CIDR only: ZCC rejects the whole app profile
+ *         (HTTP 200, success:false) when an IP list holds a domain name (verified live on ZTH, 2026-10-16).
  */
 const { classifyEntry } = require('./zpa');
 
@@ -15,6 +17,7 @@ function checkListEntry(key, raw) {
   const c = classifyEntry(s);
   if (!c.ok) return c.why;
   if (key === 'vpnGateways' && c.type === 'wildcard') return 'wildcards are not allowed for VPN gateways (use a CIDR or FQDN)';
+  if ((key === 'ipInclusions' || key === 'ipExclusions') && (c.type === 'fqdn' || c.type === 'wildcard')) return 'IP lists take an IP address or CIDR only (put domain names in the DNS lists)';
   return null;
 }
 
