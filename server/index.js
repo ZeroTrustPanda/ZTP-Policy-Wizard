@@ -2503,10 +2503,12 @@ async function planAppProfile(zccClient, platform, input, ownPrefix = null) {
   if (dup && body) {
     try {
       const stored = await zccClient.getApplicationProfile(dup.id);
-      for (const st of applied) if (!st.manual && !st.verify(stored)) changeReasons.push(st.label);
+      const ids = (x) => JSON.stringify((x || []).map(String).sort());
+      // the bypass setting is compared against the apps the user picked (not the template default list)
+      const settingMatches = (st) => (st.key === 'appBypass' && Array.isArray(st.appIds)) ? ids(stored.appServiceIds) === ids(st.appIds) : st.verify(stored);
+      for (const st of applied) if (!st.manual && !settingMatches(st)) changeReasons.push(st.label);
       const listsNow = readProfileLists(stored), listsWant = readProfileLists(body);
       for (const k of Object.keys(listsWant)) if (JSON.stringify(listsNow[k]) !== JSON.stringify(listsWant[k])) changeReasons.push(`${k}: ${listsNow[k].join(',') || 'none'} → ${listsWant[k].join(',') || 'none'}`);
-      const ids = (x) => JSON.stringify((x || []).map(String).sort());
       if (ids(stored.appServiceIds) !== ids(body.appServiceIds)) changeReasons.push(`bypass apps: ${ids(stored.appServiceIds)} → ${ids(body.appServiceIds)}`);
       if (String(Number(stored.active) || 0) !== String(Number(body.active) || 0)) changeReasons.push('enabled state');
       const storedFwd = String(stored?.onNetPolicy?.id ?? stored?.forwardingProfileId ?? 0);

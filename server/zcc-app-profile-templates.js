@@ -416,9 +416,10 @@ function getTemplate(platform, templateId) {
 /** Settings from the template that the user left enabled. */
 function selectedSettings(platform, templateId, enabledKeys) {
   const t = getTemplate(platform, templateId);
-  if (!Array.isArray(enabledKeys)) return t.settings; // default: everything in the template
+  // copies: callers set per-request values (e.g. the picked bypass app IDs) and must not change the shared template
+  if (!Array.isArray(enabledKeys)) return t.settings.map(s => ({ ...s })); // default: everything in the template
   const set = new Set(enabledKeys);
-  return t.settings.filter(s => set.has(s.key));
+  return t.settings.filter(s => set.has(s.key)).map(s => ({ ...s }));
 }
 
 module.exports = {

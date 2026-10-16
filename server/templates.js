@@ -1793,10 +1793,10 @@ function generateCloudAppControlRules(tier, complianceFramework, prefix = 'ZTP')
     ruleType: 'AI_ML',
     actions: tier === 'STRICT' || tier === 'ZTH_EBOOK'
       ? ['DENY_AI_ML_WEB_USE']
-      : ['ALLOW_AI_ML_WEB_USE', 'DENY_AI_ML_UPLOAD'],   // ZIA: DENY_AI_ML_UPLOAD requires ALLOW_AI_ML_WEB_USE
+      : ['CAUTION_AI_ML_WEB_USE'],   // category-wide rules take web-use actions only; upload controls need specific apps (live, ZTH)
     description: tier === 'STRICT' || tier === 'ZTH_EBOOK'
       ? 'Block all 144 AI/ML apps (ChatGPT, Claude, Gemini, DALL-E, etc.). Add exceptions above for approved research teams with DLP.'
-      : 'Allow 144 AI/ML apps but block uploads. Prevents PHI/PII leakage to AI platforms.',
+      : 'Caution page on 144 AI/ML apps. Upload blocking needs specific apps selected; inline DLP covers PHI/PII leakage to AI platforms.',
     tier,
     complianceMapping: mapToCompliance('cac_aiml', complianceFramework)
   });
