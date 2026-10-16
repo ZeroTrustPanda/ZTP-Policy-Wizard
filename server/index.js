@@ -25,7 +25,7 @@ const { registerZdxRoutes, ZDXClient } = require('./zdx-routes');
 const { AuditLogger } = require('./audit-logger');
 
 const app = express();
-const APP_VERSION = '1.9.0';
+const APP_VERSION = '2.0.0';
 const PORT = process.env.ZTP_PORT || 3000;
 const HOST = process.env.ZTP_HOST || '0.0.0.0';
 const SESSION_TTL_MS = 60 * 60 * 1000;   // 1 hour
