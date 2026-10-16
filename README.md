@@ -1,28 +1,77 @@
-# 🐼 ZeroTrustPanda — ZTP Policy Wizard v1.9.0
+# 🐼 ZeroTrustPanda — ZTP Policy Wizard v2.0.0
 
-Automated Zscaler Internet Access (ZIA) and Zscaler Client Connector (ZCC) policy configuration for healthcare and enterprise environments.
+Proof-of-value automation for Zscaler SEs: Zscaler Internet Access (ZIA), Zscaler Client Connector (ZCC), Zscaler Private Access (ZPA) and Zscaler Digital Experience (ZDX), all with one set of OneAPI (ZIdentity) client credentials.
 
-## What This Does
+## What's new in 2.0
 
-Deploy a complete Zscaler security policy stack in minutes instead of hours. Select a security tier, choose a compliance framework, review the rules, and apply — the wizard handles the API calls, rule ordering, and activation.
+The sidebar runs in POV order: **Zscaler Client Connector → Zscaler Internet Access → Zscaler Private Access → Zscaler Digital Experience**, plus a **Summary Report**. A **global prefix** set once after signing in names every object the wizard creates in ZIA, ZCC and ZPA. Running again with the same prefix **updates** those objects instead of creating duplicates.
 
-**Supported policy types:**
-- **URL Filtering** — Block legal liability, security risk, bandwidth/productivity categories
-- **Cloud Firewall** — Network application controls (QUIC block, web/NTP allow, P2P/tunnel block, default-deny)
-- **SSL/TLS Inspection** — Decrypt/bypass rules with health, finance, government exemptions
-- **Cloud Sandbox** — Quarantine Office/PDF, scan executables, AI Instant Verdict
-- **DNS Security** — Block malicious DNS categories and 21+ DNS tunnel types
-- **File Type Control** — Block database uploads, password-protected archives, executables, scripts
-- **Cloud App Control** — Restrict DoH, file sharing, webmail, streaming, IM, AI/ML
-- **Data Loss Prevention** — Dictionary-based DLP with auto-created custom engines per compliance framework
+**Every change goes through a dry run first.** The server refuses an apply that doesn't match a dry run of exactly the same choices. The dry run and the apply run the same code, so the preview lists each object as **Create**, **Update** or **No change**, and the apply does exactly that. After an apply, ZIA changes are activated automatically. One failed object never stops the rest: each failure is listed with its reason, and anything that depends on it is skipped.
 
-**Additional modules:**
-- **Policy Catalog** — Browse all 1,098 rules across 4 tiers × 9 frameworks without connecting
-- **Bulk Rule Manager** — Delete rules, DLP engines, and custom dictionaries across all categories
-- **Mobile Admin Portal** — Configure ZCC forwarding profiles and app profiles via PATCH/POST edit
-- **Digital Experience (ZDX)** — Set up ZDX Web and CloudPath probes from the Zscaler POV best practice guide, and manage existing apps and probes
+### ZIA: POV Policy Wizard
+1. **Scope:** pick what the POV covers.
+   - Inline DLP, either Monitor or Block.
+   - Endpoint Data Protection.
+   - Cloud Sandbox, either Standard or Advanced.
+   - AI Prompt Capture.
+   - The core areas: URL Filtering, Cloud App Control, File Type Control, ATP, Cloud Firewall, DNS Security and SSL Inspection.
+   - Licensing is read from the tenant. Features the tenant isn't licensed for are greyed out ("Not licensed on this tenant"). When the licence can't be confirmed, the feature stays available with a warning.
+   - The Endpoint DLP prerequisite in Mobile Admin is checked and reported.
+2. **Baseline Framework:** pick one baseline.
+   - The compliance frameworks: HIPAA, HITRUST, NIST 800-53, NIST 800-171, PCI DSS, CJIS, SOX, FERPA, GDPR.
+   - Or a non-mapped level: Strict, Balanced, Permissive, or Zero Trust Hospital.
+   - Each definition is a JSON file in `server/frameworks/`, with sources cited for each control and the research date.
+3. **Rules:** every rule and setting for the scope, grouped by category.
+   - Select all / Deselect all per category and for the whole page.
+   - Allow all / Block all per category, with per-rule Allow / Block. The last action wins.
+   - Isolate for URL rules, with the isolation profile and SSL certificate pickers from 1.9.
+   - Choices survive Back / Next.
+   - *Save selections* / *Load selections* reuse a configuration with another customer.
+4. **Dry run → Apply and activate → Results**, then the summary report.
 
-## Rules Step (v1.6.0, extended in v1.9.0)
+New policy areas:
+- **Inline DLP Monitor:** Allow-only rules on Zscaler's predefined engines, e.g. the HIPAA and PCI engines.
+- **Inline DLP Block:** custom dictionaries (ICD-10, MBI, MRN, card track data, CUI markings and others, each citing its source) and engines, reusing Zscaler's predefined dictionaries where they exist. The rules block by default, and each can be switched to Allow.
+- **Endpoint DLP:** USB, personal cloud storage and printing, in Monitor mode.
+- **Sandbox Standard:** .exe and .dll, Allow and Scan.
+- **Sandbox Advanced:** AI Instant Verdict on every rule. One rule per file-type group; high-risk types are quarantined and lower-risk types are allowed and scanned. File types the sandbox doesn't support are dropped and noted.
+- **AI Prompt Capture:** 14 GenAI apps and 5 UCaaS apps, all on by default and each switchable.
+- **ATP defaults.**
+
+### ZCC (Mobile Admin)
+- Every setting is a switch, for Windows and macOS.
+- **Automatically Attempt ZPA Reauthentication** is on by default, set per app profile. It is stored in `policyExtension` (verified live on both platforms).
+- **Predefined IP App Bypasses:** the list is read live from the tenant, behind a warning. All apps are checked by default.
+- **VPN Gateway Bypasses, IP Inclusions / Exclusions, DNS Inclusions / Exclusions:** each shows its description and the current default. Entries are validated inline.
+- A profile with the same name is updated in place, and the dry run says what will change.
+- The ZCC and ZDX APIs allow about **100 calls per hour**. The wizard caches repeated reads and reports a rate-limit message instead of waiting.
+
+### ZPA wizard
+The wizard creates, in order:
+1. `<prefix>-appconnector-group`: Connector certificate, San Jose, CA. Change the location in the portal afterwards; the wizard reminds you in a banner and in the report.
+2. `<prefix>-provisioning-key`: App Connector, max usage 5. The key is shown masked with reveal and copy, and it is never logged.
+3. `<prefix>-segment-group`
+4. `<prefix>-server-group`: Dynamic Server Discovery on.
+5. `<prefix>-app-segment`: one mixed field for domains and IPs.
+   - TCP and UDP ports 1-52 and 54-65535.
+   - Closer to User, Pingable on, CNAME on, and the other §5.2 defaults. Each setting can be changed.
+
+### Bulk managers and report
+- **ZPA Bulk Manager:** lists the wizard's objects by prefix and deletes them in dependency order (application segment → server group → segment group → provisioning key → App Connector Group), after a preview.
+- **ZDX Bulk Manager:** custom applications (with their probes) and collections, after a preview.
+- **Summary Report:** Markdown and printable HTML (save as PDF). It lists:
+  - the scope and baseline
+  - every object by product (Created / Updated / Unchanged / Failed / Skipped)
+  - the rule decisions, warnings and manual follow-ups
+  - the ZPA provisioning key, with the file clearly marked as sensitive
+
+All new user-facing text is in `server/v2/copy.js`.
+
+The 1.9 framework-file flow (load a saved framework, or capture a tenant's policies) is still available under ZIA › Framework Files (1.9).
+
+## 1.9 flows (still available)
+
+### Rules Step (v1.6.0, extended in v1.9.0)
 
 After **Customize**, the wizard lists every policy type (URL Filtering, Cloud Firewall, SSL Inspection, Sandbox, DNS Security, File Type Control, Cloud App Control, DLP).
 

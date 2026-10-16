@@ -1,5 +1,42 @@
 # Changelog
 
+## v2.0.0 — 2026-10-16 (feature/v2.0, in testing)
+
+Implements the *Policy Wizard 2.0 Requirements Specification*.
+
+- **Global:**
+  - One global prefix (GLB-02).
+  - A mandatory dry run enforced by the server, showing Create / Update / No change (GLB-03).
+  - Automatic ZIA activation (GLB-04).
+  - Same-name objects are updated, not duplicated, across ZIA, ZCC and ZPA (GLB-05).
+  - Choices persist across Back / Next (GLB-06).
+  - A summary report after every run (GLB-07).
+  - Licensing is detected from the tenant (GLB-08).
+  - No secrets in logs (GLB-09).
+- **ZIA:**
+  - A new Scope screen (§1).
+  - The Baseline Framework page replaces the Strict / Balanced / Permissive page (§2).
+  - Data-driven framework definitions with sources and research date.
+  - New areas: DLP Monitor and Block (custom dictionaries and engines), Endpoint DLP, Sandbox Standard and Advanced tiers, AI Prompt Capture, ATP defaults.
+  - The rule review page has category and global select, plus Allow / Block.
+- **ZCC:**
+  - The predefined IP bypass list is read live, behind a warning.
+  - New inputs for VPN gateway, IP and DNS inclusions / exclusions, with validation.
+  - ZPA reauthentication is on by default.
+  - Profiles are updated in place.
+- **ZPA:**
+  - A new wizard: connector group, provisioning key, segment group, server group, application segment.
+  - A bulk manager.
+- **ZDX:** a bulk manager.
+- **Navigation:** ZCC → ZIA → ZPA → ZDX.
+- **Fixed during live testing on ZTH:**
+  - The framework files were missing from the standalone build.
+  - The Windows reauth field was rejected by ZCC; it is now stored in `policyExtension`.
+  - Waits on long rate-limit Retry-After values are now capped, given the ZCC and ZDX limit of about 100 calls per hour.
+  - ZPA re-runs showed a false update.
+- **Not live-tested:** Endpoint DLP rule creation. The test tenant isn't licensed, and the wizard correctly reports it as not licensed.
+
+
 ## v1.9.0 — 2026-10-14
 
 ### ✨ New
