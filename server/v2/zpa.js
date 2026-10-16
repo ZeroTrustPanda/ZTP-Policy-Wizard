@@ -20,7 +20,7 @@ class ZPAClient {
   }
 
   /** Raw call. Response bodies are never logged (they can contain provisioning keys). */
-  async apiCall(method, path, body = null) {
+  async apiCall(method, path, body = null, attempt = 0) {
     const z = this.zia;
     if (!z || !z.isAuthenticated() || z.authMode !== 'oneapi') throw new Error('ZPA needs a OneAPI sign-in.');
     const now = Date.now();
@@ -29,7 +29,11 @@ class ZPAClient {
     const headers = { 'Content-Type': 'application/json', Accept: 'application/json', Authorization: `Bearer ${z.accessToken}` };
     console.log(`[ZPA-API] ${method} ${path.replace(/customers\/\d+/, 'customers/<cid>')}`);
     const res = await z._rawRequest(method, z.baseUrl, path, body ? JSON.stringify(body) : null, headers);
-    if (res.statusCode === 429) { await z._sleep(2000); return this.apiCall(method, path, body); }
+    if (res.statusCode === 429) {
+      const wait = parseInt((res.headers || {})['retry-after']) || 2;
+      if (wait > 30 || attempt >= 3) throw new Error(`ZPA API rate limit reached (HTTP 429). Wait about ${Math.max(1, Math.ceil(wait / 60))} minute(s) and run the dry run again.`);
+      await z._sleep(wait * 1000); return this.apiCall(method, path, body, attempt + 1);
+    }
     if (res.statusCode >= 200 && res.statusCode < 300) return res.body === '' ? null : res.body;
     const msg = typeof res.body === 'string' ? res.body.slice(0, 400) : JSON.stringify(res.body).replace(/"provisioningKey"\s*:\s*"[^"]*"/g, '"provisioningKey":"<redacted>"').slice(0, 400);
     throw new Error(`ZPA API Error ${res.statusCode}: ${msg}`);
@@ -120,6 +124,7 @@ const emptyish = (v) => v === undefined || v === null || v === false || v === ''
 function diffZpa(desired, existing) {
   const out = [];
   for (const [k, v] of Object.entries(desired)) {
+    if (k === 'associationType') continue;   // write-only: GET never returns it
     const e = existing[k];
     if (emptyish(v) && emptyish(e)) continue;
     if (Array.isArray(v)) {

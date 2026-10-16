@@ -64,8 +64,10 @@ class ZDXClient {
     if (response.statusCode === 429) {
       let retryAfter = 2;
       if (response.headers?.['retry-after']) retryAfter = parseInt(response.headers['retry-after']) || 2;
+      const attempt = (arguments[3] || 0) + 1;
+      if (retryAfter > 30 || attempt > 3) throw new Error(`ZDX API rate limit reached (HTTP 429). Wait about ${Math.max(1, Math.ceil(retryAfter / 60))} minute(s) and try again.`);
       await this.ziaClient._sleep(retryAfter * 1000);
-      return this.apiCall(method, path, body);
+      return this.apiCall(method, path, body, attempt);
     }
     if (response.statusCode >= 200 && response.statusCode < 300) return response.body;
 

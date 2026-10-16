@@ -3490,6 +3490,7 @@
                 <span>Planned: {plan.forwardingProfile?.isNew && <>forwarding profile <strong>{plan.forwardingProfile.name}</strong> <ActionBadge action={plan.forwardingAction || 'CREATE'} /> · </>}
                   app profile <strong>{form.name}</strong> <ActionBadge action={plan.action || 'CREATE'} /></span>
               </div>
+              {plan.action === 'UPDATE' && plan.changeReasons && plan.changeReasons.length > 0 && <div className="form-hint" style={{marginBottom:'0.5rem'}}>Will change: {plan.changeReasons.join('; ')}</div>}
               {plan.warnings.map((w, i) => <div key={i} className="alert alert-warning"><span>⚠ {w}</span></div>)}
               {plan.forwardingProfile?.isNew && (
                 <>

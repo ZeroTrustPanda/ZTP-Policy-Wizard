@@ -4,24 +4,16 @@
  * Existing 1.x rule content (templates.js) is reused for URL / CAC / file type / firewall / DNS / SSL; the areas new in
  * 2.0 come from zia-areas.js.
  */
-const fs = require('fs');
-const path = require('path');
 const { generateFullTemplate, ACTION_POLICY_TYPES, shortRuleName } = require('../templates');
 const areas = require('./zia-areas');
 const { normalizeScope } = require('./scope');
 
-const DIR = path.join(__dirname, '..', 'frameworks');
+// Required (not read from disk at runtime) so the standalone build bundles every definition
+const DEFINITIONS = require('../frameworks');
 let CACHE = null;
 function loadAll() {
-  if (CACHE) return CACHE;
-  const out = {};
-  for (const f of fs.readdirSync(DIR)) {
-    if (!f.endsWith('.json') || f.startsWith('dlp-')) continue;
-    const j = JSON.parse(fs.readFileSync(path.join(DIR, f), 'utf8'));
-    out[j.id] = j;
-  }
-  CACHE = out;
-  return out;
+  if (!CACHE) CACHE = Object.fromEntries(DEFINITIONS.map(j => [j.id, j]));
+  return CACHE;
 }
 
 // Order on the Baseline Framework page: the tool's existing compliance list (FWK-02), then the non-mapped tiers (FWK-03)

@@ -516,6 +516,10 @@ class ZIAClient {
       } else if (response.headers && response.headers['x-ratelimit-reset']) {
         retryAfter = parseInt(response.headers['x-ratelimit-reset']) || 2;
       }
+      if (retryAfter > 60) {
+        const mins = Math.ceil(retryAfter / 60);
+        throw new Error(`ZIA API rate limit reached (HTTP 429). Zscaler asks to wait about ${mins} minute${mins === 1 ? '' : 's'}; run the dry run again later.`);
+      }
       console.log(`[API] Rate limited (429). Retrying in ${retryAfter}s (attempt ${retryCount + 1}/5)`);
       await this._sleep(retryAfter * 1000);
       return this.apiCall(method, path, body, retryCount + 1);

@@ -2489,22 +2489,27 @@ async function planAppProfile(zccClient, platform, input) {
     checks.push({ name: 'Created disabled', status: 'pass', detail: 'No device is affected until you enable it' });
   }
 
-  // v2.0: Create / Update / No change (GLB-03/05)
+  // v2.0: Create / Update / No change (GLB-03/05), with the reasons for an update
   let action = dup ? 'UPDATE' : 'CREATE';
+  let changeReasons = [];
   if (dup && body) {
     try {
       const stored = await zccClient.getApplicationProfile(dup.id);
+      for (const st of applied) if (!st.manual && !st.verify(stored)) changeReasons.push(st.label);
       const listsNow = readProfileLists(stored), listsWant = readProfileLists(body);
-      const same = applied.every(st => st.manual || st.verify(stored))
-        && JSON.stringify(listsNow) === JSON.stringify(listsWant)
-        && JSON.stringify((stored.appServiceIds || []).map(String).sort()) === JSON.stringify((body.appServiceIds || []).map(String).sort())
-        && String(stored.active) === String(body.active) && !fwdPlan;
-      if (same) action = 'NO_CHANGE';
-    } catch (e) { /* update */ }
+      for (const k of Object.keys(listsWant)) if (JSON.stringify(listsNow[k]) !== JSON.stringify(listsWant[k])) changeReasons.push(`${k}: ${listsNow[k].join(',') || 'none'} → ${listsWant[k].join(',') || 'none'}`);
+      const ids = (x) => JSON.stringify((x || []).map(String).sort());
+      if (ids(stored.appServiceIds) !== ids(body.appServiceIds)) changeReasons.push(`bypass apps: ${ids(stored.appServiceIds)} → ${ids(body.appServiceIds)}`);
+      if (String(Number(stored.active) || 0) !== String(Number(body.active) || 0)) changeReasons.push('enabled state');
+      const storedFwd = String(stored?.onNetPolicy?.id ?? stored?.forwardingProfileId ?? 0);
+      if (fwdPlan) { if (fwdPlan.action !== 'NO_CHANGE' || storedFwd !== String(fwdPlan.existingId)) changeReasons.push('forwarding profile'); }
+      else if (storedFwd !== String(Number(forwardingProfileId) || 0)) changeReasons.push('forwarding profile');
+      if (!changeReasons.length) action = 'NO_CHANGE';
+    } catch (e) { changeReasons = [`could not compare (${e.message})`]; }
   }
   const ok = !checks.some(c => c.status === 'fail');
   return {
-    ok, checks, warnings, ruleOrder, placement, action, existingId: dup ? dup.id : null,
+    ok, checks, warnings, ruleOrder, placement, action, changeReasons, existingId: dup ? dup.id : null,
     platform: { id: plat.id, label: plat.label, deviceType: plat.deviceType },
     forwardingProfile: fwdPlan
       ? { id: null, name: fwdName, isNew: true, template: fwdPlan.template, settings: fwdPlan.settings, existing: fwdPlan.existing }

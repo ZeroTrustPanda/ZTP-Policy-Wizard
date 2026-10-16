@@ -18,7 +18,20 @@ class ZCCClient {
     this.ziaClient = ziaClient;
   }
 
-  async apiCall(method, path, body = null) {
+  async apiCall(method, path, body = null, attempt = 0) {
+    // v2.0: the ZCC API allows about 100 calls per hour, so identical reads within 2 minutes are served from
+    // memory (per session). Any write clears the cache so a read after a write is always fresh.
+    this._cache = this._cache || new Map();
+    if (method === 'GET' && !attempt) {
+      const hit = this._cache.get(path);
+      if (hit && Date.now() - hit.at < 120000) return JSON.parse(JSON.stringify(hit.body));
+    } else if (method !== 'GET') this._cache.clear();
+    const result = await this._apiCall(method, path, body, attempt);
+    if (method === 'GET') this._cache.set(path, { at: Date.now(), body: JSON.parse(JSON.stringify(result === undefined ? null : result)) });
+    return result;
+  }
+
+  async _apiCall(method, path, body = null, attempt = 0) {
     if (!this.ziaClient || !this.ziaClient.isAuthenticated()) {
       throw new Error('Not authenticated. ZCC API requires OneAPI authentication.');
     }
@@ -64,9 +77,15 @@ class ZCCClient {
     if (response.statusCode === 429) {
       let retryAfter = 2;
       if (response.headers?.['retry-after']) retryAfter = parseInt(response.headers['retry-after']) || 2;
-      console.log(`[ZCC-API] Rate limited. Retrying in ${retryAfter}s`);
+      // v2.0: never sleep for minutes inside a request. Short waits are retried (3 times); long ones are reported.
+      const next = attempt + 1;
+      if (retryAfter > 30 || next > 3) {
+        const mins = Math.max(1, Math.ceil(retryAfter / 60));
+        throw new Error(`ZCC API rate limit reached (HTTP 429). The Client Connector API allows about 100 calls per hour; Zscaler asks to wait about ${mins} minute${mins === 1 ? '' : 's'}. Nothing else was changed; run the dry run again later.`);
+      }
+      console.log(`[ZCC-API] Rate limited. Retrying in ${retryAfter}s (attempt ${next})`);
       await this.ziaClient._sleep(retryAfter * 1000);
-      return this.apiCall(method, path, body);
+      return this._apiCall(method, path, body, next);
     }
 
     if (response.statusCode >= 200 && response.statusCode < 300) {

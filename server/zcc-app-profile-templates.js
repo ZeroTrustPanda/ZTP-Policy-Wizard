@@ -338,8 +338,8 @@ function reauthSetting(platform) {
     apply: (b) => {
       b.policyExtension.followGlobalForZpaReauth = '0'; b.followGlobalForZpaReauth = '0';
       b.policyExtension.zpaAutoReauthTimeout = 30; b.zpaAutoReauthTimeout = [{ label: '30', value: 30 }];
-      if (platform === 'windows') b.windowsPolicy.zpaReauthConfig = REAUTH_NETWORKS;
-      else { b.policyExtension.zpaReauthConfig = REAUTH_NETWORKS; if (b.macPolicy) b.macPolicy.zpaReauthConfig = REAUTH_NETWORKS; }
+      // Stored in policyExtension (verified on macOS against a live tenant; the windowsPolicy copy is left as the portal sends it)
+      b.policyExtension.zpaReauthConfig = REAUTH_NETWORKS;
     },
     verify: (p) => String(p.policyExtension?.followGlobalForZpaReauth) === '0'
   };
