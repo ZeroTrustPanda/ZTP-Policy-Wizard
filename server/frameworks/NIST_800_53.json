@@ -1,0 +1,276 @@
+{
+  "id": "NIST_800_53",
+  "type": "compliance",
+  "name": "NIST 800-53",
+  "fullName": "NIST Special Publication 800-53 Rev. 5",
+  "description": "Security and privacy controls for federal information systems (moderate/high baselines).",
+  "version": "2026.10.1",
+  "researchedAt": "2026-10-16",
+  "baseTier": "STRICT",
+  "complianceKey": "NIST_800_53",
+  "sources": [
+    {
+      "id": "nist53",
+      "title": "NIST SP 800-53 Rev. 5 Security and Privacy Controls",
+      "url": "https://csrc.nist.gov/pubs/sp/800/53/r5/upd1/final"
+    },
+    {
+      "id": "cui",
+      "title": "NARA CUI Registry and marking guidance",
+      "url": "https://www.archives.gov/cui/registry/category-list"
+    },
+    {
+      "id": "zs-sandbox",
+      "title": "Zscaler: Recommended Sandbox Policy",
+      "url": "https://help.zscaler.com/zia/recommended-sandbox-policy"
+    },
+    {
+      "id": "zs-edlp",
+      "title": "Zscaler: Configuring Endpoint DLP Policy Rules",
+      "url": "https://help.zscaler.com/zia/configuring-endpoint-dlp-policy-rules"
+    },
+    {
+      "id": "zs-api-adv-url",
+      "title": "Zscaler SDK (Go): URL & Cloud App advanced settings incl. GenAI prompt capture flags",
+      "url": "https://github.com/zscaler/zscaler-sdk-go/blob/master/zscaler/zia/services/urlfilteringpolicies/urlfilteringpolicies.go"
+    },
+    {
+      "id": "cis",
+      "title": "CIS Critical Security Controls v8.1 (Safeguards 9.2 DNS filtering, 9.3 URL filters, 9.6 block unnecessary file types, 10.1 anti-malware, 3.13 DLP)",
+      "url": "https://myctrl.tools/frameworks/cis-controls-v8"
+    }
+  ],
+  "controls": [
+    {
+      "id": "AC-4",
+      "name": "Information flow enforcement",
+      "source": "nist53"
+    },
+    {
+      "id": "AC-19",
+      "name": "Access control for mobile devices",
+      "source": "nist53"
+    },
+    {
+      "id": "AC-20",
+      "name": "Use of external systems",
+      "source": "nist53"
+    },
+    {
+      "id": "AU-2",
+      "name": "Event logging",
+      "source": "nist53"
+    },
+    {
+      "id": "AU-12",
+      "name": "Audit record generation",
+      "source": "nist53"
+    },
+    {
+      "id": "CM-7",
+      "name": "Least functionality",
+      "source": "nist53"
+    },
+    {
+      "id": "MP-7",
+      "name": "Media use",
+      "source": "nist53"
+    },
+    {
+      "id": "SC-7",
+      "name": "Boundary protection",
+      "source": "nist53"
+    },
+    {
+      "id": "SC-7(5)",
+      "name": "Deny by default \u2014 allow by exception",
+      "source": "nist53"
+    },
+    {
+      "id": "SC-7(8)",
+      "name": "Route traffic to authenticated proxy servers",
+      "source": "nist53"
+    },
+    {
+      "id": "SC-7(10)",
+      "name": "Prevent exfiltration",
+      "source": "nist53"
+    },
+    {
+      "id": "SC-8",
+      "name": "Transmission confidentiality and integrity",
+      "source": "nist53"
+    },
+    {
+      "id": "SC-20",
+      "name": "Secure name/address resolution",
+      "source": "nist53"
+    },
+    {
+      "id": "SC-21",
+      "name": "Secure name/address resolution (recursive resolver)",
+      "source": "nist53"
+    },
+    {
+      "id": "SC-44",
+      "name": "Detonation chambers",
+      "source": "nist53"
+    },
+    {
+      "id": "SI-3",
+      "name": "Malicious code protection",
+      "source": "nist53"
+    },
+    {
+      "id": "SI-4",
+      "name": "System monitoring",
+      "source": "nist53"
+    }
+  ],
+  "areas": {
+    "urlFiltering": {
+      "controls": [
+        "SC-7",
+        "SI-3"
+      ],
+      "rationale": "Boundary protection and malicious code protection at the web gateway."
+    },
+    "cloudAppControl": {
+      "controls": [
+        "AC-4",
+        "AC-20"
+      ],
+      "rationale": "Information flow enforcement to external systems and cloud services."
+    },
+    "fileTypeControl": {
+      "controls": [
+        "SI-3",
+        "CM-7"
+      ],
+      "rationale": "Least functionality: block unneeded executable content."
+    },
+    "advancedThreatProtection": {
+      "controls": [
+        "SI-3",
+        "SI-4",
+        "SC-7"
+      ],
+      "rationale": "Malicious code protection and system monitoring."
+    },
+    "firewallFiltering": {
+      "controls": [
+        "SC-7",
+        "SC-7(5)"
+      ],
+      "rationale": "Deny network communications traffic by default; allow by exception."
+    },
+    "dnsSecurity": {
+      "controls": [
+        "SC-20",
+        "SC-21",
+        "SI-4"
+      ],
+      "rationale": "Secure name resolution and detect DNS tunneling."
+    },
+    "sslInspection": {
+      "controls": [
+        "SC-8",
+        "SC-7(8)",
+        "SI-4"
+      ],
+      "rationale": "Inspect encrypted traffic through managed interfaces."
+    },
+    "dlpMonitor": {
+      "controls": [
+        "AU-2",
+        "SI-4"
+      ],
+      "rationale": "Monitor sensitive information flows."
+    },
+    "dlpBlock": {
+      "controls": [
+        "AC-4",
+        "SC-7(10)"
+      ],
+      "rationale": "Prevent exfiltration of CUI and PII."
+    },
+    "endpointDlp": {
+      "controls": [
+        "MP-7",
+        "AC-19"
+      ],
+      "rationale": "Media use restrictions: removable media, personal cloud and print."
+    },
+    "sandbox": {
+      "controls": [
+        "SI-3",
+        "SC-44"
+      ],
+      "rationale": "Detonation chambers for unknown content (SC-44)."
+    },
+    "aiPromptCapture": {
+      "controls": [
+        "AU-2",
+        "AU-12"
+      ],
+      "rationale": "Event logging for AI tool use."
+    }
+  },
+  "dlp": {
+    "monitorEngines": [
+      "HIPAA",
+      "PCI",
+      "GLBA"
+    ],
+    "blockRules": [
+      {
+        "key": "CUI-Markings",
+        "label": "CUI-Markings",
+        "dictionaries": [
+          "custom:CUI_MARKINGS"
+        ],
+        "controls": [
+          "AC-4",
+          "SC-7(10)"
+        ]
+      },
+      {
+        "key": "PII",
+        "label": "PII",
+        "dictionaries": [
+          "predefined:SSN",
+          "predefined:TIN_LEAKAGE",
+          "predefined:USDL_LEAKAGE"
+        ],
+        "controls": [
+          "AC-4"
+        ]
+      },
+      {
+        "key": "Credentials",
+        "label": "Credentials",
+        "dictionaries": [
+          "predefined:CRED_LEAKAGE"
+        ],
+        "controls": [
+          "AC-4"
+        ]
+      },
+      {
+        "key": "Payment-Cards",
+        "label": "Payment-Cards",
+        "dictionaries": [
+          "predefined:CREDIT_CARD"
+        ],
+        "controls": [
+          "AC-4"
+        ]
+      }
+    ],
+    "endpointChannels": [
+      "REMOVABLE_DRIVE_TRANSFER",
+      "PERSONAL_CLOUD_STORAGE",
+      "PRINTING"
+    ]
+  }
+}

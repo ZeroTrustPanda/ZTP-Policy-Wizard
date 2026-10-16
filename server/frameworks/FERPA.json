@@ -1,0 +1,175 @@
+{
+  "id": "FERPA",
+  "type": "compliance",
+  "name": "FERPA",
+  "fullName": "Family Educational Rights and Privacy Act",
+  "description": "Protects the privacy of student education records; schools commonly pair it with CIPA content filtering.",
+  "version": "2026.10.1",
+  "researchedAt": "2026-10-16",
+  "baseTier": "BALANCED",
+  "complianceKey": "FERPA",
+  "sources": [
+    {
+      "id": "ferpa",
+      "title": "34 CFR Part 99 \u2014 FERPA (eCFR)",
+      "url": "https://www.ecfr.gov/current/title-34/subtitle-A/part-99"
+    },
+    {
+      "id": "ferpa993",
+      "title": "34 CFR 99.3 Definitions (education records, PII)",
+      "url": "https://www.ecfr.gov/current/title-34/subtitle-A/part-99/subpart-A/section-99.3"
+    },
+    {
+      "id": "cipa",
+      "title": "FCC: Children's Internet Protection Act (CIPA)",
+      "url": "https://www.fcc.gov/consumers/guides/childrens-internet-protection-act"
+    },
+    {
+      "id": "zs-sandbox",
+      "title": "Zscaler: Recommended Sandbox Policy",
+      "url": "https://help.zscaler.com/zia/recommended-sandbox-policy"
+    },
+    {
+      "id": "zs-edlp",
+      "title": "Zscaler: Configuring Endpoint DLP Policy Rules",
+      "url": "https://help.zscaler.com/zia/configuring-endpoint-dlp-policy-rules"
+    },
+    {
+      "id": "zs-api-adv-url",
+      "title": "Zscaler SDK (Go): URL & Cloud App advanced settings incl. GenAI prompt capture flags",
+      "url": "https://github.com/zscaler/zscaler-sdk-go/blob/master/zscaler/zia/services/urlfilteringpolicies/urlfilteringpolicies.go"
+    },
+    {
+      "id": "cis",
+      "title": "CIS Critical Security Controls v8.1 (Safeguards 9.2 DNS filtering, 9.3 URL filters, 9.6 block unnecessary file types, 10.1 anti-malware, 3.13 DLP)",
+      "url": "https://myctrl.tools/frameworks/cis-controls-v8"
+    }
+  ],
+  "controls": [
+    {
+      "id": "99.3",
+      "name": "Education records and PII definitions",
+      "source": "ferpa993"
+    },
+    {
+      "id": "99.31",
+      "name": "Disclosure without consent \u2014 reasonable methods",
+      "source": "ferpa"
+    },
+    {
+      "id": "CIPA",
+      "name": "Technology protection measure for minors",
+      "source": "cipa"
+    }
+  ],
+  "areas": {
+    "urlFiltering": {
+      "controls": [
+        "CIPA"
+      ],
+      "rationale": "Block content harmful to minors (CIPA) alongside security categories."
+    },
+    "cloudAppControl": {
+      "controls": [
+        "99.31"
+      ],
+      "rationale": "Control student data in unsanctioned apps."
+    },
+    "fileTypeControl": {
+      "controls": [
+        "99.31"
+      ],
+      "rationale": "Block malware delivery file types."
+    },
+    "advancedThreatProtection": {
+      "controls": [
+        "99.31"
+      ],
+      "rationale": "Protect systems holding education records."
+    },
+    "firewallFiltering": {
+      "controls": [
+        "99.31"
+      ],
+      "rationale": "Restrict tunnels and anonymizers."
+    },
+    "dnsSecurity": {
+      "controls": [
+        "CIPA",
+        "99.31"
+      ],
+      "rationale": "DNS-layer protection."
+    },
+    "sslInspection": {
+      "controls": [
+        "CIPA"
+      ],
+      "rationale": "Inspect TLS so content filtering works."
+    },
+    "dlpMonitor": {
+      "controls": [
+        "99.31"
+      ],
+      "rationale": "Log student record movement."
+    },
+    "dlpBlock": {
+      "controls": [
+        "99.3",
+        "99.31"
+      ],
+      "rationale": "Block student records and PII leaving the district."
+    },
+    "endpointDlp": {
+      "controls": [
+        "99.31"
+      ],
+      "rationale": "Monitor student records copied to removable media, cloud sync and print."
+    },
+    "sandbox": {
+      "controls": [
+        "99.31"
+      ],
+      "rationale": "Detonate unknown files."
+    },
+    "aiPromptCapture": {
+      "controls": [
+        "99.31"
+      ],
+      "rationale": "Capture GenAI prompts that may include student records."
+    }
+  },
+  "dlp": {
+    "monitorEngines": [
+      "CYBER_BULLY_ENG",
+      "OFFENSIVE_LANGUAGE"
+    ],
+    "blockRules": [
+      {
+        "key": "Student-Records",
+        "label": "Student-Records",
+        "dictionaries": [
+          "custom:STUDENT_RECORDS",
+          "predefined:SSN"
+        ],
+        "controls": [
+          "99.3"
+        ]
+      },
+      {
+        "key": "Self-Harm",
+        "label": "Self-Harm-Bullying",
+        "dictionaries": [
+          "predefined:CYBER_BULLY"
+        ],
+        "controls": [
+          "CIPA"
+        ]
+      }
+    ],
+    "endpointChannels": [
+      "REMOVABLE_DRIVE_TRANSFER",
+      "PERSONAL_CLOUD_STORAGE",
+      "PRINTING"
+    ]
+  }
+}
