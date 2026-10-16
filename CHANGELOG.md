@@ -4,6 +4,15 @@
 
 Implements the *Policy Wizard 2.0 Requirements Specification*.
 
+**Live-test findings (ZTH, 2026-10-16), fixed in this build:**
+- The ZIA API session can end before the OAuth token expires. ZIA then returns 403 "Resource Access Blocked". The client now signs in again once and retries.
+- A failed rule create gives back its rule order, so one failure no longer causes "Rule is not allowed at order N" for every later rule.
+- Cloud Sandbox: DMG needs the Sandbox macOS subscription. It is left out with a warning, and re-runs stay No change.
+- Descriptions are clamped to 255 bytes, because DLP dictionaries reject anything longer.
+- Cloud App Control rules that cover a whole category accept only web-use actions. Upload, chat and post sub-actions need specific apps selected. Balanced now uses Social "Allow view + Block post" and AI/ML "Caution".
+- ZCC IP Inclusions and Exclusions take an IP address or CIDR only. A domain name there makes ZCC reject the whole app profile (HTTP 200, success:false), so the dry run now refuses it. This deviates from ZCC-08, which allows FQDNs.
+- ZCC re-runs compare bypass apps against the apps that were picked, not the template default, so they now show No change.
+
 - **Global:**
   - One global prefix (GLB-02).
   - A mandatory dry run enforced by the server, showing Create / Update / No change (GLB-03).
