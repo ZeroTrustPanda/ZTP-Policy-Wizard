@@ -935,6 +935,12 @@
         setPov(prev => pruneToScope(prev, next));
       };
       useEffect(() => { if (!pov.scope) setPov(prev => ({ ...prev, scope })); }, []);
+      // GLB-08 + SCP-04: an item the tenant is not licensed for is switched off, not just hidden
+      useEffect(() => {
+        if (!licensing || !licensing.items) return;
+        const blocked = Object.entries(licensing.items).filter(([, v]) => v.licensed === false).map(([k]) => k);
+        if (blocked.some(k => scope[k])) setPov(prev => pruneToScope(prev, { ...(prev.scope || scope), ...Object.fromEntries(blocked.map(k => [k, false])) }));
+      }, [licensing, pov.scope]);
       const rows = (keys) => keys.map(key => {
         const item = meta.scopeItems.find(i => i.key === key);
         const l = lic(key);
@@ -1252,8 +1258,8 @@
       const [reveal, setReveal] = useState(false);
       const [confirmed, setConfirmed] = useState(false);
       useEffect(() => { api.call('GET', '/v2/zpa/context').then(setCtx).catch(e => setCtx({ error: e.message })); }, []);
+      useEffect(() => { setPlan(null); setConfirmed(false); }, [JSON.stringify([form, settings])]);
       useEffect(() => {
-        setPlan(null);
         const t = setTimeout(() => api.call('POST', '/v2/zpa/validate', { domains: form.domains, tcpPorts: form.tcpPorts, udpPorts: form.udpPorts, settings }).then(r => setErrors(r.errors)).catch(() => {}), 250);
         return () => clearTimeout(t);
       }, [form.domains, form.tcpPorts, form.udpPorts, settings.healthReporting]);

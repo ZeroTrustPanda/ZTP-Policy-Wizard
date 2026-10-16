@@ -137,7 +137,7 @@ function build(opts, withChoices) {
     if (!rules) continue;
     for (const r of rules) {
       r.toggleKey = r.actionKey;
-      r.name = shortRuleName(r.name);
+      r.name = shortRuleName(r.name, prefix);
       r.canOverride = type === 'dlp' && !r.allowOnly;
       r.defaultAction = r.defaultAction || (type === 'sandbox' ? r.firstTimeOperation : r.action);
     }
@@ -155,9 +155,9 @@ function build(opts, withChoices) {
     }
     if (!policies[type].length) delete policies[type];
   }
-  for (const d of objects.dlpDictionaries) d.name = shortRuleName(d.name);
-  for (const e of objects.dlpEngines) { e.name = shortRuleName(e.name); e.dictRefs = e.dictRefs.map(r => r.custom ? { custom: shortRuleName(r.custom) } : r); }
-  for (const r of (policies.dlp || [])) if (r.engineRef && r.engineRef.custom) r.engineRef.custom = shortRuleName(r.engineRef.custom);
+  for (const d of objects.dlpDictionaries) d.name = shortRuleName(d.name, prefix);
+  for (const e of objects.dlpEngines) { e.name = shortRuleName(e.name, prefix); e.dictRefs = e.dictRefs.map(r => r.custom ? { custom: shortRuleName(r.custom, prefix) } : r); }
+  for (const r of (policies.dlp || [])) if (r.engineRef && r.engineRef.custom) r.engineRef.custom = shortRuleName(r.engineRef.custom, prefix);
 
   // 4. Settings (ATP, AI prompt capture): per-setting values and switches
   for (const type of SINGLETON_TYPES) {

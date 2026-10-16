@@ -1999,18 +1999,24 @@ const NAME_ABBREV = [[/Advanced-Threat-Protection/g, 'ATP'], [/Inspection/g, 'In
   [/Malware/g, 'Mal'], [/Exemptions?/g, 'Exempt'], [/Communication/g, 'Comm'], [/Applications?/g, 'Apps'], [/Recommended/g, 'Rec'],
   [/Unknown/g, 'Unk'], [/Suspicious/g, 'Susp'], [/Newly-Registered/g, 'NRD'], [/Remaining/g, 'Rest'], [/Control/g, 'Ctl'],
   [/Security/g, 'Sec'], [/Category/g, 'Cat'], [/Block/g, 'Blk'], [/Allow/g, 'Alw']];
-function shortRuleName(name) {
-  let n = String(name || '');
-  for (const [re, to] of NAME_ABBREV) { if (n.length <= MAX_RULE_NAME) break; n = n.replace(re, to); }
-  return n.length <= MAX_RULE_NAME ? n : n.substring(0, MAX_RULE_NAME).replace(/[-_ ]+$/, '');
+function shortRuleName(name, prefix = '') {
+  const full = String(name || '');
+  // Abbreviate only the part after "<prefix>-" so every name keeps the global prefix (GLB-02)
+  const head = prefix && full.startsWith(prefix + '-') ? prefix + '-' : '';
+  let n = full.slice(head.length);
+  const room = MAX_RULE_NAME - head.length;
+  for (const [re, to] of NAME_ABBREV) { if (n.length <= room) break; n = n.replace(re, to); }
+  if (n.length > room) n = n.substring(0, room).replace(/[-_ ]+$/, '');
+  return head + n;
 }
 function clampRuleNames(template) {
+  const prefix = (template.metadata && template.metadata.prefix) || '';
   for (const rules of Object.values(template.policies || {})) {
     if (!Array.isArray(rules)) continue;
     const used = new Set();
     for (const r of rules) {
       if (!r || typeof r.name !== 'string') continue;
-      let n = shortRuleName(r.name);
+      let n = shortRuleName(r.name, prefix);
       for (let i = 2; used.has(n); i++) n = n.substring(0, MAX_RULE_NAME - String(i).length - 1).replace(/[-_ ]+$/, '') + '-' + i;
       if (n !== r.name) { r.fullName = r.fullName || r.name; r.name = n; }
       used.add(n);

@@ -36,6 +36,7 @@ const ZIA_ADMIN_URLS = {
 const ONEAPI_BASE = 'api.zsapi.net';
 const ZIDENTITY_TOKEN_PATH = '/oauth2/v1/token';
 
+const redactBody = (s) => String(s).replace(/("[^"]*(?:password|secret|provisioningKey|token|apiKey)[^"]*"\s*:\s*)"[^"]*"/gi, '$1"<redacted>"');
 class ZIAClient {
   constructor() {
     this.authMode = null; // 'legacy' or 'oneapi'
@@ -495,7 +496,7 @@ class ZIAClient {
     if (payload && method !== 'GET') {
       // Log truncated request body for debugging
       const bodyPreview = payload.length > 2000 ? payload.substring(0, 2000) + '...' : payload;
-      console.log(`[API] Request body: ${bodyPreview}`);
+      console.log(`[API] Request body: ${redactBody(bodyPreview)}`);
     }
 
     const response = await this._rawRequest(method, host, fullPath, payload, headers);

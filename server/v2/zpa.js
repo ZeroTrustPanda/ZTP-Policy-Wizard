@@ -35,7 +35,8 @@ class ZPAClient {
       await z._sleep(wait * 1000); return this.apiCall(method, path, body, attempt + 1);
     }
     if (res.statusCode >= 200 && res.statusCode < 300) return res.body === '' ? null : res.body;
-    const msg = typeof res.body === 'string' ? res.body.slice(0, 400) : JSON.stringify(res.body).replace(/"provisioningKey"\s*:\s*"[^"]*"/g, '"provisioningKey":"<redacted>"').slice(0, 400);
+    const raw = typeof res.body === 'string' ? res.body : JSON.stringify(res.body);
+    const msg = raw.replace(/"provisioningKey"\s*:\s*"[^"]*"/g, '"provisioningKey":"<redacted>"').replace(/\d+\|[A-Za-z0-9+/=]{20,}[^"\s]*/g, '<redacted>').slice(0, 400);
     throw new Error(`ZPA API Error ${res.statusCode}: ${msg}`);
   }
 
@@ -153,13 +154,15 @@ async function runZpa(zpa, input, { dryRun, logger }) {
   const rec = (e) => { const x = { product: 'ZPA', ...e }; ledger.push(x); if (logger && !dryRun) logger.logPolicyApply(`ZPA ${e.category}`, e.name, e.action, e.error ? { error: e.error } : { success: true, id: e.id }); return x; };
   const base = await zpa.base();
 
-  async function upsert(kind, category, name, body, { createPath, updatePath, listRel, fetchFull } = {}) {
+  async function upsert(kind, category, name, body, { createPath, updatePath, listRel, fetchFull, createOnly = [] } = {}) {
     const rel = listRel || PATHS[kind];
     let existing;
     try { existing = (await zpa.listAll(rel)).find(o => o.name === name); }
     catch (e) { return rec({ category, name, action: 'FAILED', error: `Could not read existing objects: ${e.message}` }); }
     if (existing) {
       const full = fetchFull ? await zpa.apiCall('GET', `${base}${rel}/${existing.id}`).catch(() => existing) : existing;
+      // Fields set only on create (e.g. the connector group location the SE changes in the portal) are never compared or sent on update
+      if (createOnly.length) { body = { ...body }; for (const k of createOnly) delete body[k]; }
       const changes = diffZpa(body, full);
       if (!changes.length) return rec({ category, name, action: 'NO_CHANGE', id: existing.id, existing: full });
       if (dryRun) return rec({ category, name, action: 'UPDATE', id: existing.id, changes, existing: full });
@@ -189,11 +192,7 @@ async function runZpa(zpa, input, { dryRun, logger }) {
   const cg = await upsert('connectorGroup', 'App Connector Group', names.connectorGroup, {
     name: names.connectorGroup, description: input.descriptions?.connectorGroup || COPY.zpa.connectorGroupDescription, enabled: true,
     ...SAN_JOSE, ...(certId ? { enrollmentCertId: certId } : {})
-  });
-  // Location is only set on create, so a re-run never undoes the "change the location in the portal" follow-up
-  if (cg.action === 'UPDATE' && cg.changes && cg.changes.every(c => ['location', 'cityCountry', 'countryCode', 'latitude', 'longitude'].includes(c))) {
-    cg.action = 'NO_CHANGE'; cg.note = 'Location differs from San Jose, CA (changed in the portal) — left as is.'; delete cg.changes;
-  }
+  }, { createOnly: ['location', 'cityCountry', 'countryCode', 'latitude', 'longitude'] });
   let cgId = dead(cg) ? null : cg.id;
   if (input.connectorGroupId) cgId = input.connectorGroupId;   // ZPA-03 dropdown
 
@@ -255,7 +254,7 @@ async function listZpaObjects(zpa, prefix) {
   for (const kind of DELETE_ORDER) {
     try {
       for (const o of await zpa.listAll(PATHS[kind])) {
-        if (prefix && !String(o.name || '').startsWith(prefix)) continue;
+        if (prefix && !String(o.name || '').startsWith(prefix + '-')) continue;
         out.push({ kind, label: KIND_LABEL[kind], id: String(o.id), name: o.name, enabled: o.enabled, detail: kind === 'provisioningKey' ? `used ${o.usageCount || 0} of ${o.maxUsage}` : (o.description || '') });
       }
     } catch (e) { out.push({ kind, label: KIND_LABEL[kind], error: e.message }); }

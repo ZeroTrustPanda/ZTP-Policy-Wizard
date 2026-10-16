@@ -84,7 +84,8 @@ function registerV2Routes(app, requireAuth) {
       const template = fw.generate(input);
       const resolved = await resolveForTenant(client, template, { cbiProfile: input.cbiProfile });
       const run = await runZia(client, resolved.template, { dryRun: true, logger });
-      const lic = v2(req.session).licensing || await detectLicensing({ client, zccClient: req.session.zccClient }).catch(() => null);
+      let lic = v2(req.session).licensing;
+      if (!lic) { lic = await detectLicensing({ client, zccClient: req.session.zccClient }).catch(() => null); v2(req.session).licensing = lic; }
       const planId = rememberPlan(req.session, 'zia', input);
       logger.log('V2_ZIA_DRY_RUN', { baseline: input.baseline, scope: input.scope, counts: countActions(run.ledger) });
       res.json({
@@ -183,7 +184,15 @@ function registerV2Routes(app, requireAuth) {
   });
   app.post('/api/v2/zpa/delete', requireAuth, async (req, res) => {
     try {
-      const items = ((req.body || {}).items || []).map(i => ({ kind: i.kind, id: String(i.id), name: i.name }));
+      const prefix = v2(req.session).prefix;
+      if (!prefix) return res.status(400).json({ error: 'Set the global prefix first. The bulk manager only deletes objects named with it.' });
+      // Never trust names from the browser: delete only objects that exist now and are named "<prefix>-…" (BRM-03)
+      const current = (await listZpaObjects(zpaOf(req.session), prefix)).filter(o => !o.error);
+      const allowed = new Map(current.map(o => [`${o.kind}:${o.id}`, o]));
+      const asked = ((req.body || {}).items || []).map(i => `${i.kind}:${String(i.id)}`);
+      const refused = asked.filter(k => !allowed.has(k));
+      if (refused.length) return res.status(400).json({ error: `Only objects named "${prefix}-…" can be deleted here. Not allowed: ${refused.length} item(s).` });
+      const items = asked.map(k => { const o = allowed.get(k); return { kind: o.kind, id: o.id, name: o.name }; });
       if (!items.length) return res.status(400).json({ error: 'Select at least one object.' });
       if (req.body.dryRun) return res.json({ planId: rememberPlan(req.session, 'zpa-del', items), results: await deleteZpaObjects(zpaOf(req.session), items, { dryRun: true }) });
       const bad = checkPlan(req.session, 'zpa-del', items, req.body.planId);
@@ -217,8 +226,15 @@ function registerV2Routes(app, requireAuth) {
   app.post('/api/v2/zdx/delete', requireAuth, async (req, res) => {
     const zdx = req.session.zdxClient;
     if (!zdx) return res.status(400).json({ error: 'ZDX needs a OneAPI sign-in.' });
-    const items = ((req.body || {}).items || []).map(i => ({ kind: i.kind, id: String(i.id), name: i.name }))
-      .sort((a, b) => (a.kind === b.kind ? 0 : a.kind === 'app' ? -1 : 1));   // applications (and their probes) first, then collections
+    // Re-read the tenant: only custom applications and non-system collections can be deleted
+    const SYSTEM = /^(Unified Communication Collection|Predefined Apps Collection|Custom Apps Collection)$/;
+    let apps = [], cols = [];
+    try { apps = (await zdx.listApps()).filter(a => a.type !== 'PREDEFINED'); cols = (await zdx.listCollections()).filter(c => !SYSTEM.test(c.name)); }
+    catch (e) { return res.status(502).json({ error: e.zdxMessage || e.message }); }
+    const allowed = new Map([...apps.map(a => [`app:${a.id}`, { kind: 'app', id: String(a.id), name: a.name }]), ...cols.map(c => [`collection:${c.id}`, { kind: 'collection', id: String(c.id), name: c.name }])]);
+    const asked = ((req.body || {}).items || []).map(i => `${i.kind}:${String(i.id)}`);
+    if (asked.some(k => !allowed.has(k))) return res.status(400).json({ error: 'Only custom applications and collections that still exist can be deleted.' });
+    const items = asked.map(k => allowed.get(k)).sort((a, b) => (a.kind === b.kind ? 0 : a.kind === 'app' ? -1 : 1));   // applications (and probes) first
     if (!items.length) return res.status(400).json({ error: 'Select at least one object.' });
     if (req.body.dryRun) return res.json({ planId: rememberPlan(req.session, 'zdx-del', items), results: items.map(i => ({ ...i, action: 'DELETE' })) });
     const bad = checkPlan(req.session, 'zdx-del', items, req.body.planId);

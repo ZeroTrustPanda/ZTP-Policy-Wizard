@@ -13,6 +13,7 @@
  *   4. POST forwarding profile edit (full profile from GET merged with changes)
  */
 
+const redactBody = (s) => String(s).replace(/("[^"]*(?:password|secret|provisioningKey|token|apiKey)[^"]*"\s*:\s*)"[^"]*"/gi, '$1"<redacted>"');
 class ZCCClient {
   constructor(ziaClient) {
     this.ziaClient = ziaClient;
@@ -61,7 +62,7 @@ class ZCCClient {
     console.log(`[ZCC-API] ${method} https://${host}${path}`);
     if (payload && method !== 'GET') {
       const bodyPreview = payload.length > 2000 ? payload.substring(0, 2000) + '...' : payload;
-      console.log(`[ZCC-API] Request body: ${bodyPreview}`);
+      console.log(`[ZCC-API] Request body: ${redactBody(bodyPreview)}`);
     }
 
     const response = await this.ziaClient._rawRequest(method, host, path, payload, headers);

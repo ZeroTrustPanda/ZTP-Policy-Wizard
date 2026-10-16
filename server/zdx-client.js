@@ -27,6 +27,7 @@
  * (e.g. MICROSOFT_LOGIN) for predefined apps.
  */
 
+const redactBody = (s) => String(s).replace(/("[^"]*(?:password|secret|provisioningKey|token|apiKey)[^"]*"\s*:\s*)"[^"]*"/gi, '$1"<redacted>"');
 class ZDXClient {
   constructor(ziaClient) {
     this.ziaClient = ziaClient;
@@ -56,7 +57,7 @@ class ZDXClient {
     const payload = body ? JSON.stringify(body) : null;
     const fullPath = `/zdx/v1${path}`;
     console.log(`[ZDX-API] ${method} https://${host}${fullPath}`);
-    if (payload && method !== 'GET') console.log(`[ZDX-API] Request body: ${payload.length > 1500 ? payload.substring(0, 1500) + '...' : payload}`);
+    if (payload && method !== 'GET') console.log(`[ZDX-API] Request body: ${redactBody(payload.length > 1500 ? payload.substring(0, 1500) + '...' : payload)}`);
 
     const response = await this.ziaClient._rawRequest(method, host, fullPath, payload, headers);
     console.log(`[ZDX-API] Response: ${response.statusCode}`);
