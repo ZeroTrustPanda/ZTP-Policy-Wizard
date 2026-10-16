@@ -68,7 +68,7 @@ const APP_SEGMENT_DEFAULTS = {
   autoAppProtectEnabled: false,
   useInDrMode: false,                // Disaster Recovery
   ipAnchored: false,                 // Source IP Anchor
-  tcpKeepAlive: '0',
+  tcpKeepAlive: false,               // sent to ZPA as "0" / "1"
   isCnameEnabled: true,
   doubleEncrypt: false,
   bypassOnReauth: false
@@ -261,7 +261,7 @@ async function listZpaObjects(zpa, prefix) {
 /** Delete selected objects in dependency order (BRM-04). dryRun returns the planned order only. */
 async function deleteZpaObjects(zpa, items, { dryRun, logger }) {
   const base = await zpa.base();
-  const sorted = [...items].sort((a, b) => DELETE_ORDER.indexOf(a.kind) - DELETE_ORDER.indexOf(b.kind));
+  const sorted = [...items].sort((a, b) => DELETE_ORDER.indexOf(a.kind) - DELETE_ORDER.indexOf(b.kind)).map(i => ({ ...i, label: KIND_LABEL[i.kind] || i.kind }));
   const results = [];
   for (const it of sorted) {
     if (!PATHS[it.kind]) { results.push({ ...it, action: 'FAILED', error: 'Unknown object type' }); continue; }
