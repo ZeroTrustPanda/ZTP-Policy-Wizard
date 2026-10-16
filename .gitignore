@@ -7,3 +7,18 @@ standalone/release/
 standalone/dist/
 standalone/build/
 standalone/node_modules/
+
+# Credentials and local secrets - never commit
+API*.txt
+*API*.txt
+GovCloudAPI.txt
+LegacyAPI.txt
+credentials*.txt
+!credentials-example.txt
+.env
+.env.*
+!.env.example
+.claude/settings.local.json
+livetest-*.json
+livecheck*.json
+*.har
