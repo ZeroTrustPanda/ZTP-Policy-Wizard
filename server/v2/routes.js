@@ -8,7 +8,7 @@ const { SCOPE_ITEMS, EXCLUSIVE_GROUPS, normalizeScope, detectLicensing, scopeWar
 const fw = require('./frameworks');
 const areas = require('./zia-areas');
 const { runZia } = require('./zia-engine');
-const { parseBulkCsv, validateBulkApps, ZPAClient, runZpa, validateZpaInput, APP_SEGMENT_DEFAULTS, SAN_JOSE, listZpaObjects, deleteZpaObjects, DELETE_ORDER } = require('./zpa');
+const { parseBulkCsv, validateBulkApps, ZPAClient, runZpa, validateZpaInput, APP_SEGMENT_DEFAULTS, SAN_JOSE, POLICY_DEFAULTS, listZpaObjects, deleteZpaObjects, DELETE_ORDER } = require('./zpa');
 const { buildReport } = require('./report');
 const { LIST_KEYS, LIST_LABELS, validateProfileLists } = require('./validate');
 const { resolveForTenant } = require('../tenant-resolve');
@@ -153,6 +153,8 @@ function registerV2Routes(app, requireAuth) {
     if (!PREFIX_RE.test(prefix)) throw Object.assign(new Error('Set a global prefix first.'), { status: 400 });
     return { prefix, domains: b.domains || '', tcpPorts: b.tcpPorts ?? '1-52, 54-65535', udpPorts: b.udpPorts ?? '1-52, 54-65535',
       settings: { ...APP_SEGMENT_DEFAULTS, ...(b.settings || {}) }, connectorGroupId: b.connectorGroupId || null, descriptions: b.descriptions || {},
+      policies: { ...POLICY_DEFAULTS, ...(b.policies && typeof b.policies === 'object' ? { timeout: b.policies.timeout !== false, inspection: b.policies.inspection !== false, isolation: b.policies.isolation !== false } : {}) },
+      pra: { rdpHost: String((b.pra || {}).rdpHost || '').trim().slice(0, 253), sshHost: String((b.pra || {}).sshHost || '').trim().slice(0, 253), portalId: (b.pra || {}).portalId ? String(b.pra.portalId) : null },
       apps: Array.isArray(b.apps) ? b.apps.slice(0, 500).map(a => ({ name: String(a.name || ''), destinations: Array.isArray(a.destinations) ? a.destinations.map(String) : String(a.destinations || ''),
         tcpPorts: String(a.tcpPorts || ''), udpPorts: String(a.udpPorts || ''), row: a.row, settings: a.settings && typeof a.settings === 'object' ? a.settings : {} })) : null };
   }
@@ -179,7 +181,7 @@ function registerV2Routes(app, requireAuth) {
       const bad = checkPlan(req.session, 'zpa', input, req.body.planId);
       if (bad) return res.status(409).json({ error: bad });
       const run = await runZpa(zpaOf(req.session), input, { dryRun: false, logger: req.session.logger });
-      v2(req.session).runs.zpa.push({ at: new Date().toISOString(), ledger: run.ledger, warnings: run.warnings, secrets: run.secrets, names: run.names });
+      v2(req.session).runs.zpa.push({ at: new Date().toISOString(), ledger: run.ledger, warnings: run.warnings, secrets: run.secrets, names: run.names, followUps: run.followUps });
       req.session.logger.log('V2_ZPA_APPLY', { counts: countActions(run.ledger), provisioningKey: run.secrets.provisioningKey ? '<redacted>' : 'not available' });
       // ZPA-04: the key goes to the browser once, for the masked reveal/copy field and the report
       res.json({ ledger: run.ledger, counts: countActions(run.ledger), warnings: run.warnings, names: run.names, followUps: run.followUps,

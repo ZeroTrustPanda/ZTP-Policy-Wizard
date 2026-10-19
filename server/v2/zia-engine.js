@@ -89,6 +89,13 @@ class ZiaEngine {
     return this.cache[key]++;
   }
 
+  /** The bottom of the list (below every rule, predefined ones included), read fresh. */
+  async lastOrder(path) {
+    this.cache[path] = null;
+    const rules = (await this.get(path)).filter(r => !r.defaultRule);
+    return Math.max(0, ...rules.map(r => r.order || 0)) + 1;
+  }
+
   releaseOrder(path, order) {
     const key = `order:${path}`;
     if (this.cache[key] === order + 1) this.cache[key] = order;
@@ -112,10 +119,17 @@ class ZiaEngine {
     if (existing) {
       const want = spec.adjust ? spec.adjust(body, existing) : body;
       const changes = diff(want, existing);
+      // A catch-all rule that is no longer last (e.g. it sits above Zscaler's predefined rules) is moved to the bottom.
+      let moveTo = null;
+      if (spec.placeLast) {
+        const others = (this.cache[spec.listPath] || []).filter(o => o && !o.defaultRule && o.id !== existing.id && o.order !== undefined);
+        const max = Math.max(0, ...others.map(o => o.order));
+        if (existing.order !== undefined && existing.order < max) { moveTo = max; changes.push(`order (${existing.order} → bottom, ${max})`); }
+      }
       if (!changes.length) return this.record({ category, name, action: 'NO_CHANGE', id: existing.id });
       if (this.dryRun) return this.record({ category, name, action: 'UPDATE', id: existing.id, changes });
       const merged = clampDescription({ ...existing, ...want, id: existing.id });
-      if (existing.order !== undefined) merged.order = existing.order;   // re-runs never move rules
+      if (existing.order !== undefined) merged.order = moveTo || existing.order;   // re-runs only move a catch-all back to the bottom
       for (const k of READ_ONLY) delete merged[k];
       try {
         await this.client.apiCall('PUT', spec.updatePath(existing.id), merged);
@@ -127,14 +141,14 @@ class ZiaEngine {
       }
     }
     if (this.dryRun) {
-      if (spec.build) await this.nextOrder(spec.orderPath || spec.listPath, spec.orderOpts);
+      if (spec.build && !spec.placeLast) await this.nextOrder(spec.orderPath || spec.listPath, spec.orderOpts);
       return this.record({ category, name, action: 'CREATE', id: `new:${++this.seq}` });
     }
     let takenOrder;
     const orderPath = spec.orderPath || spec.listPath;
     try {
       let created;
-      if (spec.build) takenOrder = await this.nextOrder(orderPath, spec.orderOpts);
+      if (spec.build) takenOrder = spec.placeLast ? await this.lastOrder(orderPath) : await this.nextOrder(orderPath, spec.orderOpts);
       const createBody = spec.build ? clampDescription(spec.build(takenOrder)) : clampDescription(body);
       try { created = await this.client.apiCall('POST', spec.createPath, createBody); }
       catch (e) {
@@ -148,7 +162,7 @@ class ZiaEngine {
       this.cache[spec.listPath] = null;
       return this.record({ category, name, action: 'CREATE', id: created && (created.id !== undefined ? created.id : created.configuredName) });
     } catch (e) {
-      if (takenOrder !== undefined) this.releaseOrder(orderPath, takenOrder);
+      if (takenOrder !== undefined && !spec.placeLast) this.releaseOrder(orderPath, takenOrder);
       return this.record({ category, name, action: 'FAILED', error: e.message });
     }
   }
@@ -200,8 +214,13 @@ function urlRuleBody(rule, order, catIds) {
 function firewallBody(rule, order) {
   const b = { name: rule.name, description: rule.description || '', order, state: rule.state || 'ENABLED', rank: 7,
     action: rule.action === 'BLOCK_ICMP_UNREACHABLE' ? 'BLOCK_DROP' : rule.action, enableFullLogging: false };
-  for (const k of ['nwApplications', 'destPorts', 'protocols', 'destIpCategories']) if (rule[k] && (!Array.isArray(rule[k]) || rule[k].length)) b[k] = rule[k];
+  for (const k of ['nwApplications', 'destPorts', 'protocols', 'destIpCategories', 'destCountries', 'sourceCountries']) if (rule[k] && (!Array.isArray(rule[k]) || rule[k].length)) b[k] = rule[k];
   return b;
+}
+/** A rule with no category or app scope (urlCategories empty or ['ANY']) catches all remaining traffic. */
+function isSslCatchAll(rule) {
+  const cats = rule.urlCategories || [];
+  return (!cats.length || (cats.length === 1 && cats[0] === 'ANY')) && !(rule.cloudApplications || []).length && rule.placeLast !== false;
 }
 function sslBody(rule, order) {
   const decrypt = rule.action === 'INSPECT' || rule.action === 'DECRYPT';
@@ -230,8 +249,13 @@ function sandboxBody(rule, order) {
   }
   return b;
 }
-const dnsBody = (rule, order) => ({ name: rule.name, description: rule.description || '', order, state: rule.state || 'ENABLED', rank: rule.rank || 7,
-  action: rule.action || 'BLOCK', protocols: rule.protocols || ['ANY_RULE'], ...(rule.applications && rule.applications.length ? { applications: rule.applications } : {}) });
+const dnsBody = (rule, order, gateway) => {
+  const b = { name: rule.name, description: rule.description || '', order, state: rule.state || 'ENABLED', rank: rule.rank || 7,
+    action: rule.action || 'BLOCK', protocols: rule.protocols || ['ANY_RULE'] };
+  for (const k of ['applications', 'destIpCategories', 'resCategories', 'destCountries']) if (rule[k] && rule[k].length) b[k] = rule[k].slice();
+  if (gateway) b.dnsGateway = { id: gateway.id, name: gateway.name };
+  return b;
+};
 const fileTypeBody = (rule, order) => ({ name: rule.name, description: rule.description || '', order, state: rule.state || 'ENABLED', rank: 7,
   protocols: rule.protocols || ['ANY_RULE'], fileTypes: rule.fileTypes || [], filteringAction: rule.filteringAction || 'BLOCK',
   operation: rule.operation || 'UPLOAD_DOWNLOAD', ...(rule.passwordProtected !== undefined ? { passwordProtected: rule.passwordProtected } : {}) });
@@ -294,6 +318,8 @@ async function runZia(client, template, { dryRun, logger }) {
       }
       await eng.upsert({ category: 'SSL Inspection', name: r.name, listPath: '/api/v1/sslInspectionRules', createPath: '/api/v1/sslInspectionRules',
         updatePath: id => `/api/v1/sslInspectionRules/${id}`, orderPath: '/api/v1/sslInspectionRules', orderOpts: { afterPredefined: true }, build: order => sslBody(r, order),
+        // The catch-all (inspect everything remaining) goes last, below "Zscaler Recommended Exemptions" and the other predefined rules.
+        placeLast: isSslCatchAll(r),
         createFallback: (e, body) => {
           if (!/not allowed at order/i.test(String(e.message))) return null;
           const all = eng.cache['/api/v1/sslInspectionRules'] || [];
@@ -317,9 +343,19 @@ async function runZia(client, template, { dryRun, logger }) {
           return { body: { ...body, fileTypes: types }, warning: `${m[1].toUpperCase()} left out (needs ${m[2].trim()}).` };
         } });
   }
+  let ztr;   // Zscaler Trusted Resolver gateway (auto-created by Zscaler, natZtrGateway)
   for (const r of P.dnsSecurity || []) {
+    let gw = null;
+    if (r.useTrustedResolver) {
+      if (ztr === undefined) {
+        try { ztr = list(await client.apiCall('GET', '/api/v1/dnsGateways')).find(g => g.natZtrGateway) || null; }
+        catch (e) { ztr = null; eng.warnings.push(`Could not read DNS gateways: ${e.message}`); }
+      }
+      if (!ztr) { eng.record({ category: 'DNS Security', name: r.name, action: 'SKIPPED', error: 'This tenant has no Zscaler Trusted Resolver DNS gateway.' }); continue; }
+      gw = ztr;
+    }
     await eng.upsert({ category: 'DNS Security', name: r.name, listPath: '/api/v1/firewallDnsRules', createPath: '/api/v1/firewallDnsRules',
-      updatePath: id => `/api/v1/firewallDnsRules/${id}`, orderPath: '/api/v1/firewallDnsRules', build: order => dnsBody(r, order) });
+      updatePath: id => `/api/v1/firewallDnsRules/${id}`, orderPath: '/api/v1/firewallDnsRules', build: order => dnsBody(r, order, gw) });
   }
   for (const r of P.fileTypeControl || []) {
     await eng.upsert({ category: 'File Type Control', name: r.name, listPath: '/api/v1/fileTypeRules', createPath: '/api/v1/fileTypeRules',
@@ -443,4 +479,4 @@ async function runDlp(eng, template) {
   }
 }
 
-module.exports = { runZia, ZiaEngine, diff };
+module.exports = { runZia, ZiaEngine, diff, isSslCatchAll };

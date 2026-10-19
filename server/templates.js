@@ -308,9 +308,28 @@ function generateUrlFilteringRules(tier, complianceFramework, prefix = 'ZTP') {
 // FIREWALL TEMPLATES
 // ========================
 
+// Countries with high-risk remote-access traffic. Remote admin and file transfer protocols to or from them are dropped.
+const HIGH_RISK_COUNTRIES = ['COUNTRY_CN', 'COUNTRY_RU', 'COUNTRY_KP', 'COUNTRY_IR'];
+const REMOTE_ACCESS_APPS = ['SSH', 'RDP', 'FTP'];
+function geoFirewallRules(prefix, tier, complianceFramework) {
+  const where = 'China, Russia, North Korea and Iran';
+  return [
+    { name: `${prefix}-FW-Geo-Block-Out`, state: 'ENABLED', action: 'BLOCK_DROP',
+      nwApplications: REMOTE_ACCESS_APPS.slice(), destCountries: HIGH_RISK_COUNTRIES.slice(),
+      description: `Drop SSH, RDP and FTP to ${where}. Remote administration and file transfer to high-risk countries is a common exfiltration path.`,
+      tier, complianceMapping: mapToCompliance('fw_geo', complianceFramework) },
+    { name: `${prefix}-FW-Geo-Block-In`, state: 'ENABLED', action: 'BLOCK_DROP',
+      nwApplications: REMOTE_ACCESS_APPS.slice(), sourceCountries: HIGH_RISK_COUNTRIES.slice(),
+      description: `Drop SSH, RDP and FTP coming from ${where}.`,
+      tier, complianceMapping: mapToCompliance('fw_geo', complianceFramework) }
+  ];
+}
+
 function generateFirewallRules(tier, complianceFramework, prefix = 'ZTP') {
   const rules = [];
   let order = 5;
+
+  for (const g of geoFirewallRules(prefix, tier, complianceFramework)) rules.push({ ...g, order: order++ });
 
   // Block QUIC protocol
   rules.push({
@@ -436,8 +455,10 @@ function generateSslInspectionRules(tier, complianceFramework, prefix = 'ZTP') {
       state: 'ENABLED',
       action: 'DECRYPT',
       urlCategories: ['ANY'],
-      description: 'Inspect all SSL/TLS traffic for maximum security visibility (Strict mode)',
+      description: 'Inspect all remaining SSL/TLS traffic (Strict mode). Sits below the Zscaler predefined exemptions. Blocks TLS 1.0 and 1.1.',
       tier,
+      minClientTLS: 'CLIENT_TLS_1_2',
+      minServerTLS: 'SERVER_TLS_1_2',
       complianceMapping: mapToCompliance('ssl_inspect_all', complianceFramework)
     });
   } else if (tier === 'BALANCED') {
@@ -470,8 +491,10 @@ function generateSslInspectionRules(tier, complianceFramework, prefix = 'ZTP') {
       state: 'ENABLED',
       action: 'DECRYPT',
       urlCategories: ['ANY'],
-      description: 'Inspect all remaining SSL/TLS traffic (Balanced mode)',
+      description: 'Inspect all remaining SSL/TLS traffic (Balanced mode). Sits below the Zscaler predefined exemptions. Blocks TLS 1.0 and 1.1.',
       tier,
+      minClientTLS: 'CLIENT_TLS_1_2',
+      minServerTLS: 'SERVER_TLS_1_2',
       complianceMapping: mapToCompliance('ssl_inspect_all', complianceFramework)
     });
   } else {
@@ -637,6 +660,11 @@ function mapToCompliance(policyType, framework) {
       GDPR: ['Art.25']
     },
     // Firewall mappings
+    fw_geo: {
+      'NIST_800_53': ['SC-7', 'AC-4'],
+      'NIST_800_171': ['3.13.1'],
+      PCI: ['1.3']
+    },
     fw_quic: {
       'NIST_800_53': ['SC-7'],
       'NIST_800_171': ['3.13.1'],
@@ -748,6 +776,14 @@ function mapToCompliance(policyType, framework) {
     },
     dns_tunnels_high: {
       'NIST_800_53': ['SC-7'],
+      'NIST_800_171': ['3.13.1']
+    },
+    dns_doh: {
+      'NIST_800_53': ['SC-7', 'SI-4'],
+      'NIST_800_171': ['3.13.1']
+    },
+    dns_resolver: {
+      'NIST_800_53': ['SC-20', 'SC-21', 'SC-7'],
       'NIST_800_171': ['3.13.1']
     },
     dns_unknown: {
@@ -1322,6 +1358,8 @@ function generateZTHFirewallRules(prefix = 'ZTP') {
   const rules = [];
   let order = 5;
 
+  for (const g of geoFirewallRules(prefix, 'ZTH_EBOOK', null)) rules.push({ ...g, order: order++ });
+
   rules.push({
     name: `${prefix}-Block-QUIC`,
     order: order++,
@@ -1570,6 +1608,34 @@ function generateDnsSecurityRules(tier, complianceFramework, prefix = 'ZTP') {
     });
   }
 
+  // 3. DNS over HTTPS is inspected, not just blocked: DoH lookups of risky domains are blocked, the rest resolve normally
+  rules.push({
+    name: `${prefix}-DNS-DoH-Block-Risky`,
+    order: order++,
+    state: 'ENABLED',
+    action: 'BLOCK',
+    rank: 7,
+    protocols: ['DOHTTPS_RULE'],
+    destIpCategories: ['NEWLY_REG_DOMAINS', 'NEWLY_REVIVED_DOMAINS', 'DYNAMIC_DNS', 'ADWARE_OR_SPYWARE', 'OTHER_SECURITY'],
+    description: 'Inspect DNS over HTTPS: block DoH lookups of newly registered, dynamic DNS and spyware domains. Other DoH lookups are allowed and logged (check with 1.1.1.1/help).',
+    tier,
+    complianceMapping: mapToCompliance('dns_doh', complianceFramework)
+  });
+
+  // 4. Resolver control: plain DNS sent to any resolver (e.g. 8.8.8.8) is answered by the Zscaler Trusted Resolver
+  rules.push({
+    name: `${prefix}-DNS-Trusted-Resolver`,
+    order: order++,
+    state: 'ENABLED',
+    action: 'REDIR_REQ',
+    rank: 7,
+    protocols: ['TCP_RULE', 'UDP_RULE'],
+    useTrustedResolver: true,
+    description: 'Send DNS requests to the Zscaler Trusted Resolver, even when a device is set to use another resolver (e.g. 8.8.8.8). ZPA resolver rules above still apply.',
+    tier,
+    complianceMapping: mapToCompliance('dns_resolver', complianceFramework)
+  });
+
   return rules;
 }
 
@@ -1719,11 +1785,12 @@ function generateCloudAppControlRules(tier, complianceFramework, prefix = 'ZTP')
   rules.push({
     name: `${prefix}-CAC-Block-DoH`,
     order: order++,
-    state: 'ENABLED',
+    // Off by default: DNS Control inspects DoH (DNS-DoH-Block-Risky). Turn on to block DoH apps outright instead.
+    state: 'DISABLED',
     type: 'DNS_OVER_HTTPS',
     ruleType: 'DNS_OVER_HTTPS',
     actions: ['DENY_DNS_OVER_HTTPS_USE'],
-    description: 'Block all 12 DNS over HTTPS apps (AdGuard, Cloudflare DNS, Google DNS, Quad9, etc.) to maintain DNS visibility.',
+    description: 'Optional (off): block all 12 DNS over HTTPS apps outright. Off by default because DNS Control inspects DoH instead.',
     tier,
     complianceMapping: mapToCompliance('cac_doh', complianceFramework)
   });
@@ -1929,7 +1996,8 @@ function applyActionSettings(policyKey, rules, actionSettings, prefix) {
   return rules.map(rule => {
     const suffix = rule.name.startsWith(`${prefix}-`) ? rule.name.slice(prefix.length + 1) : rule.name;
     const key = `${policyKey}:${suffix}`;
-    const locked = policyKey === 'firewallFiltering' && LOCKED_RULE_SUFFIXES.has(suffix);
+    // Redirect rules (resolver control) are not allow/block rules: flipping one to Block would block all DNS
+    const locked = (policyKey === 'firewallFiltering' && LOCKED_RULE_SUFFIXES.has(suffix)) || (policyKey === 'dnsSecurity' && /^REDIR/.test(rule.action || ''));
     const defaultAction = summarizeAction(policyKey, rule);
 
     let choice = null;
