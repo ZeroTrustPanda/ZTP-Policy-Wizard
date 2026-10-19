@@ -83,7 +83,7 @@ const APP_SEGMENT_DEFAULTS = {
 // Default ZPA policies built for the application segment(s) (on by default; each can be turned off in the UI)
 const POLICY_DEFAULTS = { timeout: true, inspection: true, isolation: true };
 const TIMEOUTS = { reauthTimeout: '28800', reauthIdleTimeout: '3600' };   // seconds: re-authenticate every 8 hours, or after 1 hour idle
-const OWASP_VERSION = 'OWASP_CRS/3.3.0';
+const OWASP_FALLBACK = 'OWASP_CRS/4.8.0';   // live: tenants refuse new profiles on 3.3.0; the current version comes from /inspectionControls/predefined/versions
 const PRA_PROTOCOLS = { rdp: { protocol: 'RDP', port: '3389' }, ssh: { protocol: 'SSH', port: '22' } };
 const SAN_JOSE = { location: 'San Jose, CA, USA', cityCountry: 'San Jose, US', countryCode: 'US', latitude: '37.3382082', longitude: '-121.8863286' };
 
@@ -383,7 +383,11 @@ async function runZpa(zpa, input, { dryRun, logger }) {
     try { set = await zpa.apiCall('GET', `${base}/policySet/policyType/${policyType}`); }
     catch (e) { return rec({ category: 'Policy Rule', name, action: 'FAILED', error: `Could not read the ${policyType} policy set: ${e.message}` }); }
     if (!set || !set.id) return rec({ category: 'Policy Rule', name, action: 'FAILED', error: `This tenant has no ${policyType} policy set` });
-    const existing = (set.rules || []).find(r => r.name === name);
+    // the policy set read does not embed its rules (seen live): list them separately
+    let rules;
+    try { rules = await policyRules(zpa, policyType); }
+    catch (e) { return rec({ category: 'Policy Rule', name, action: 'FAILED', error: `Could not read the ${policyType} rules: ${e.message}` }); }
+    const existing = rules.find(r => r.name === name);
     const v2 = `${await zpa.base('v2')}/policySet/${set.id}/rule`;
     if (existing) {
       const changes = policyRuleDiff(want, existing);
@@ -410,21 +414,19 @@ async function runZpa(zpa, input, { dryRun, logger }) {
       if (existing) ip = rec({ category: 'Inspection Profile', name: names.inspectionProfile, action: 'NO_CHANGE', id: existing.id });
       else if (dryRun) ip = rec({ category: 'Inspection Profile', name: names.inspectionProfile, action: 'CREATE', id: 'new:inspectionProfile' });
       else {
-        const groups = list(await zpa.apiCall('GET', `${base}/inspectionControls/predefined?version=${encodeURIComponent(OWASP_VERSION)}`));
-        const controls = groups.flatMap(g => g.predefinedInspectionControls || []);
-        const ipBody = {
-          name: names.inspectionProfile, description: 'OWASP Core Rule Set (paranoia level 1) with all predefined controls. Created by the Zscaler Policy Wizard.',
-          paranoiaLevel: '1', predefinedControlsVersion: OWASP_VERSION,
-          globalControlActions: ['PREDEFINED:PASS', 'CUSTOM:NONE', 'OVERRIDE_ACTION:COMMON'], commonGlobalOverrideActionsConfig: { PREDEF_CNTRL_GLOBAL_ACTION: 'PASS', IS_OV_EN: 'true' },
-          predefinedControls: controls.filter(x => x.defaultAction).map(x => ({ id: String(x.id), action: x.defaultAction, ...(x.defaultActionValue ? { actionValue: x.defaultActionValue } : {}) }))
-        };
-        let c;
-        try { c = await zpa.apiCall('POST', `${base}/inspectionProfile`, ipBody); }
-        catch (e) {   // older tenants refuse the global override block: retry with the controls only
-          const { globalControlActions, commonGlobalOverrideActionsConfig, ...slim } = ipBody;
-          c = await zpa.apiCall('POST', `${base}/inspectionProfile`, slim);
-        }
-        try { await zpa.apiCall('PUT', `${base}/inspectionProfile/${c.id}/associateAllPredefinedControls?version=${encodeURIComponent(OWASP_VERSION)}`); }
+        // Current predefined rule-set version (older versions exist on old profiles but are refused for new ones)
+        let ver = OWASP_FALLBACK;
+        try { const vs = await zpa.apiCall('GET', `${base}/inspectionControls/predefined/versions`); const arr = Array.isArray(vs) ? vs : list(vs); if (arr.length) ver = String(arr[arr.length - 1]); }
+        catch (e) { /* fallback */ }
+        const groups = list(await zpa.apiCall('GET', `${base}/inspectionControls/predefined?version=${ver}`));
+        const controls = groups.flatMap(g => g.predefinedInspectionControls || []).filter(x => Number(x.paranoiaLevel || 1) <= 1 && x.defaultAction);
+        const c = await zpa.apiCall('POST', `${base}/inspectionProfile`, {
+          name: names.inspectionProfile, description: `OWASP Core Rule Set ${ver.split('/')[1] || ''} (paranoia level 1) with all predefined controls. Created by the Zscaler Policy Wizard.`,
+          paranoiaLevel: '1', predefinedControlsVersion: ver,
+          globalControlActions: ['PREDEFINED:NONE', 'CUSTOM:NONE', 'WEBSOCKET:NONE', 'THREATLABZ:NONE', 'OVERRIDE_ACTION:SPECIFIC'],
+          predefinedControls: controls.map(x => ({ id: String(x.id), action: x.defaultAction }))
+        });
+        try { await zpa.apiCall('PUT', `${base}/inspectionProfile/${c.id}/associateAllPredefinedControls?version=${ver}`); }
         catch (e) { warnings.push(`${names.inspectionProfile}: created, but adding all predefined controls failed (${e.message}). Add them in the ZPA portal.`); }
         ip = rec({ category: 'Inspection Profile', name: names.inspectionProfile, action: 'CREATE', id: c && c.id });
       }
@@ -484,6 +486,11 @@ async function runZpa(zpa, input, { dryRun, logger }) {
   return { ledger, warnings, errors: [], secrets, names, followUps };
 }
 
+/** Rules of one policy type (GET policySet/rules/policyType/{type}, paged). */
+async function policyRules(zpa, policyType) {
+  return zpa.listAll(`/policySet/rules/policyType/${policyType}`);
+}
+
 /** Fields of a wanted v2 policy rule that differ from the rule read back (v1 shape: operands with lhs/rhs). */
 function policyRuleDiff(want, existing) {
   const out = [];
@@ -510,7 +517,8 @@ async function listZpaObjects(zpa, prefix) {
         const base = await zpa.base();
         for (const t of POLICY_TYPES) {
           const set = await zpa.apiCall('GET', `${base}/policySet/policyType/${t}`).catch(() => null);
-          for (const r of (set && set.rules) || []) if (mine(r)) out.push({ kind, label: KIND_LABEL[kind], id: `${set.id}:${r.id}`, name: r.name, enabled: true, detail: `${t.replace('_POLICY', '').toLowerCase()} policy` });
+          if (!set) continue;
+          for (const r of await policyRules(zpa, t)) if (mine(r)) out.push({ kind, label: KIND_LABEL[kind], id: `${set.id}:${r.id}`, name: r.name, enabled: true, detail: `${t.replace('_POLICY', '').toLowerCase()} policy` });
         }
         continue;
       }

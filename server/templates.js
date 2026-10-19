@@ -1627,7 +1627,8 @@ function generateDnsSecurityRules(tier, complianceFramework, prefix = 'ZTP') {
     name: `${prefix}-DNS-Trusted-Resolver`,
     order: order++,
     state: 'ENABLED',
-    action: 'REDIR_REQ',
+    // live: REDIR_REQ needs a redirect IP; redirecting to a DNS gateway is REDIR_REQ_KEEP_SENDER
+    action: 'REDIR_REQ_KEEP_SENDER',
     rank: 7,
     protocols: ['TCP_RULE', 'UDP_RULE'],
     useTrustedResolver: true,
