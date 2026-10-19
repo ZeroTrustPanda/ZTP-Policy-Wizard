@@ -504,7 +504,18 @@ class ZIAClient {
       console.log(`[API] Request body: ${redactBody(bodyPreview)}`);
     }
 
-    const response = await this._rawRequest(method, host, fullPath, payload, headers);
+    let response;
+    try {
+      response = await this._rawRequest(method, host, fullPath, payload, headers);
+    } catch (e) {
+      // A timed-out GET or PUT is safe to send again (both are idempotent); POST and DELETE are not retried.
+      if (/Request timeout/.test(e.message) && (method === 'GET' || method === 'PUT') && !this._timeoutRetry) {
+        console.log(`[API] ${method} timed out; retrying once`);
+        this._timeoutRetry = true;
+        try { return await this.apiCall(method, path, body, retryCount); } finally { this._timeoutRetry = false; }
+      }
+      throw e;
+    }
 
     console.log(`[API] Response: ${response.statusCode}`);
     if (response.statusCode >= 400) {
