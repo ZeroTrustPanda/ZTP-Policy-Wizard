@@ -16,7 +16,12 @@ class AuditLogger {
     }
     this.sessionId = uuidv4();
     this.entries = [];
+    this.listeners = new Set();   // v2.2: live progress subscribers (GET /api/v2/events)
   }
+
+  /** Live progress: fn(event) for every entry from now on. Returns an unsubscribe function. */
+  subscribe(fn) { this.listeners.add(fn); return () => this.listeners.delete(fn); }
+  emit(event) { for (const fn of this.listeners) { try { fn(event); } catch (e) { /* subscriber gone */ } } }
 
   log(action, details, status = 'success') {
     const entry = {
@@ -29,7 +34,17 @@ class AuditLogger {
     };
     this.entries.push(entry);
     this._appendToFile(entry);
+    if (this.listeners.size) this.emit({ at: entry.timestamp, action, status, ...AuditLogger.brief(action, details) });
     return entry;
+  }
+
+  /** The parts of an entry that are safe and useful to show live (never request bodies). */
+  static brief(action, d = {}) {
+    if (action === 'POLICY_APPLIED') return { category: d.policyType, name: d.ruleName, result: d.action, error: d.result && d.result.error ? String(d.result.error).slice(0, 300) : undefined };
+    if (action === 'RATE_LIMIT') return { product: d.product, until: d.until, message: d.message };
+    if (action === 'PROGRESS') return { product: d.product, message: d.message };
+    if (/_APPLY$/.test(action)) return { category: d.category, name: d.name, result: d.action, error: d.error ? String(d.error).slice(0, 300) : undefined };
+    return {};
   }
 
   logApiCall(method, endpoint, requestBody, responseStatus, responseBody) {

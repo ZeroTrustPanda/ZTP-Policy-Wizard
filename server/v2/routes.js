@@ -12,6 +12,7 @@ const { parseBulkCsv, validateBulkApps, ZPAClient, runZpa, validateZpaInput, APP
 const { buildReport } = require('./report');
 const { LIST_KEYS, LIST_LABELS, validateProfileLists } = require('./validate');
 const { resolveForTenant } = require('../tenant-resolve');
+const snapshots = require('./snapshots');
 
 const PREFIX_RE = /^[A-Za-z0-9_-]{1,20}$/;
 const stable = (v) => JSON.stringify(v, (k, x) => (k === 'generatedAt' || k === 'catalog' ? undefined : x));
@@ -107,9 +108,10 @@ function registerV2Routes(app, requireAuth) {
       const run = await runZia(client, resolved.template, { dryRun: false, logger });   // GLB-04: activates when anything was written
       const lic = v2(req.session).licensing;
       const warnings = [...scopeWarnings(input.scope, lic).map(w => w.text), ...resolved.warnings, ...run.warnings];
-      v2(req.session).runs.zia.push({ at: new Date().toISOString(), template: resolved.template, ledger: run.ledger, warnings, activated: run.activated });
+      const snapshot = snapshots.save({ product: 'zia', prefix: input.prefix || v2(req.session).prefix, undo: run.undo, tenant: client.vanityDomain || client.baseUrl });
+      v2(req.session).runs.zia.push({ at: new Date().toISOString(), template: resolved.template, ledger: run.ledger, warnings, activated: run.activated, snapshot });
       logger.log('V2_ZIA_APPLY', { baseline: input.baseline, counts: countActions(run.ledger), activated: run.activated });
-      res.json({ ledger: run.ledger, counts: countActions(run.ledger), warnings, activated: run.activated });
+      res.json({ ledger: run.ledger, counts: countActions(run.ledger), warnings, activated: run.activated, snapshot });
     } catch (e) { res.status(e.status || 502).json({ error: e.message }); }
   });
 
@@ -144,7 +146,10 @@ function registerV2Routes(app, requireAuth) {
     try {
       const zpa = zpaOf(req.session);
       const groups = await zpa.listAll('/appConnectorGroup');
-      res.json({ connectorGroups: groups.map(g => ({ id: String(g.id), name: g.name, location: g.location })), defaults: APP_SEGMENT_DEFAULTS, location: SAN_JOSE });
+      let certificates = [], praPortals = [];
+      try { certificates = (await zpa.listAll('/certificate')).map(c => ({ id: String(c.id), name: c.name, cn: c.cName || c.cname || '', san: c.san || [], validTo: Number(c.validToInEpochSec) || null })); } catch (e) { /* optional */ }
+      try { praPortals = (await zpa.listAll('/praPortal')).map(x => ({ id: String(x.id), name: x.name, domain: x.domain })); } catch (e) { /* optional */ }
+      res.json({ connectorGroups: groups.map(g => ({ id: String(g.id), name: g.name, location: g.location })), certificates, praPortals, defaults: APP_SEGMENT_DEFAULTS, location: SAN_JOSE });
     } catch (e) { res.status(502).json({ error: e.message }); }
   });
   function zpaInput(body, session) {
@@ -153,7 +158,14 @@ function registerV2Routes(app, requireAuth) {
     if (!PREFIX_RE.test(prefix)) throw Object.assign(new Error('Set a global prefix first.'), { status: 400 });
     return { prefix, domains: b.domains || '', tcpPorts: b.tcpPorts ?? '1-52, 54-65535', udpPorts: b.udpPorts ?? '1-52, 54-65535',
       settings: { ...APP_SEGMENT_DEFAULTS, ...(b.settings || {}) }, connectorGroupId: b.connectorGroupId || null, descriptions: b.descriptions || {},
-      policies: { ...POLICY_DEFAULTS, ...(b.policies && typeof b.policies === 'object' ? { timeout: b.policies.timeout !== false, inspection: b.policies.inspection !== false, isolation: b.policies.isolation !== false } : {}) },
+      policies: { ...POLICY_DEFAULTS, ...(b.policies && typeof b.policies === 'object' ? { access: b.policies.access !== false, timeout: b.policies.timeout !== false, inspection: b.policies.inspection !== false, isolation: b.policies.isolation !== false } : {}) },
+      isolationProfile: b.isolationProfile && typeof b.isolationProfile === 'object' ? {
+        enabled: b.isolationProfile.enabled !== false,
+        copyPaste: ['none', 'all', 'upstream', 'downstream'].includes(b.isolationProfile.copyPaste) ? b.isolationProfile.copyPaste : 'none',
+        uploadDownload: ['none', 'all', 'upstream'].includes(b.isolationProfile.uploadDownload) ? b.isolationProfile.uploadDownload : 'none',
+        allowPrinting: !!b.isolationProfile.allowPrinting, watermark: b.isolationProfile.watermark !== false,
+        watermarkMessage: String(b.isolationProfile.watermarkMessage || 'Zscaler POV').replace(/[<>]/g, '').slice(0, 64) } : null,
+      browserAccess: { domain: String((b.browserAccess || {}).domain || '').trim().slice(0, 253), port: String((b.browserAccess || {}).port || '443').trim(), certificateId: (b.browserAccess || {}).certificateId ? String(b.browserAccess.certificateId) : null, protocol: (b.browserAccess || {}).protocol === 'HTTP' ? 'HTTP' : 'HTTPS' },
       pra: { rdpHost: String((b.pra || {}).rdpHost || '').trim().slice(0, 253), sshHost: String((b.pra || {}).sshHost || '').trim().slice(0, 253), portalId: (b.pra || {}).portalId ? String(b.pra.portalId) : null },
       apps: Array.isArray(b.apps) ? b.apps.slice(0, 500).map(a => ({ name: String(a.name || ''), destinations: Array.isArray(a.destinations) ? a.destinations.map(String) : String(a.destinations || ''),
         tcpPorts: String(a.tcpPorts || ''), udpPorts: String(a.udpPorts || ''), row: a.row, settings: a.settings && typeof a.settings === 'object' ? a.settings : {} })) : null };
@@ -181,10 +193,11 @@ function registerV2Routes(app, requireAuth) {
       const bad = checkPlan(req.session, 'zpa', input, req.body.planId);
       if (bad) return res.status(409).json({ error: bad });
       const run = await runZpa(zpaOf(req.session), input, { dryRun: false, logger: req.session.logger });
-      v2(req.session).runs.zpa.push({ at: new Date().toISOString(), ledger: run.ledger, warnings: run.warnings, secrets: run.secrets, names: run.names, followUps: run.followUps });
+      const snapshot = snapshots.save({ product: 'zpa', prefix: input.prefix, undo: run.undo, tenant: req.session.client.vanityDomain || req.session.client.baseUrl });
+      v2(req.session).runs.zpa.push({ at: new Date().toISOString(), ledger: run.ledger, warnings: run.warnings, secrets: run.secrets, names: run.names, followUps: run.followUps, input, snapshot });
       req.session.logger.log('V2_ZPA_APPLY', { counts: countActions(run.ledger), provisioningKey: run.secrets.provisioningKey ? '<redacted>' : 'not available' });
       // ZPA-04: the key goes to the browser once, for the masked reveal/copy field and the report
-      res.json({ ledger: run.ledger, counts: countActions(run.ledger), warnings: run.warnings, names: run.names, followUps: run.followUps,
+      res.json({ ledger: run.ledger, counts: countActions(run.ledger), warnings: run.warnings, names: run.names, followUps: run.followUps, snapshot,
         provisioningKey: run.secrets.provisioningKey || null });
     } catch (e) { res.status(e.status || 502).json({ error: e.message }); }
   });
@@ -273,10 +286,12 @@ function registerV2Routes(app, requireAuth) {
     const s = v2(req.session);
     const lic = s.licensing;
     const report = buildReport({ runs: s.runs, prefix: s.prefix || '', tenant: req.session.client.vanityDomain || req.session.client.baseUrl,
-      licensing: lic, endpointWarning: lic ? lic.endpointDlpEnabledInZcc !== true : true, includeSecrets: (req.body || {}).includeSecrets !== false });
+      licensing: lic, endpointWarning: lic ? lic.endpointDlpEnabledInZcc !== true : true, includeSecrets: (req.body || {}).includeSecrets !== false,
+      tests: require('./pov-tests').runbook(s.runs, s.testResults || {}) });
     req.session.logger.log('V2_REPORT', { containsSecret: report.containsSecret });
     res.json(report);
   });
+  require('./routes22').register(app, requireAuth, { v2, rememberPlan, checkPlan, zpaOf, countActions, runZia, runZpa });
   app.get('/api/v2/runs', requireAuth, (req, res) => {
     const s = v2(req.session);
     res.json({ prefix: s.prefix || null, zia: s.runs.zia.length, zcc: s.runs.zcc.length, zpa: s.runs.zpa.length });

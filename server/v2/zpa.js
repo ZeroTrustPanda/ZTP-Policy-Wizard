@@ -81,7 +81,9 @@ const APP_SEGMENT_DEFAULTS = {
   bypassOnReauth: false
 };
 // Default ZPA policies built for the application segment(s) (on by default; each can be turned off in the UI)
-const POLICY_DEFAULTS = { timeout: true, inspection: true, isolation: true };
+// v2.2 isolation profile security controls (CBI): none = blocked; upstream = local → isolated only
+const ISOLATION_DEFAULTS = { enabled: true, copyPaste: 'none', uploadDownload: 'none', allowPrinting: false, watermark: true, watermarkMessage: 'Zscaler POV' };
+const POLICY_DEFAULTS = { access: true, timeout: true, inspection: true, isolation: true };
 const TIMEOUTS = { reauthTimeout: '28800', reauthIdleTimeout: '3600' };   // seconds: re-authenticate every 8 hours, or after 1 hour idle
 const OWASP_FALLBACK = 'OWASP_CRS/4.8.0';   // live: tenants refuse new profiles on 3.3.0; the current version comes from /inspectionControls/predefined/versions
 const PRA_PROTOCOLS = { rdp: { protocol: 'RDP', port: '3389' }, ssh: { protocol: 'SSH', port: '22' } };
@@ -124,8 +126,17 @@ function praErrors(pra) {
   }
   return out;
 }
+function browserAccessErrors(ba) {
+  const d = String((ba || {}).domain || '').trim();
+  if (!d) return [];
+  const out = [];
+  const c = classifyEntry(d);
+  if (!c.ok || c.type !== 'fqdn') out.push(`Browser Access domain "${d}": enter one web server name (for example ehr.hospital.org).`);
+  if (!/^\d{1,5}$/.test(String(ba.port || '443')) || +ba.port > 65535) out.push('Browser Access port must be a number from 1 to 65535.');
+  return out;
+}
 function validateZpaInput(input) {
-  const pe = praErrors(input.pra);
+  const pe = [...praErrors(input.pra), ...browserAccessErrors(input.browserAccess)];
   const r = validateZpaInputCore(input);
   r.errors.push(...pe);
   return r;
@@ -269,7 +280,7 @@ async function runZpa(zpa, input, { dryRun, logger }) {
     connectorGroup: `${p}-appconnector-group`, provisioningKey: `${p}-provisioning-key`,
     segmentGroup: `${p}-segment-group`, serverGroup: `${p}-server-group`, appSegment: `${p}-app-segment`
   };
-  const ledger = [], warnings = [], secrets = {};
+  const ledger = [], warnings = [], secrets = {}, undo = [];
   const rec = (e) => { const x = { product: 'ZPA', ...e }; ledger.push(x); if (logger && !dryRun) logger.logPolicyApply(`ZPA ${e.category}`, e.name, e.action, e.error ? { error: e.error } : { success: true, id: e.id }); return x; };
   const base = await zpa.base();
 
@@ -284,15 +295,19 @@ async function runZpa(zpa, input, { dryRun, logger }) {
       if (createOnly.length) { body = { ...body }; for (const k of createOnly) delete body[k]; }
       const changes = diffZpa(body, full);
       if (!changes.length) return rec({ category, name, action: 'NO_CHANGE', id: existing.id, existing: full });
-      if (dryRun) return rec({ category, name, action: 'UPDATE', id: existing.id, changes, existing: full });
+      const det = changes.map(k => ({ field: k, from: shortVal(full[k]), to: shortVal(body[k]) }));
+      if (dryRun) return rec({ category, name, action: 'UPDATE', id: existing.id, changes, details: det, existing: full });
       try {
         await zpa.apiCall('PUT', `${base}${updatePath || rel}/${existing.id}`, { ...full, ...body, id: existing.id });
-        return rec({ category, name, action: 'UPDATE', id: existing.id, changes, existing: full });
+        const before = { ...full }; delete before.provisioningKey;   // never kept: the key is a secret
+        undo.push({ op: 'PUT', path: `${base}${updatePath || rel}/${existing.id}`, body: before, label: `${category}: ${name}` });
+        return rec({ category, name, action: 'UPDATE', id: existing.id, changes, details: det, existing: full });
       } catch (e) { return rec({ category, name, action: 'FAILED', id: existing.id, error: e.message, changes }); }
     }
     if (dryRun) return rec({ category, name, action: 'CREATE', id: `new:${kind}` });
     try {
       const created = await zpa.apiCall('POST', `${base}${createPath || rel}`, body);
+      if (created && created.id) undo.push({ op: 'DELETE', path: `${base}${createPath || rel}/${created.id}${kind === 'appSegment' ? '?forceDelete=true' : ''}`, label: `${category}: ${name}` });
       return rec({ category, name, action: 'CREATE', id: created && created.id, created });
     } catch (e) { return rec({ category, name, action: 'FAILED', error: e.message }); }
   }
@@ -372,13 +387,76 @@ async function runZpa(zpa, input, { dryRun, logger }) {
   }
   }
 
+  // 5b. Browser Access (clientless): one web application published through ZPA with an uploaded/existing web certificate
+  const ba = input.browserAccess || {};
+  if (String(ba.domain || '').trim()) {
+    const host = String(ba.domain).trim(), port = String(ba.port || '443');
+    names.browserAccess = `${p}-browser-access`;
+    if (dead(sg) || dead(svg)) skip('Browser Access Application', names.browserAccess, dead(sg) ? names.segmentGroup : names.serverGroup);
+    else if (!ba.certificateId) rec({ category: 'Browser Access Application', name: names.browserAccess, action: 'SKIPPED', error: 'Pick a web server certificate for the Browser Access domain.' });
+    else {
+      const body = { name: names.browserAccess, description: `Browser Access (no client) to https://${host}. Created by the Zscaler Policy Wizard.`, enabled: true,
+        domainNames: [host], segmentGroupId: String(sg.id), serverGroups: [{ id: String(svg.id) }], tcpPortRanges: [port, port],
+        bypassType: 'NEVER', healthReporting: 'ON_ACCESS', healthCheckType: 'DEFAULT', isCnameEnabled: true, icmpAccessType: 'NONE',
+        clientlessApps: [{ name: host, domain: host, applicationPort: port, applicationProtocol: ba.protocol === 'HTTP' ? 'HTTP' : 'HTTPS', certificateId: String(ba.certificateId),
+          enabled: true, trustUntrustedCert: true, allowOptions: false, path: '/' }] };
+      if (String(body.segmentGroupId).startsWith('new:')) body.segmentGroupId = '(new)';
+      const b = await upsert('appSegment', 'Browser Access Application', names.browserAccess, body, { fetchFull: true, createOnly: ['clientlessApps'] });
+      if (b.existing) { const url = ((b.existing.clientlessApps || [])[0] || {}).extDomainName; if (url) names.browserAccessUrl = `https://${url}`; }
+      delete b.existing; delete b.created;
+      segIds.push(b);
+    }
+  }
+
+  // Cloud Browser Isolation profile (ZPA CBI service). Created profiles appear as ZPA isolation profiles with the same name.
+  async function upsertCbiProfile(name, iso) {
+    const C = `/zpa/cbiconfig/cbi/api/customers/${await zpa.cid()}`;
+    const sc = { copyPaste: iso.copyPaste, uploadDownload: iso.uploadDownload, allowPrinting: !!iso.allowPrinting, documentViewer: true, localRender: true,
+      restrictKeystrokes: false, cameraAndMic: false, flattenedPdf: false, deepLink: { enabled: false, applications: [] },
+      watermark: { enabled: !!iso.watermark, showUserId: !!iso.watermark, showTimestamp: !!iso.watermark, showMessage: !!iso.watermark, message: String(iso.watermarkMessage || 'Zscaler POV').slice(0, 64) } };
+    const profiles = list(await zpa.apiCall('GET', `${C}/profiles`));
+    const existing = profiles.find(x => x.name === name);
+    const cat = 'Isolation Profile';
+    if (existing) {
+      const full = await zpa.apiCall('GET', `${C}/profiles/${existing.id}`);
+      const cur = full.securityControls || {};
+      const changes = ['copyPaste', 'uploadDownload', 'allowPrinting'].filter(k => String(cur[k]) !== String(sc[k]));
+      if (!!(cur.watermark || {}).enabled !== sc.watermark.enabled || ((cur.watermark || {}).message || '') !== (sc.watermark.enabled ? sc.watermark.message : ((cur.watermark || {}).message || ''))) changes.push('watermark');
+      if (!changes.length) rec({ category: cat, name, action: 'NO_CHANGE', id: existing.id });
+      else if (dryRun) rec({ category: cat, name, action: 'UPDATE', id: existing.id, changes, details: changes.map(k => ({ field: k, from: shortVal(k === 'watermark' ? cur.watermark : cur[k]), to: shortVal(k === 'watermark' ? sc.watermark : sc[k]) })) });
+      else {
+        const body = { ...full, securityControls: { ...cur, ...sc } };
+        for (const k of ['regions', 'certificates']) if (Array.isArray(full[k])) { body[k === 'regions' ? 'regionIds' : 'certificateIds'] = full[k].map(x => x.id); delete body[k]; }
+        if (full.banner && full.banner.id) { body.bannerId = full.banner.id; delete body.banner; }
+        await zpa.apiCall('PUT', `${C}/profiles/${existing.id}`, body);
+        undo.push({ op: 'PUT', path: `${C}/profiles/${existing.id}`, body: { ...body, securityControls: cur }, label: `${cat}: ${name}` });
+        rec({ category: cat, name, action: 'UPDATE', id: existing.id, changes });
+      }
+    } else if (dryRun) {
+      rec({ category: cat, name, action: 'CREATE', id: 'new:isolationProfile' });
+      return { id: '(new)', name };
+    } else {
+      const regions = list(await zpa.apiCall('GET', `${C}/regions`)), certs = list(await zpa.apiCall('GET', `${C}/certificates`)), banners = list(await zpa.apiCall('GET', `${C}/banners`));
+      const near = regions.filter(r => /Ohio|Portland|Washington/i.test(r.name));
+      const c = await zpa.apiCall('POST', `${C}/profiles`, { name, description: 'Isolation settings for the POV (copy / paste, upload / download, printing, watermark). Created by the Zscaler Policy Wizard.',
+        regionIds: (near.length >= 2 ? near : regions.slice(0, 3)).map(r => r.id), certificateIds: certs.filter(x => x.isDefault).map(x => x.id),
+        ...(banners.length ? { bannerId: (banners.find(b => /default/i.test(b.name)) || banners[0]).id } : {}),
+        securityControls: sc, userExperience: { browserInBrowser: true, sessionPersistence: true, persistIsolationBar: false, translate: false, zgpu: false, forwardToZia: { enabled: false } } });
+      if (c && c.id) undo.push({ op: 'DELETE', path: `${C}/profiles/${c.id}`, label: `${cat}: ${name}` });
+      rec({ category: cat, name, action: 'CREATE', id: c && c.id });
+    }
+    // the matching ZPA isolation profile (created by ZPA from the CBI profile)
+    const zp = (await zpa.listAll('/isolation/profiles')).find(x => x.name === name);
+    return zp ? { id: String(zp.id), name } : null;
+  }
+
   // 6. Policies for the segment(s): timeout (re-authentication), AppProtection inspection, browser isolation
   const pol = { ...POLICY_DEFAULTS, ...(input.policies || {}) };
   const appIds = segIds.filter(x => !dead(x)).map(x => String(x.id));
   const anyApps = appIds.length > 0;
-  const policyRule = async (policyType, name, body) => {
-    if (!anyApps) return skip('Policy Rule', name, 'the application segment');
-    const want = { ...body, name, conditions: [...(body.conditions || []), { operator: 'OR', operands: [{ objectType: 'APP', values: appIds }] }] };
+  const policyRule = async (policyType, name, body, ids = appIds) => {
+    if (!ids.length) return skip('Policy Rule', name, 'the application segment');
+    const want = { ...body, name, conditions: [...(body.conditions || []), { operator: 'OR', operands: [{ objectType: 'APP', values: ids }] }] };
     let set;
     try { set = await zpa.apiCall('GET', `${base}/policySet/policyType/${policyType}`); }
     catch (e) { return rec({ category: 'Policy Rule', name, action: 'FAILED', error: `Could not read the ${policyType} policy set: ${e.message}` }); }
@@ -393,11 +471,19 @@ async function runZpa(zpa, input, { dryRun, logger }) {
       const changes = policyRuleDiff(want, existing);
       if (!changes.length) return rec({ category: 'Policy Rule', name, action: 'NO_CHANGE', id: existing.id });
       if (dryRun) return rec({ category: 'Policy Rule', name, action: 'UPDATE', id: existing.id, changes });
-      try { await zpa.apiCall('PUT', `${v2}/${existing.id}`, { ...want, id: existing.id }); return rec({ category: 'Policy Rule', name, action: 'UPDATE', id: existing.id, changes }); }
+      try {
+        await zpa.apiCall('PUT', `${v2}/${existing.id}`, { ...want, id: existing.id });
+        undo.push({ op: 'PUT', path: `${v2}/${existing.id}`, body: v1RuleToV2(existing), label: `Policy Rule: ${name}` });
+        return rec({ category: 'Policy Rule', name, action: 'UPDATE', id: existing.id, changes });
+      }
       catch (e) { return rec({ category: 'Policy Rule', name, action: 'FAILED', id: existing.id, error: e.message, changes }); }
     }
     if (dryRun) return rec({ category: 'Policy Rule', name, action: 'CREATE', id: 'new:policyRule' });
-    try { const c = await zpa.apiCall('POST', v2, want); return rec({ category: 'Policy Rule', name, action: 'CREATE', id: c && c.id }); }
+    try {
+      const c = await zpa.apiCall('POST', v2, want);
+      if (c && c.id) undo.push({ op: 'DELETE', path: `${base}/policySet/${set.id}/rule/${c.id}`, label: `Policy Rule: ${name}` });
+      return rec({ category: 'Policy Rule', name, action: 'CREATE', id: c && c.id });
+    }
     catch (e) { return rec({ category: 'Policy Rule', name, action: 'FAILED', error: e.message }); }
   };
   if (pol.timeout) {
@@ -428,6 +514,7 @@ async function runZpa(zpa, input, { dryRun, logger }) {
         });
         try { await zpa.apiCall('PUT', `${base}/inspectionProfile/${c.id}/associateAllPredefinedControls?version=${ver}`); }
         catch (e) { warnings.push(`${names.inspectionProfile}: created, but adding all predefined controls failed (${e.message}). Add them in the ZPA portal.`); }
+        if (c && c.id) undo.push({ op: 'DELETE', path: `${base}/inspectionProfile/${c.id}`, label: `Inspection Profile: ${names.inspectionProfile}` });
         ip = rec({ category: 'Inspection Profile', name: names.inspectionProfile, action: 'CREATE', id: c && c.id });
       }
     } catch (e) { ip = rec({ category: 'Inspection Profile', name: names.inspectionProfile, action: 'FAILED', error: e.message }); }
@@ -438,8 +525,18 @@ async function runZpa(zpa, input, { dryRun, logger }) {
   if (pol.isolation) {
     names.isolationPolicy = `${p}-isolation-policy`;
     let prof = null;
-    try { const ps = await zpa.listAll('/isolation/profiles'); prof = ps.find(x => x.enabled !== false && /default/i.test(x.name)) || ps.find(x => x.enabled !== false) || null; }
-    catch (e) { warnings.push(`Could not read ZPA isolation profiles: ${e.message}`); }
+    // v2.2: the wizard's own isolation profile with the POV security controls (copy / paste, upload / download, printing, watermark)
+    const iso = { ...ISOLATION_DEFAULTS, ...(input.isolationProfile || {}) };
+    if (iso.enabled !== false) {
+      const cbiName = `${p}-isolation-profile`;
+      names.isolationProfile = cbiName;
+      try { prof = await upsertCbiProfile(cbiName, iso); }
+      catch (e) { rec({ category: 'Isolation Profile', name: cbiName, action: 'FAILED', error: e.message }); }
+    }
+    if (!prof) {
+      try { const ps = await zpa.listAll('/isolation/profiles'); prof = ps.find(x => x.enabled !== false && /default/i.test(x.name)) || ps.find(x => x.enabled !== false) || null; }
+      catch (e) { warnings.push(`Could not read ZPA isolation profiles: ${e.message}`); }
+    }
     if (!prof) rec({ category: 'Policy Rule', name: names.isolationPolicy, action: 'SKIPPED', error: 'This tenant has no ZPA isolation profile (Cloud Browser Isolation for ZPA).' });
     else await policyRule('ISOLATION_POLICY', names.isolationPolicy, { action: 'ISOLATE', zpnIsolationProfileId: String(prof.id),
       conditions: [{ operator: 'OR', operands: [{ objectType: 'CLIENT_TYPE', values: ['zpn_client_type_exporter'] }] }],
@@ -449,6 +546,7 @@ async function runZpa(zpa, input, { dryRun, logger }) {
   // 7. Privileged Remote Access: one RDP and/or SSH application (by host), and a console when the tenant has a PRA portal
   const followUps = [COPY.report.followUps.zpaLocation, COPY.report.followUps.zpaDeploy];
   const pra = input.pra || {};
+  const praSegIds = [];
   const praWanted = Object.entries(PRA_PROTOCOLS).filter(([k]) => String(pra[`${k}Host`] || '').trim());
   if (praWanted.length) {
     let portal = null;
@@ -466,6 +564,7 @@ async function runZpa(zpa, input, { dryRun, logger }) {
           ...(proto.protocol === 'RDP' ? { connectionSecurity: 'ANY' } : {}) }] } };
       if (String(body.segmentGroupId).startsWith('new:')) body.segmentGroupId = '(new)';
       const seg = await upsert('appSegment', 'PRA Application', segName, body, { fetchFull: true, createOnly: ['commonAppsDto'] });
+      praSegIds.push(seg);
       const praApp = seg && seg.existing && (seg.existing.praApps || [])[0];
       delete seg.existing; delete seg.created;
       const consoleName = `${p}-pra-${k}-console`;
@@ -482,8 +581,29 @@ async function runZpa(zpa, input, { dryRun, logger }) {
     }
     if (!portal) followUps.push('Create a Privileged Remote Access portal (domain and certificate) in the ZPA portal, then run the wizard again to add the PRA consoles.');
   }
+  // 8. Access policy: anyone signed in to ZPA can reach the wizard's applications (segments, Browser Access and PRA)
+  if (pol.access) {
+    names.accessPolicy = `${p}-access-policy`;
+    const accessIds = [...appIds, ...praSegIds.filter(x => !dead(x)).map(x => String(x.id))];
+    await policyRule('ACCESS_POLICY', names.accessPolicy, { action: 'ALLOW',
+      description: 'Any user signed in to ZPA can reach these applications. Narrow it to groups in the ZPA portal when the POV moves to production. Created by the Zscaler Policy Wizard.' }, accessIds);
+  }
   followUps.push('ZPA browser isolation applies to Browser Access (clientless) users; ZPA inspection needs AppProtection on the tenant.');
-  return { ledger, warnings, errors: [], secrets, names, followUps };
+  for (const e of ledger) { delete e.existing; delete e.created; }   // full objects stay on the server (they can hold a provisioning key)
+  return { ledger, warnings, errors: [], secrets, names, followUps, undo };
+}
+
+const shortVal = (v) => { const t = typeof v === 'string' ? v : JSON.stringify(v === undefined ? null : v); return t.length > 140 ? t.slice(0, 137) + '…' : t; };
+/** A rule read back (v1 operands lhs/rhs) as a v2 body, for putting it back on restore. */
+function v1RuleToV2(r) {
+  const out = { name: r.name, description: r.description || '', action: r.action };
+  for (const k of ['reauthTimeout', 'reauthIdleTimeout', 'zpnInspectionProfileId', 'zpnIsolationProfileId', 'customMsg', 'operator']) if (r[k] !== undefined) out[k] = r[k];
+  out.conditions = (r.conditions || []).map(c => {
+    const byType = {};
+    for (const o of c.operands || []) (byType[o.objectType] = byType[o.objectType] || []).push(o.rhs);
+    return { operator: c.operator || 'OR', operands: Object.entries(byType).map(([objectType, values]) => ({ objectType, values })) };
+  });
+  return out;
 }
 
 /** Rules of one policy type (GET policySet/rules/policyType/{type}, paged). */
@@ -503,10 +623,10 @@ function policyRuleDiff(want, existing) {
 }
 
 // ---------- bulk manager (BRM-01..05) ----------
-const DELETE_ORDER = ['praConsole', 'policyRule', 'appSegment', 'inspectionProfile', 'serverGroup', 'segmentGroup', 'provisioningKey', 'connectorGroup'];
-const KIND_LABEL = { praConsole: 'PRA Console', policyRule: 'Policy Rule', appSegment: 'Application Segment', inspectionProfile: 'Inspection Profile', serverGroup: 'Server Group',
+const DELETE_ORDER = ['praConsole', 'policyRule', 'appSegment', 'inspectionProfile', 'cbiProfile', 'serverGroup', 'segmentGroup', 'provisioningKey', 'connectorGroup'];
+const KIND_LABEL = { praConsole: 'PRA Console', policyRule: 'Policy Rule', appSegment: 'Application Segment', inspectionProfile: 'Inspection Profile', cbiProfile: 'Isolation Profile', serverGroup: 'Server Group',
   segmentGroup: 'Segment Group', provisioningKey: 'Provisioning Key', connectorGroup: 'App Connector Group' };
-const POLICY_TYPES = ['TIMEOUT_POLICY', 'INSPECTION_POLICY', 'ISOLATION_POLICY'];
+const POLICY_TYPES = ['ACCESS_POLICY', 'TIMEOUT_POLICY', 'INSPECTION_POLICY', 'ISOLATION_POLICY'];
 
 async function listZpaObjects(zpa, prefix) {
   const out = [];
@@ -520,6 +640,10 @@ async function listZpaObjects(zpa, prefix) {
           if (!set) continue;
           for (const r of await policyRules(zpa, t)) if (mine(r)) out.push({ kind, label: KIND_LABEL[kind], id: `${set.id}:${r.id}`, name: r.name, enabled: true, detail: `${t.replace('_POLICY', '').toLowerCase()} policy` });
         }
+        continue;
+      }
+      if (kind === 'cbiProfile') {
+        for (const o of list(await zpa.apiCall('GET', `/zpa/cbiconfig/cbi/api/customers/${await zpa.cid()}/profiles`))) if (mine(o)) out.push({ kind, label: KIND_LABEL[kind], id: String(o.id), name: o.name, enabled: true, detail: o.description || '' });
         continue;
       }
       for (const o of await zpa.listAll(PATHS[kind])) {
@@ -537,10 +661,11 @@ async function deleteZpaObjects(zpa, items, { dryRun, logger }) {
   const sorted = [...items].sort((a, b) => DELETE_ORDER.indexOf(a.kind) - DELETE_ORDER.indexOf(b.kind)).map(i => ({ ...i, label: KIND_LABEL[i.kind] || i.kind }));
   const results = [];
   for (const it of sorted) {
-    if (!PATHS[it.kind] && it.kind !== 'policyRule') { results.push({ ...it, action: 'FAILED', error: 'Unknown object type' }); continue; }
+    if (!PATHS[it.kind] && it.kind !== 'policyRule' && it.kind !== 'cbiProfile') { results.push({ ...it, action: 'FAILED', error: 'Unknown object type' }); continue; }
     if (dryRun) { results.push({ ...it, action: 'DELETE' }); continue; }
     try {
-      if (it.kind === 'policyRule') {
+      if (it.kind === 'cbiProfile') await zpa.apiCall('DELETE', `/zpa/cbiconfig/cbi/api/customers/${await zpa.cid()}/profiles/${it.id}`);
+      else if (it.kind === 'policyRule') {
         const [setId, ruleId] = String(it.id).split(':');
         await zpa.apiCall('DELETE', `${base}/policySet/${setId}/rule/${ruleId}`);
       } else {
@@ -558,5 +683,5 @@ async function deleteZpaObjects(zpa, items, { dryRun, logger }) {
 }
 
 module.exports = {
-  parseBulkCsv, validateBulkApps, segmentName, ZPAClient, runZpa, validateZpaInput, classifyEntry, splitEntries, parsePortRanges, APP_SEGMENT_DEFAULTS, SAN_JOSE, POLICY_DEFAULTS, policyRuleDiff,
+  parseBulkCsv, validateBulkApps, segmentName, ZPAClient, runZpa, validateZpaInput, classifyEntry, splitEntries, parsePortRanges, APP_SEGMENT_DEFAULTS, SAN_JOSE, POLICY_DEFAULTS, ISOLATION_DEFAULTS, policyRuleDiff,
   listZpaObjects, deleteZpaObjects, DELETE_ORDER, KIND_LABEL };
