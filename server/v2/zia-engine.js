@@ -240,6 +240,7 @@ const CAC_BROWSERS = ['OPERA', 'FIREFOX', 'MSIE', 'MSEDGE', 'CHROME', 'SAFARI', 
 const cacBody = (rule, order) => {
   const b = { name: rule.name, description: rule.description || '', order, state: rule.state || 'ENABLED', rank: 7,
     type: rule.ruleType || rule.type || 'AI_ML', actions: rule.actions || [] };
+  if (rule.applications && rule.applications.length) b.applications = rule.applications.slice();
   if (b.actions.some(a => /^CAUTION_/.test(a))) b.userAgentTypes = rule.userAgentTypes && rule.userAgentTypes.length ? rule.userAgentTypes : CAC_BROWSERS.slice();
   return b;
 };
@@ -327,7 +328,14 @@ async function runZia(client, template, { dryRun, logger }) {
   for (const r of P.cloudAppControl || []) {
     const type = r.ruleType || r.type || 'AI_ML';
     const path = `/api/v1/webApplicationRules/${type}`;
-    await eng.upsert({ category: 'Cloud App Control', name: r.name, listPath: path, createPath: path, updatePath: id => `${path}/${id}`, orderPath: path, build: order => cacBody(r, order) });
+    const sameSet = (a, b) => JSON.stringify([...(a || [])].sort()) === JSON.stringify([...(b || [])].sort());
+    await eng.upsert({ category: 'Cloud App Control', name: r.name, listPath: path, createPath: path, updatePath: id => `${path}/${id}`, orderPath: path, build: order => cacBody(r, order),
+      // A rule created with its fallback actions (the tenant refused the first set) stays as created on re-runs.
+      adjust: (body, existing) => (r.fallbackActions && sameSet(existing.actions, r.fallbackActions)) ? { ...body, actions: existing.actions } : body,
+      createFallback: (e, body) => {
+        if (!r.fallbackActions || !/Invalid action|not supported|INVALID_INPUT/i.test(String(e.message))) return null;
+        return { body: { ...body, actions: r.fallbackActions.slice() }, warning: `the tenant refused ${body.actions.join(', ')}; created with ${r.fallbackActions.join(', ')}.` };
+      } });
   }
 
   // DLP: dictionaries → engines → rules (FWK-20/22: reuse predefined, update ours by name)
@@ -345,6 +353,11 @@ async function runZia(client, template, { dryRun, logger }) {
     const values = {};
     for (const s of P.aiPromptCapture.settings) values[s.key] = !!s.value;
     await eng.upsertSettings({ category: 'AI Prompt Capture', name: P.aiPromptCapture.name, path: '/api/v1/advancedUrlFilterAndCloudAppSettings', values });
+  }
+  if (P.ucaas) {
+    const values = {};
+    for (const s of P.ucaas.settings) values[s.key] = !!s.value;
+    await eng.upsertSettings({ category: 'UCaaS', name: P.ucaas.name, path: '/api/v1/advancedUrlFilterAndCloudAppSettings', values });
   }
 
   const activated = await eng.activate();

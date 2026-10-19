@@ -37,9 +37,10 @@ const URL_CATEGORY_CLASSES = {
   ],
   SECURITY_RISK: [
     'NEWLY_REG_DOMAINS', 'NON_CATEGORIZABLE',
-    'MISCELLANEOUS_OR_UNKNOWN', 'OTHER_MISCELLANEOUS',
     'P2P_COMMUNICATION', 'REMOTE_ACCESS'
-  ]
+  ],
+  // Isolated rather than blocked: users can still reach obscure but legitimate sites, safely in Browser Isolation
+  MISC_UNKNOWN: ['MISCELLANEOUS_OR_UNKNOWN', 'OTHER_MISCELLANEOUS']
 };
 
 // Fallback: if specific categories fail, use ANY (matches all categories)
@@ -205,6 +206,21 @@ function generateUrlFilteringRules(tier, complianceFramework, prefix = 'ZTP') {
     protocols: ANY_PROTOCOL,
     requestMethods: ALL_REQUEST_METHODS,
     description: 'Block newly registered domains, uncategorizable sites, and P2P/remote access sites',
+    tier,
+    complianceMapping: mapToCompliance('url_security_risk', complianceFramework)
+  });
+
+  // Rule 4: Isolate Miscellaneous / Unknown (Cloud Browser Isolation; falls back to Caution with no isolation profile)
+  rules.push({
+    name: `${prefix}-Isolate-Misc-Unknown`,
+    order: order++,
+    state: 'ENABLED',
+    action: 'ISOLATE',
+    isolateFallback: 'CAUTION',
+    urlCategories: URL_CATEGORY_CLASSES.MISC_UNKNOWN,
+    protocols: ['HTTPS_RULE', 'HTTP_RULE'],
+    requestMethods: ALL_REQUEST_METHODS,
+    description: 'Open Miscellaneous and Unknown sites in Cloud Browser Isolation: users can still read them, but no active content reaches the device and nothing can be uploaded or downloaded.',
     tier,
     complianceMapping: mapToCompliance('url_security_risk', complianceFramework)
   });
@@ -1262,13 +1278,14 @@ function generateZTHUrlFilteringRules(prefix = 'ZTP') {
 
   // 9. Block Miscellaneous/Uncategorized
   rules.push({
-    name: `${prefix}-Block-Uncategorized`,
+    name: `${prefix}-Isolate-Misc-Unknown`,
     order: order++,
     state: 'ENABLED',
-    action: 'BLOCK',
+    action: 'ISOLATE',
+    isolateFallback: 'CAUTION',
     urlCategories: ['MISCELLANEOUS_OR_UNKNOWN', 'OTHER_MISCELLANEOUS', 'NON_CATEGORIZABLE'],
-    protocols: ['ANY_RULE'],
-    description: 'Block uncategorized and miscellaneous sites. In production, consider using Browser Isolation instead for legitimate access to obscure medical device vendor sites.',
+    protocols: ['HTTPS_RULE', 'HTTP_RULE'],
+    description: 'Open uncategorized and miscellaneous sites in Cloud Browser Isolation, so obscure but legitimate sites (e.g. medical device vendors) stay reachable without risk to the device.',
     tier: 'ZTH_EBOOK'
   });
 
@@ -1652,9 +1669,51 @@ function generateFileTypeControlRules(tier, complianceFramework, prefix = 'ZTP')
 // API: POST /api/v1/webApplicationRules/:rule_type
 // ========================
 
+// App-specific Cloud App Control rules that show granular controls (view but not upload / post).
+// They come first in their rule type, so they win over the category-wide rules further down.
+// App enums and actions were read from ZTH with /cloudApplications/policy and /webApplicationRules/{type}/availableActions.
+// fallbackActions: used when the tenant rejects the first set (re-runs accept either set as No change).
+const GRANULAR_CAC_RULES = [
+  { key: 'CAC-FileShare-ViewOnly', type: 'FILE_SHARE', applications: ['GDRIVE', 'DROPBOX', 'BOXNET'],
+    actions: ['ALLOW_FILE_SHARE_VIEW', 'DENY_FILE_SHARE_UPLOAD'],
+    fallbackActions: ['ALLOW_FILE_SHARE_DOWNLOAD', 'DENY_FILE_SHARE_CREATE', 'DENY_FILE_SHARE_EDIT', 'DENY_FILE_SHARE_SHARE'],
+    description: 'Google Drive, Dropbox and Box: users can open and download files but cannot upload, edit or share. Every other file-sharing app falls through to the file-sharing rule below.' },
+  { key: 'CAC-Social-ViewNoPost', type: 'SOCIAL_NETWORKING', applications: ['FACEBOOK', 'TWITTER'],
+    actions: ['ALLOW_SOCIAL_NETWORKING_VIEW', 'BLOCK_SOCIAL_NETWORKING_POST'],
+    description: 'Facebook and X: reading is allowed, posting is blocked.' },
+  { key: 'CAC-LinkedIn-ReadOnly', type: 'SOCIAL_NETWORKING', applications: ['LINKEDIN'],
+    actions: ['ALLOW_SOCIAL_NETWORKING_VIEW', 'BLOCK_SOCIAL_NETWORKING_POST', 'BLOCK_SOCIAL_NETWORKING_COMMENT', 'BLOCK_SOCIAL_NETWORKING_SHARE', 'BLOCK_SOCIAL_NETWORKING_UPLOAD'],
+    fallbackActions: ['ALLOW_SOCIAL_NETWORKING_VIEW', 'BLOCK_SOCIAL_NETWORKING_POST'],
+    description: 'LinkedIn: browsing and recruiting research allowed; posting, commenting, sharing and uploading are blocked.' },
+  { key: 'CAC-GenAI-NoUpload', type: 'AI_ML', applications: ['CHATGPT_AI', 'GOOGLE_GEMINI', 'MICROSOFT_COPILOT'],
+    actions: ['ALLOW_AI_ML_WEB_USE', 'DENY_AI_ML_UPLOAD'],
+    description: 'ChatGPT, Gemini and Copilot: prompts are allowed (and captured by AI Prompt Capture), file uploads are blocked.' },
+  { key: 'CAC-Slack-NoFileUpload', type: 'ENTERPRISE_COLLABORATION', applications: ['SLACK'],
+    actions: ['ALLOW_ENTERPRISE_COLLABORATION_CHAT', 'BLOCK_ENTERPRISE_COLLABORATION_UPLOAD'],
+    fallbackActions: ['BLOCK_ENTERPRISE_COLLABORATION_UPLOAD'],
+    description: 'Slack: chat is allowed, file uploads are blocked.' }
+];
+
 function generateCloudAppControlRules(tier, complianceFramework, prefix = 'ZTP') {
   const rules = [];
   let order = 1;
+
+  for (const g of GRANULAR_CAC_RULES) {
+    rules.push({
+      name: `${prefix}-${g.key}`,
+      order: order++,
+      state: 'ENABLED',
+      type: g.type,
+      ruleType: g.type,
+      applications: g.applications.slice(),
+      actions: g.actions.slice(),
+      ...(g.fallbackActions ? { fallbackActions: g.fallbackActions.slice() } : {}),
+      granular: true,
+      description: g.description,
+      tier,
+      complianceMapping: mapToCompliance('cac_fileshare', complianceFramework)
+    });
+  }
 
   // 1. Block DNS over HTTPS — 12 apps (AdGuard, Cloudflare DNS, Google DNS, Quad9, etc.)
   rules.push({
@@ -1885,6 +1944,7 @@ function applyActionSettings(policyKey, rules, actionSettings, prefix) {
     if (choice && policyKey === 'cloudAppControl') {
       out.defaultActions = rule.actions;
       out.actions = uniq((rule.actions || []).map(choice === 'ALLOW' ? cacToAllow : cacToBlock));
+      if (rule.fallbackActions) out.fallbackActions = uniq(rule.fallbackActions.map(choice === 'ALLOW' ? cacToAllow : cacToBlock));
     } else if (choice === 'ISOLATE') {
       // Open these categories in Cloud Browser Isolation (profile chosen on the Customize step)
       out.action = 'ISOLATE';

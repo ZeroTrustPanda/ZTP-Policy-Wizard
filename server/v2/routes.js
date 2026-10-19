@@ -8,7 +8,7 @@ const { SCOPE_ITEMS, EXCLUSIVE_GROUPS, normalizeScope, detectLicensing, scopeWar
 const fw = require('./frameworks');
 const areas = require('./zia-areas');
 const { runZia } = require('./zia-engine');
-const { ZPAClient, runZpa, validateZpaInput, APP_SEGMENT_DEFAULTS, SAN_JOSE, listZpaObjects, deleteZpaObjects, DELETE_ORDER } = require('./zpa');
+const { parseBulkCsv, validateBulkApps, ZPAClient, runZpa, validateZpaInput, APP_SEGMENT_DEFAULTS, SAN_JOSE, listZpaObjects, deleteZpaObjects, DELETE_ORDER } = require('./zpa');
 const { buildReport } = require('./report');
 const { LIST_KEYS, LIST_LABELS, validateProfileLists } = require('./validate');
 const { resolveForTenant } = require('../tenant-resolve');
@@ -152,8 +152,18 @@ function registerV2Routes(app, requireAuth) {
     const prefix = String(b.prefix || v2(session).prefix || '').trim();
     if (!PREFIX_RE.test(prefix)) throw Object.assign(new Error('Set a global prefix first.'), { status: 400 });
     return { prefix, domains: b.domains || '', tcpPorts: b.tcpPorts ?? '1-52, 54-65535', udpPorts: b.udpPorts ?? '1-52, 54-65535',
-      settings: { ...APP_SEGMENT_DEFAULTS, ...(b.settings || {}) }, connectorGroupId: b.connectorGroupId || null, descriptions: b.descriptions || {} };
+      settings: { ...APP_SEGMENT_DEFAULTS, ...(b.settings || {}) }, connectorGroupId: b.connectorGroupId || null, descriptions: b.descriptions || {},
+      apps: Array.isArray(b.apps) ? b.apps.slice(0, 500).map(a => ({ name: String(a.name || ''), destinations: Array.isArray(a.destinations) ? a.destinations.map(String) : String(a.destinations || ''),
+        tcpPorts: String(a.tcpPorts || ''), udpPorts: String(a.udpPorts || ''), row: a.row, settings: a.settings && typeof a.settings === 'object' ? a.settings : {} })) : null };
   }
+  // ZPA bulk upload: parse a CSV (Application Name, Destinations, Ports) into applications and validate them
+  app.post('/api/v2/zpa/parse-csv', requireAuth, (req, res) => {
+    const text = String((req.body || {}).text || '');
+    if (text.length > 2_000_000) return res.status(413).json({ error: 'The file is too large (2 MB limit).' });
+    const parsed = parseBulkCsv(text);
+    const v = validateBulkApps(parsed.apps);
+    res.json({ apps: parsed.apps, errors: [...parsed.errors, ...v.errors] });
+  });
   app.post('/api/v2/zpa/validate', (req, res) => { const v = validateZpaInput(req.body || {}); res.json({ errors: v.errors }); });
   app.post('/api/v2/zpa/plan', requireAuth, async (req, res) => {
     try {

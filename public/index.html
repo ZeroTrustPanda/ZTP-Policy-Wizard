@@ -689,7 +689,7 @@
                     <span className="step-num">🌐</span> Zscaler Internet Access
                   </div>
                   {ziaExpanded && (<>
-                    {sub('zia-pov', '🧭', 'POV Policy Wizard')}
+                    {sub('zia-pov', '🧭', 'Policy Wizard')}
                     {activeModule === 'zia-pov' && POV_STEPS.map((st, i) => (
                       <div key={st.id} className={`sidebar-item ${povStep === st.id ? 'active' : ''} ${i < povReached && povStep !== st.id ? 'completed' : ''}`}
                         onClick={() => { if (i <= povReached && !(st.id === 'done' && !povResult)) goPov(st.id); }}
@@ -761,7 +761,7 @@
                       <div className="tier-desc">Forwarding and app profiles for Windows and macOS: bypass apps, VPN / IP / DNS lists, ZPA reauthentication.</div>
                     </div>
                     <div className="tier-card" onClick={() => switchModule('zia-pov')} style={{cursor:'pointer'}}>
-                      <div className="tier-icon">🌐</div><div className="tier-name">ZIA POV Policy Wizard</div>
+                      <div className="tier-icon">🌐</div><div className="tier-name">Zscaler Internet Access</div>
                       <div className="tier-desc">Pick what is in scope and a baseline framework, review every rule, dry run, apply and activate.</div>
                     </div>
                     <div className="tier-card" onClick={() => switchModule('zpa')} style={{cursor:'pointer'}}>
@@ -837,7 +837,7 @@
               )}
               {showZiaWizard && step === 'tier' && (<FrameworkPanel setConfig={setConfig} setError={setError} auth={auth}
                 onLoaded={(captured) => { markComplete('tier'); markComplete('compliance'); goTo('customize'); }} />)}
-              {showZiaWizard && step === 'tier' && (<div className="alert alert-info"><span>ℹ Framework files from 1.9: load a saved framework or capture this tenant's policies, then continue. For a new POV, use <a href="#" onClick={e => { e.preventDefault(); switchModule('zia-pov'); }}>POV Policy Wizard</a>.</span></div>)}
+              {showZiaWizard && step === 'tier' && (<div className="alert alert-info"><span>ℹ Framework files from 1.9: load a saved framework or capture this tenant's policies, then continue. For a new POV, use the <a href="#" onClick={e => { e.preventDefault(); switchModule('zia-pov'); }}>Zscaler Internet Access Policy Wizard</a>.</span></div>)}
               {showZiaWizard && step === 'compliance' && (<ComplianceStep config={config} setConfig={setConfig}
                 onNext={() => { markComplete('compliance'); goTo('customize'); }} onBack={() => goTo('tier')} />)}
               {showZiaWizard && step === 'customize' && (<CustomizeStep config={config} setConfig={setConfig} auth={auth}
@@ -1115,6 +1115,7 @@
                 {open[g.type] && (
                   <div className="ab-rows">
                     {g.type === 'aiPromptCapture' && <div className="alert alert-warning" style={{margin:'0.5rem'}}><span>⚠ {meta.copy.aiPrompt.note}</span></div>}
+                    {g.type === 'ucaas' && <div className="form-hint" style={{margin:'0.5rem'}}>Advanced Settings → Unified communications as a service (UCaaS). Enabled for every Zscaler Internet Access run so these apps are recognised and handled correctly.</div>}
                     {items.map(r => {
                       const isOff = !!disabled[r.key];
                       const eff = g.rules ? effective(g, r) : null;
@@ -1126,7 +1127,7 @@
                               <div className="ab-row-name">{r.name || r.label}</div>
                               {r.description && <div className="ab-row-desc">{r.description}</div>}
                               {g.rules && <div className="ab-row-desc">Default: <strong>{r.defaultAction}</strong>{r.categoryCount !== undefined && <> · {r.categoryCount} categories</>}{r.allowOnly && ' · Allow only (monitor)'}</div>}
-                              {g.settings && <div className="ab-row-desc">{g.type === 'aiPromptCapture' ? (isOff ? 'Capture off' : 'Capture on') : isOff ? 'Left as the tenant has it' : `Set to ${settingValue(r) ? 'Block' : 'Allow'}`}</div>}
+                              {g.settings && <div className="ab-row-desc">{g.type === 'aiPromptCapture' ? (isOff ? 'Capture off' : 'Capture on') : g.type === 'ucaas' ? (isOff ? 'Off' : 'Enabled') : isOff ? 'Left as the tenant has it' : `Set to ${settingValue(r) ? 'Block' : 'Allow'}`}</div>}
                               {r.locked && <div className="ab-row-desc">🔒 Required for baseline internet access</div>}
                             </div>
                           </div>
@@ -1246,11 +1247,61 @@
     }
 
     // ---------- §5 ZPA wizard ----------
+    // Application segment settings, used for the shared defaults and for per-application overrides in a bulk upload
+    function ZpaSegmentSettings({ value, onChange, compact }) {
+      const set = (k, v) => onChange({ ...value, [k]: v });
+      const tog = (k, label, hint) => (
+        <div className="toggle-item" key={k} style={compact ? {padding:'6px 10px'} : undefined}>
+          <div><label onClick={() => set(k, !value[k])} style={{cursor:'pointer'}}>{label}</label>{hint && !compact && <div className="form-hint">{hint}</div>}</div>
+          <div className={`toggle-switch ${value[k] ? 'active' : ''}`} onClick={() => set(k, !value[k])} data-zpaset={k}><div className="toggle-knob"></div></div>
+        </div>
+      );
+      return (<>
+        <div style={compact ? {display:'grid', gridTemplateColumns:'repeat(3, 1fr)', gap:'8px'} : undefined}>
+          <div className="form-group">
+            <label className="form-label">Bypass / Client Steering</label>
+            <select value={value.bypassType} onChange={e => set('bypassType', e.target.value)}>
+              <option value="NEVER">Use Client Forwarding Policy</option><option value="ALWAYS">Always bypass</option><option value="ON_NET">Bypass on corporate network</option>
+            </select>
+          </div>
+          <div className="form-group">
+            <label className="form-label">Health check</label>
+            <select value={value.healthReporting} onChange={e => set('healthReporting', e.target.value)}>
+              <option value="ON_ACCESS">On Access</option><option value="CONTINUOUS">Continuous</option><option value="NONE">None</option>
+            </select>
+          </div>
+          <div className="form-group">
+            <label className="form-label">App Connector selection</label>
+            <select value={value.selectConnectorCloseToApp ? 'APP' : 'USER'} onChange={e => set('selectConnectorCloseToApp', e.target.value === 'APP')}>
+              <option value="USER">Closer to User</option><option value="APP">Closer to Application (no UDP)</option>
+            </select>
+          </div>
+        </div>
+        <div style={compact ? {display:'grid', gridTemplateColumns:'repeat(2, 1fr)', gap:'6px'} : undefined}>
+          {tog('icmpAccessType', 'Pingable')}
+          {tog('isCnameEnabled', 'Client Connector can receive CNAME')}
+          {tog('clientlessAccess', 'Clientless Access: Enabled', 'Needs a web server certificate; set up in the ZPA portal.')}
+          {tog('adpEnabled', 'Active Directory Inspection')}
+          {tog('autoAppProtectEnabled', 'Auto App Protection')}
+          {tog('useInDrMode', 'Disaster Recovery')}
+          {tog('ipAnchored', 'Source IP Anchor')}
+          {tog('tcpKeepAlive', 'TCP Keepalive')}
+          {tog('doubleEncrypt', 'Double Encryption')}
+          {tog('bypassOnReauth', 'Bypass during Reauthentication')}
+        </div>
+      </>);
+    }
+
     function ZpaWizard({ meta, prefix, setError, onReport }) {
       const [ctx, setCtx] = useState(null);
       const [form, setForm] = useState({ domains: '', tcpPorts: '1-52, 54-65535', udpPorts: '1-52, 54-65535', connectorGroupId: '',
         descriptions: { connectorGroup: meta.copy.zpa.connectorGroupDescription, appSegment: meta.copy.zpa.appSegmentDescription } });
       const [settings, setSettings] = useState({ ...meta.zpaDefaults });
+      const [bulk, setBulk] = useState(false);
+      const [apps, setApps] = useState([]);            // [{ name, destinations[], tcpPorts, udpPorts, row, settings }]
+      const [csvErrors, setCsvErrors] = useState([]);
+      const [csvName, setCsvName] = useState('');
+      const [openApp, setOpenApp] = useState(null);
       const [errors, setErrors] = useState([]);
       const [plan, setPlan] = useState(null);
       const [result, setResult] = useState(null);
@@ -1258,21 +1309,32 @@
       const [reveal, setReveal] = useState(false);
       const [confirmed, setConfirmed] = useState(false);
       useEffect(() => { api.call('GET', '/v2/zpa/context').then(setCtx).catch(e => setCtx({ error: e.message })); }, []);
-      useEffect(() => { setPlan(null); setConfirmed(false); }, [JSON.stringify([form, settings])]);
+      useEffect(() => { setPlan(null); setConfirmed(false); }, [JSON.stringify([form, settings, bulk, apps])]);
       useEffect(() => {
-        const t = setTimeout(() => api.call('POST', '/v2/zpa/validate', { domains: form.domains, tcpPorts: form.tcpPorts, udpPorts: form.udpPorts, settings }).then(r => setErrors(r.errors)).catch(() => {}), 250);
+        if (bulk && !apps.length) { setErrors([]); return; }
+        const t = setTimeout(() => api.call('POST', '/v2/zpa/validate', bulk ? { apps, settings } : { domains: form.domains, tcpPorts: form.tcpPorts, udpPorts: form.udpPorts, settings }).then(r => setErrors(r.errors)).catch(() => {}), 250);
         return () => clearTimeout(t);
-      }, [form.domains, form.tcpPorts, form.udpPorts, settings.healthReporting]);
-      const body = () => ({ prefix, domains: form.domains, tcpPorts: form.tcpPorts, udpPorts: form.udpPorts, settings, connectorGroupId: form.connectorGroupId || null, descriptions: form.descriptions });
+      }, [form.domains, form.tcpPorts, form.udpPorts, settings.healthReporting, bulk, JSON.stringify(apps)]);
+      const body = () => ({ prefix, ...(bulk ? { apps } : { domains: form.domains, tcpPorts: form.tcpPorts, udpPorts: form.udpPorts }), settings, connectorGroupId: form.connectorGroupId || null, descriptions: form.descriptions });
+      const downloadTemplate = () => {
+        const blob = new Blob([meta.copy.zpa.bulkTemplate], { type: 'text/csv' });
+        const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'zpa-app-segments-template.csv'; document.body.appendChild(a); a.click(); a.remove();
+      };
+      const loadCsv = async (file) => {
+        if (!file) return;
+        setCsvName(file.name);
+        try {
+          const text = await file.text();
+          const r = await api.call('POST', '/v2/zpa/parse-csv', { text });
+          setApps(r.apps.map(a => ({ ...a, settings: {} }))); setCsvErrors(r.errors);
+        } catch (e) { setCsvErrors([e.message]); setApps([]); }
+      };
+      const segName = (name) => `${prefix}-${String(name).trim().replace(/\s+/g, '-')}`;
+      const appSettings = (a) => ({ ...settings, ...(a.settings || {}) });
+      const setAppSettings = (i, v) => setApps(apps.map((a, j) => j === i ? { ...a, settings: Object.fromEntries(Object.entries(v).filter(([k, val]) => settings[k] !== val)) } : a));
       const dry = async () => { setBusy(true); setError(null); try { setPlan(await api.call('POST', '/v2/zpa/plan', body())); setConfirmed(false); } catch (e) { setError(e.message); } setBusy(false); };
       const apply = async () => { setBusy(true); setError(null); try { setResult(await api.call('POST', '/v2/zpa/apply', { ...body(), planId: plan.planId })); } catch (e) { setError(e.message); } setBusy(false); };
       const n = (s) => `${prefix}-${s}`;
-      const tog = (k, label, hint) => (
-        <div className="toggle-item" key={k}>
-          <div><label onClick={() => setSettings({ ...settings, [k]: !settings[k] })} style={{cursor:'pointer'}}>{label}</label>{hint && <div className="form-hint">{hint}</div>}</div>
-          <div className={`toggle-switch ${settings[k] ? 'active' : ''}`} onClick={() => setSettings({ ...settings, [k]: !settings[k] })} data-zpaset={k}><div className="toggle-knob"></div></div>
-        </div>
-      );
       const masked = (k) => k.length > 12 ? k.slice(0, 6) + '•'.repeat(18) + k.slice(-4) : '•'.repeat(k.length);
       return (
         <div className="card" data-step="zpa">
@@ -1284,7 +1346,7 @@
             <tr><td>Provisioning Key</td><td><code>{n('provisioning-key')}</code> · App Connector · max usage 5</td></tr>
             <tr><td>Segment Group</td><td><code>{n('segment-group')}</code></td></tr>
             <tr><td>Server Group</td><td><code>{n('server-group')}</code> · Dynamic Server Discovery on</td></tr>
-            <tr><td>Application Segment</td><td><code>{n('app-segment')}</code></td></tr>
+            <tr><td>Application Segment{bulk ? 's' : ''}</td><td>{bulk ? (apps.length ? apps.map(a => <code key={a.name} style={{marginRight:'6px'}}>{segName(a.name)}</code>) : 'One per application in the uploaded CSV') : <code>{n('app-segment')}</code>}</td></tr>
           </tbody></table>
           <div className="form-group">
             <label className="form-label">App Connector Group description</label>
@@ -1297,6 +1359,49 @@
               {ctx && ctx.connectorGroups && ctx.connectorGroups.filter(g => g.name !== n('appconnector-group')).map(g => <option key={g.id} value={g.id}>{g.name}{g.location ? ` — ${g.location}` : ''}</option>)}
             </select>
           </div>
+          <div className="toggle-item" style={{marginBottom:'1rem'}} data-zpabulktoggle>
+            <div><label onClick={() => setBulk(!bulk)} style={{cursor:'pointer'}}>{meta.copy.zpa.bulkLabel}</label><div className="form-hint">{meta.copy.zpa.bulkHelp}</div></div>
+            <div className={`toggle-switch ${bulk ? 'active' : ''}`} onClick={() => setBulk(!bulk)}><div className="toggle-knob"></div></div>
+          </div>
+          {bulk ? (
+            <div className="card" style={{background:'var(--bg-input)'}} data-zpabulk>
+              <div style={{display:'flex', gap:'8px', alignItems:'center', flexWrap:'wrap', marginBottom:'0.75rem'}}>
+                <button className="btn btn-ghost btn-sm" onClick={downloadTemplate} data-zpatemplate>⬇ Download CSV template</button>
+                <label className="btn btn-primary btn-sm" style={{cursor:'pointer', margin:0}}>⬆ Upload CSV<input type="file" accept=".csv,text/csv" style={{display:'none'}} onChange={e => { loadCsv(e.target.files[0]); e.target.value = ''; }} data-zpacsv /></label>
+                {csvName && <span className="form-hint">{csvName}: {apps.length} application{apps.length === 1 ? '' : 's'}</span>}
+              </div>
+              {csvErrors.length > 0 && <div className="alert alert-danger" style={{display:'block'}} data-zpacsverrors>{csvErrors.map((e, i) => <div key={i}>✕ {e}</div>)}</div>}
+              {apps.length > 0 && (
+                <table className="diff-table" data-zpaapps>
+                  <thead><tr><th>Application segment</th><th>Destinations</th><th>TCP</th><th>UDP</th><th>Settings</th><th></th></tr></thead>
+                  <tbody>
+                    {apps.map((a, i) => (
+                      <React.Fragment key={i}>
+                        <tr data-zpaapp={a.name}>
+                          <td><code>{segName(a.name)}</code></td>
+                          <td style={{fontSize:'12px'}}>{(a.destinations || []).join(', ')}</td>
+                          <td style={{fontSize:'12px'}}>{a.tcpPorts || '—'}</td>
+                          <td style={{fontSize:'12px'}}>{a.udpPorts || '—'}</td>
+                          <td style={{fontSize:'12px'}}>{Object.keys(a.settings || {}).length ? <span className="badge badge-update">{Object.keys(a.settings).length} custom</span> : 'Shared defaults'}</td>
+                          <td style={{whiteSpace:'nowrap'}}>
+                            <button className="btn btn-ghost btn-sm" onClick={() => setOpenApp(openApp === i ? null : i)} data-zpaappsettings={a.name}>{openApp === i ? 'Close' : 'Settings'}</button>
+                            <button className="btn btn-ghost btn-sm" onClick={() => { setApps(apps.filter((_, j) => j !== i)); setCsvErrors(csvErrors.filter(e => !e.startsWith(`Row ${a.row} `))); setOpenApp(null); }} title="Remove from this upload">✕</button>
+                          </td>
+                        </tr>
+                        {openApp === i && (
+                          <tr><td colSpan={6} style={{background:'var(--bg-card)'}}>
+                            <div className="form-hint" style={{marginBottom:'6px'}}>Settings for <strong>{a.name}</strong>. Anything you change here overrides the shared defaults below for this application only.</div>
+                            <ZpaSegmentSettings value={appSettings(a)} onChange={v => setAppSettings(i, v)} compact />
+                            {Object.keys(a.settings || {}).length > 0 && <button className="btn btn-ghost btn-sm" onClick={() => setAppSettings(i, settings)}>Reset to shared defaults</button>}
+                          </td></tr>
+                        )}
+                      </React.Fragment>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          ) : (<>
           <div className="form-group">
             <label className="form-label">Application segment: domains and IPs</label>
             <input type="text" value={form.domains} placeholder={meta.copy.zpa.fqdnHelp} onChange={e => setForm({ ...form, domains: e.target.value })} data-zpadomains />
@@ -1311,37 +1416,11 @@
             <label className="form-label">Application segment description</label>
             <input type="text" value={form.descriptions.appSegment} onChange={e => setForm({ ...form, descriptions: { ...form.descriptions, appSegment: e.target.value } })} />
           </div>
+          </>)}
           <details style={{margin:'0.5rem 0 1rem'}} open>
-            <summary style={{cursor:'pointer', fontSize:'13px'}}>Application segment settings (defaults from the POV guide)</summary>
+            <summary style={{cursor:'pointer', fontSize:'13px'}}>{bulk ? 'Shared application segment settings (every uploaded application starts with these)' : 'Application segment settings (defaults from the POV guide)'}</summary>
             <div className="form-hint" style={{margin:'6px 0'}}>{meta.copy.zpa.defaultsNote}</div>
-            <div className="form-group">
-              <label className="form-label">Bypass / Client Steering</label>
-              <select value={settings.bypassType} onChange={e => setSettings({ ...settings, bypassType: e.target.value })}>
-                <option value="NEVER">Use Client Forwarding Policy</option><option value="ALWAYS">Always bypass</option><option value="ON_NET">Bypass on corporate network</option>
-              </select>
-            </div>
-            <div className="form-group">
-              <label className="form-label">Health check</label>
-              <select value={settings.healthReporting} onChange={e => setSettings({ ...settings, healthReporting: e.target.value })}>
-                <option value="ON_ACCESS">On Access</option><option value="CONTINUOUS">Continuous</option><option value="NONE">None</option>
-              </select>
-            </div>
-            <div className="form-group">
-              <label className="form-label">App Connector selection</label>
-              <select value={settings.selectConnectorCloseToApp ? 'APP' : 'USER'} onChange={e => setSettings({ ...settings, selectConnectorCloseToApp: e.target.value === 'APP' })}>
-                <option value="USER">Closer to User</option><option value="APP">Closer to Application (no UDP)</option>
-              </select>
-            </div>
-            {tog('icmpAccessType', 'Pingable')}
-            {tog('isCnameEnabled', 'Client Connector can receive CNAME')}
-            {tog('clientlessAccess', 'Clientless Access: Enabled', 'Needs a web server certificate; set up in the ZPA portal.')}
-            {tog('adpEnabled', 'Active Directory Inspection')}
-            {tog('autoAppProtectEnabled', 'Auto App Protection')}
-            {tog('useInDrMode', 'Disaster Recovery')}
-            {tog('ipAnchored', 'Source IP Anchor')}
-            {tog('tcpKeepAlive', 'TCP Keepalive')}
-            {tog('doubleEncrypt', 'Double Encryption')}
-            {tog('bypassOnReauth', 'Bypass during Reauthentication')}
+            <ZpaSegmentSettings value={settings} onChange={setSettings} />
           </details>
           {errors.length > 0 && <div className="alert alert-danger" style={{display:'block'}} data-zpaerrors>{errors.map((e, i) => <div key={i}>✕ {e}</div>)}</div>}
           {plan && !result && (<>
@@ -1371,7 +1450,7 @@
             <div className="alert alert-warning" style={{marginTop:'1rem'}}><span>📍 Follow-ups: {result.followUps.join(' ')}</span></div>
           </>)}
           <div className="btn-group">
-            {!result && <button className="btn btn-primary" onClick={dry} disabled={busy || errors.length > 0 || !form.domains.trim()} data-zpadry>{busy && !plan ? <><span className="spinner"></span> Checking…</> : 'Run Dry Run'}</button>}
+            {!result && <button className="btn btn-primary" onClick={dry} disabled={busy || errors.length > 0 || (bulk ? (!apps.length || csvErrors.length > 0) : !form.domains.trim())} data-zpadry>{busy && !plan ? <><span className="spinner"></span> Checking…</> : 'Run Dry Run'}</button>}
             {plan && !result && <button className="btn btn-success" onClick={apply} disabled={busy || !confirmed} data-zpaapply>{busy ? <><span className="spinner"></span> Applying…</> : '🚀 Apply'}</button>}
             {result && <button className="btn btn-primary" onClick={onReport}>Summary report →</button>}
           </div>
@@ -3002,14 +3081,15 @@
     ];
 
     // Settings toggles grouped by category (shared by the forwarding and app profile steps)
-    function ZccSettingToggles({ settings, enabled, onToggle }) {
+    function ZccSettingToggles({ settings, enabled, onToggle, extras }) {
       const cats = [...new Set(settings.map(s => s.category))];
       return cats.map(cat => (
         <div key={cat} style={{marginBottom:'1rem'}}>
           <h4 style={{fontSize:'13px', color:'var(--accent-blue)', margin:'0.75rem 0 0.5rem'}}>{cat}</h4>
           <div className="toggle-group">
             {settings.filter(s => s.category === cat).map(s => (
-              <div className="toggle-item" key={s.key} data-setting={s.key}>
+              <React.Fragment key={s.key}>
+              <div className="toggle-item" data-setting={s.key}>
                 <div>
                   <label onClick={() => onToggle(s.key)}>{s.label} {s.impact === 'caution' && <span className="badge badge-risk" style={{marginLeft:'6px'}}>REVIEW</span>}{s.manual && <span className="badge badge-risk" style={{marginLeft:'6px'}}>MANUAL</span>}</label>
                   <div className="form-hint">{s.description}</div>
@@ -3017,6 +3097,8 @@
                 </div>
                 <div className={`toggle-switch ${enabled.has(s.key) ? 'active' : ''}`} onClick={() => onToggle(s.key)}><div className="toggle-knob"></div></div>
               </div>
+              {extras && extras[s.key] && enabled.has(s.key) && <div style={{margin:'0 0 0.75rem 1rem'}}>{extras[s.key]}</div>}
+              </React.Fragment>
             ))}
           </div>
         </div>
@@ -3242,6 +3324,30 @@
         </table>
       );
 
+      const bypassPanel = (
+                <div data-bypass>
+                  <h4 style={{fontSize:'13px', margin:'0.25rem 0 0.5rem'}}>Predefined IP App Bypasses</h4>
+                  <div className="alert alert-warning"><span>⚠ {(v2meta && v2meta.copy.zcc.bypassWarning) || 'Enabling this bypasses all Zscaler security features for these applications.'}</span></div>
+                  {!bypassApps ? <div className="form-hint"><span className="spinner"></span> Reading the predefined apps from your tenant…</div>
+                    : bypassApps.error ? <div className="alert alert-danger"><span>Could not read predefined apps: {bypassApps.error}</span></div>
+                    : (
+                      <div>
+                        <div style={{display:'flex', gap:'6px', margin:'0 0 0.5rem'}}>
+                          <button className="btn btn-ghost btn-sm" onClick={() => { setPlan(null); setBypassChecked(new Set(bypassApps.map(a => a.id))); }}>Select all</button>
+                          <button className="btn btn-ghost btn-sm" onClick={() => { setPlan(null); setBypassChecked(new Set()); }}>Clear</button>
+                        </div>
+                        <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(220px, 1fr))', gap:'6px'}}>
+                          {bypassApps.map(a => (
+                            <label key={a.id} className="toggle-item" style={{cursor:'pointer', padding:'8px 10px', margin:0}} data-bypassapp={a.id}>
+                              <span><input type="checkbox" checked={bypassChecked.has(a.id)} onChange={() => { setPlan(null); setBypassChecked(prev => { const n = new Set(prev); n.has(a.id) ? n.delete(a.id) : n.add(a.id); return n; }); }} style={{marginRight:'8px'}} />{a.name}</span>
+                            </label>
+                          ))}
+                        </div>
+                        <div className="form-hint" style={{marginTop:'4px'}}>{bypassChecked.size} of {bypassApps.length} apps will bypass Zscaler. Only checked apps are applied.</div>
+                      </div>
+                    )}
+                </div>
+      );
       return (
         <div className="card">
           <div className="card-header">
@@ -3395,32 +3501,7 @@
                       <button className="btn btn-ghost btn-sm" onClick={() => { setPlan(null); setEnabled(new Set()); }}>Clear</button>
                     </div>
                   </div>
-                  <ZccSettingToggles settings={template.settings} enabled={enabled} onToggle={toggle} />
-                </div>
-              )}
-
-              {enabled.has('appBypass') && (
-                <div style={{marginTop:'1.25rem'}} data-bypass>
-                  <h3 style={{fontSize:'14px', margin:'0 0 0.5rem'}}>Predefined IP App Bypasses</h3>
-                  <div className="alert alert-warning"><span>⚠ {(v2meta && v2meta.copy.zcc.bypassWarning) || 'Enabling this bypasses all Zscaler security features for these applications.'}</span></div>
-                  {!bypassApps ? <div className="form-hint"><span className="spinner"></span> Reading the predefined apps from your tenant…</div>
-                    : bypassApps.error ? <div className="alert alert-danger"><span>Could not read predefined apps: {bypassApps.error}</span></div>
-                    : (
-                      <div>
-                        <div style={{display:'flex', gap:'6px', margin:'0 0 0.5rem'}}>
-                          <button className="btn btn-ghost btn-sm" onClick={() => { setPlan(null); setBypassChecked(new Set(bypassApps.map(a => a.id))); }}>Select all</button>
-                          <button className="btn btn-ghost btn-sm" onClick={() => { setPlan(null); setBypassChecked(new Set()); }}>Clear</button>
-                        </div>
-                        <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(220px, 1fr))', gap:'6px'}}>
-                          {bypassApps.map(a => (
-                            <label key={a.id} className="toggle-item" style={{cursor:'pointer', padding:'8px 10px', margin:0}} data-bypassapp={a.id}>
-                              <span><input type="checkbox" checked={bypassChecked.has(a.id)} onChange={() => { setPlan(null); setBypassChecked(prev => { const n = new Set(prev); n.has(a.id) ? n.delete(a.id) : n.add(a.id); return n; }); }} style={{marginRight:'8px'}} />{a.name}</span>
-                            </label>
-                          ))}
-                        </div>
-                        <div className="form-hint" style={{marginTop:'4px'}}>{bypassChecked.size} of {bypassApps.length} apps will bypass Zscaler. Only checked apps are applied.</div>
-                      </div>
-                    )}
+                  <ZccSettingToggles settings={template.settings} enabled={enabled} onToggle={toggle} extras={{ appBypass: bypassPanel }} />
                 </div>
               )}
 

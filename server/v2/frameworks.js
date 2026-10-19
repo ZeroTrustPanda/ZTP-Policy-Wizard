@@ -43,9 +43,9 @@ const POLICY_LABELS = {
   urlFiltering: 'URL Filtering', cloudAppControl: 'Cloud App Control', fileTypeControl: 'File Type Control',
   advancedThreatProtection: 'Advanced Threat Protection', firewallFiltering: 'Cloud Firewall', dnsSecurity: 'DNS Security',
   sslInspection: 'SSL Inspection', dlp: 'Inline Data Loss Prevention', endpointDlp: 'Endpoint Data Protection',
-  sandbox: 'Cloud Sandbox', aiPromptCapture: 'AI Prompt Capture'
+  sandbox: 'Cloud Sandbox', aiPromptCapture: 'AI Prompt Capture', ucaas: 'Unified Communications as a Service (UCaaS)'
 };
-const SINGLETON_TYPES = new Set(['advancedThreatProtection', 'aiPromptCapture']);
+const SINGLETON_TYPES = new Set(['advancedThreatProtection', 'aiPromptCapture', 'ucaas']);
 
 /** Which policy type each scope item controls (SCP-04: out-of-scope types are removed, not hidden). */
 function inScopeTypes(scope) {
@@ -62,6 +62,7 @@ function inScopeTypes(scope) {
   if (s.endpointDlp) t.add('endpointDlp');
   if (s.sandboxStandard || s.sandboxAdvanced) t.add('sandbox');
   if (s.aiPromptCapture) t.add('aiPromptCapture');
+  if (t.size) t.add('ucaas');   // UCaaS apps are switched on for every ZIA run
   return t;
 }
 
@@ -130,6 +131,9 @@ function build(opts, withChoices) {
     // SCP-54: every app on by default; each can be switched off
     policies.aiPromptCapture = { name: `${prefix}-AI-Prompt-Capture`, settings: areas.AI_PROMPT_APPS.map(a => ({ ...a, value: true, toggleKey: `aiPromptCapture:${a.key}` })) };
   }
+  if (types.has('ucaas')) {
+    policies.ucaas = { name: `${prefix}-UCaaS`, settings: areas.UCAAS_APPS.map(a => ({ ...a, value: true, toggleKey: `ucaas:${a.key}` })) };
+  }
 
   // 3. New rule types: names within 31 characters (stable, so re-runs match by name), defaults, on/off and DLP Allow / Block
   for (const type of ['sandbox', 'dlp', 'endpointDlp']) {
@@ -167,7 +171,7 @@ function build(opts, withChoices) {
       if (overrides[s.toggleKey] !== undefined) s.value = !!overrides[s.toggleKey];
       if (disabled[s.toggleKey]) {
         // AI prompt capture: off = don't capture; ATP: off = leave the tenant's current value alone
-        if (type === 'aiPromptCapture') s.value = false; else s.skip = true;
+        if (type === 'aiPromptCapture' || type === 'ucaas') s.value = false; else s.skip = true;
         off.push({ key: s.toggleKey, name: s.label, type });
       }
     }
