@@ -11,8 +11,8 @@
 const express = require('express');
 const path = require('path');
 const fs = require('fs');
-const cors = require('cors');
-const { v4: uuidv4 } = require('uuid');
+const { randomUUID: uuidv4 } = require('crypto'); // built-in (no uuid package)
+const { LOG_DIR } = require('./paths');
 const { ZIAClient, ZIA_CLOUDS } = require('./zia-client');
 const { ZCCClient } = require('./zcc-client');
 const { generateFullTemplate, COMPLIANCE_FRAMEWORKS, getActionCatalog } = require('./templates');
@@ -50,7 +50,7 @@ setInterval(() => {
   if (cleaned > 0) console.log(`[SESSION] Cleaned ${cleaned} expired sessions. Active: ${sessions.size}`);
 }, 5 * 60 * 1000);
 
-app.use(cors());
+// No CORS middleware: the UI is served by this same server (same origin).
 app.use(express.json({ limit: '10mb' }));
 
 // ========================
@@ -58,7 +58,7 @@ app.use(express.json({ limit: '10mb' }));
 // ========================
 // This logs EVERY incoming request to the Node.js console (stdout)
 // and to a dedicated HTTP log file in ./logs/
-const HTTP_LOG_DIR = path.join(__dirname, '..', 'logs');
+const HTTP_LOG_DIR = LOG_DIR;
 if (!fs.existsSync(HTTP_LOG_DIR)) fs.mkdirSync(HTTP_LOG_DIR, { recursive: true });
 
 app.use((req, res, next) => {
@@ -93,7 +93,17 @@ app.use((err, req, res, next) => {
   next(err);
 });
 
-app.use(express.static(path.join(__dirname, '..', 'public')));
+// Standalone builds embed the compiled UI (global.__ZTP_EMBEDDED_HTML__); the server
+// build serves public/ from disk as before.
+const EMBEDDED_HTML = global.__ZTP_EMBEDDED_HTML__ || null;
+const sendIndex = (res) => EMBEDDED_HTML
+  ? res.type('html').set('Cache-Control', 'no-store').send(EMBEDDED_HTML)
+  : res.sendFile(path.join(__dirname, '..', 'public', 'index.html'));
+if (EMBEDDED_HTML) {
+  app.get(['/', '/index.html'], (req, res) => sendIndex(res));
+} else {
+  app.use(express.static(path.join(__dirname, '..', 'public')));
+}
 
 // ========================
 // Version endpoint (no auth required)
@@ -2861,7 +2871,7 @@ app.use((err, req, res, next) => {
 
   // Also write to error log file
   const dateStr = timestamp.split('T')[0];
-  const logFile = path.join(__dirname, '..', 'logs', `ztp-errors-${dateStr}.log`);
+  const logFile = path.join(LOG_DIR, `ztp-errors-${dateStr}.log`);
   try {
     fs.appendFileSync(logFile, errMsg + '\n');
   } catch (e) { /* ignore */ }
@@ -2873,15 +2883,14 @@ app.use((err, req, res, next) => {
 // SPA Fallback
 // ========================
 
-app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, '..', 'public', 'index.html'));
-});
+app.get('*', (req, res) => sendIndex(res));
 
 // ========================
 // Start Server
 // ========================
 
 const server = app.listen(PORT, HOST, () => {
+  if (typeof global.__ZTP_ON_LISTEN__ === 'function') return global.__ZTP_ON_LISTEN__({ host: HOST, port: PORT, version: APP_VERSION, logDir: LOG_DIR });
   console.log(`
 ╔══════════════════════════════════════════════════════════╗
 ║       ZTP Policy Wizard v${APP_VERSION} - Zscaler Template       ║
@@ -2917,13 +2926,13 @@ server.on('error', (err) => {
 // Log uncaught exceptions so the process doesn't die silently
 process.on('uncaughtException', (err) => {
   console.error(`[UNCAUGHT EXCEPTION] ${err.stack || err.message}`);
-  const logFile = path.join(__dirname, '..', 'logs', `ztp-errors-${new Date().toISOString().split('T')[0]}.log`);
+  const logFile = path.join(LOG_DIR, `ztp-errors-${new Date().toISOString().split('T')[0]}.log`);
   try { fs.appendFileSync(logFile, `[UNCAUGHT] ${err.stack || err.message}\n`); } catch(e) {}
 });
 
 process.on('unhandledRejection', (reason) => {
   console.error(`[UNHANDLED REJECTION] ${reason}`);
-  const logFile = path.join(__dirname, '..', 'logs', `ztp-errors-${new Date().toISOString().split('T')[0]}.log`);
+  const logFile = path.join(LOG_DIR, `ztp-errors-${new Date().toISOString().split('T')[0]}.log`);
   try { fs.appendFileSync(logFile, `[UNHANDLED_REJECTION] ${reason}\n`); } catch(e) {}
 });
 

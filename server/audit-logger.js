@@ -5,9 +5,9 @@
 
 const fs = require('fs');
 const path = require('path');
-const { v4: uuidv4 } = require('uuid');
+const { randomUUID: uuidv4 } = require('crypto'); // built-in (no uuid package)
 
-const LOG_DIR = path.join(__dirname, '..', 'logs');
+const { LOG_DIR } = require('./paths');
 
 class AuditLogger {
   constructor() {
