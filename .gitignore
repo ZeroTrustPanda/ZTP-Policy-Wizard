@@ -22,3 +22,4 @@ credentials*.txt
 livetest-*.json
 livecheck*.json
 *.har
+logs/snapshots/
