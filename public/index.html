@@ -3178,7 +3178,7 @@
       const plat = ZCC_PLATFORMS.find(p => p.id === platform);
       useEffect(() => {
         api.call('GET', '/v2/meta').then(setV2meta).catch(() => {});
-        api.call('GET', '/v2/zcc/bypass-apps').then(apps => { setBypassApps(apps); setBypassChecked(new Set(apps.map(a => a.id))); })
+        api.call('GET', '/v2/zcc/bypass-apps').then(apps => { setBypassChecked(new Set(apps.map(a => a.id))); setBypassApps(apps); })
           .catch(e => setBypassApps({ error: e.message }));
       }, []);
       // Defaults shown for each list = what the chosen template produces (ZCC-07); reloaded when the template changes
@@ -3328,7 +3328,7 @@
                 <div data-bypass>
                   <h4 style={{fontSize:'13px', margin:'0.25rem 0 0.5rem'}}>Predefined IP App Bypasses</h4>
                   <div className="alert alert-warning"><span>⚠ {(v2meta && v2meta.copy.zcc.bypassWarning) || 'Enabling this bypasses all Zscaler security features for these applications.'}</span></div>
-                  {!bypassApps ? <div className="form-hint"><span className="spinner"></span> Reading the predefined apps from your tenant…</div>
+                  {!bypassApps || (!bypassApps.error && !bypassChecked) ? <div className="form-hint"><span className="spinner"></span> Reading the predefined apps from your tenant…</div>
                     : bypassApps.error ? <div className="alert alert-danger"><span>Could not read predefined apps: {bypassApps.error}</span></div>
                     : (
                       <div>
