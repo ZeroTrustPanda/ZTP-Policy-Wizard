@@ -1,0 +1,224 @@
+{
+  "id": "HIPAA",
+  "type": "compliance",
+  "name": "HIPAA",
+  "fullName": "Health Insurance Portability and Accountability Act \u2014 Security Rule",
+  "description": "Technical and administrative safeguards for electronic protected health information (ePHI).",
+  "version": "2026.10.1",
+  "researchedAt": "2026-10-16",
+  "baseTier": "BALANCED",
+  "complianceKey": "HIPAA",
+  "sources": [
+    {
+      "id": "hipaa-312",
+      "title": "45 CFR 164.312 Technical safeguards (eCFR)",
+      "url": "https://www.ecfr.gov/current/title-45/subtitle-A/subchapter-C/part-164/subpart-C/section-164.312"
+    },
+    {
+      "id": "hipaa-308",
+      "title": "45 CFR 164.308 Administrative safeguards (eCFR)",
+      "url": "https://www.ecfr.gov/current/title-45/subtitle-A/subchapter-C/part-164/subpart-C/section-164.308"
+    },
+    {
+      "id": "hipaa-310",
+      "title": "45 CFR 164.310 Physical safeguards \u2014 device and media controls (eCFR)",
+      "url": "https://www.ecfr.gov/current/title-45/subtitle-A/subchapter-C/part-164/subpart-C/section-164.310"
+    },
+    {
+      "id": "icd10",
+      "title": "CDC/NCHS ICD-10-CM Official Guidelines for Coding and Reporting FY2026",
+      "url": "https://ftp.cdc.gov/pub/health_statistics/nchs/publications/ICD10CM/2026/ICD-10-CM-October-2025-Guidelines.pdf"
+    },
+    {
+      "id": "mbi",
+      "title": "CMS: Understanding the Medicare Beneficiary Identifier (MBI) format",
+      "url": "https://www.hhs.gov/guidance/sites/default/files/hhs-guidance-documents/Understanding-the-MBI-052918.pdf"
+    },
+    {
+      "id": "zs-sandbox",
+      "title": "Zscaler: Recommended Sandbox Policy",
+      "url": "https://help.zscaler.com/zia/recommended-sandbox-policy"
+    },
+    {
+      "id": "zs-edlp",
+      "title": "Zscaler: Configuring Endpoint DLP Policy Rules",
+      "url": "https://help.zscaler.com/zia/configuring-endpoint-dlp-policy-rules"
+    },
+    {
+      "id": "zs-api-adv-url",
+      "title": "Zscaler SDK (Go): URL & Cloud App advanced settings incl. GenAI prompt capture flags",
+      "url": "https://github.com/zscaler/zscaler-sdk-go/blob/master/zscaler/zia/services/urlfilteringpolicies/urlfilteringpolicies.go"
+    },
+    {
+      "id": "cis",
+      "title": "CIS Critical Security Controls v8.1 (Safeguards 9.2 DNS filtering, 9.3 URL filters, 9.6 block unnecessary file types, 10.1 anti-malware, 3.13 DLP)",
+      "url": "https://myctrl.tools/frameworks/cis-controls-v8"
+    }
+  ],
+  "controls": [
+    {
+      "id": "164.308(a)(1)(ii)(D)",
+      "name": "Information system activity review",
+      "source": "hipaa-308"
+    },
+    {
+      "id": "164.308(a)(5)(ii)(B)",
+      "name": "Protection from malicious software",
+      "source": "hipaa-308"
+    },
+    {
+      "id": "164.310(d)(1)",
+      "name": "Device and media controls",
+      "source": "hipaa-310"
+    },
+    {
+      "id": "164.312(a)(1)",
+      "name": "Access control",
+      "source": "hipaa-312"
+    },
+    {
+      "id": "164.312(b)",
+      "name": "Audit controls",
+      "source": "hipaa-312"
+    },
+    {
+      "id": "164.312(c)(1)",
+      "name": "Integrity",
+      "source": "hipaa-312"
+    },
+    {
+      "id": "164.312(e)(1)",
+      "name": "Transmission security",
+      "source": "hipaa-312"
+    }
+  ],
+  "areas": {
+    "urlFiltering": {
+      "controls": [
+        "164.308(a)(5)(ii)(B)",
+        "164.312(a)(1)"
+      ],
+      "rationale": "Block malicious, phishing and high-risk categories; restrict web destinations that expose ePHI to unauthorized parties."
+    },
+    "cloudAppControl": {
+      "controls": [
+        "164.312(a)(1)",
+        "164.312(e)(1)"
+      ],
+      "rationale": "Control file-sharing, webmail and AI apps where ePHI can leave the organization."
+    },
+    "fileTypeControl": {
+      "controls": [
+        "164.308(a)(5)(ii)(B)"
+      ],
+      "rationale": "Block executable and script downloads from untrusted sources."
+    },
+    "advancedThreatProtection": {
+      "controls": [
+        "164.308(a)(5)(ii)(B)",
+        "164.312(c)(1)"
+      ],
+      "rationale": "Botnet, phishing, malicious content and cryptomining protections guard ePHI integrity."
+    },
+    "firewallFiltering": {
+      "controls": [
+        "164.312(a)(1)",
+        "164.312(e)(1)"
+      ],
+      "rationale": "Restrict outbound protocols and tunnels that bypass inspection."
+    },
+    "dnsSecurity": {
+      "controls": [
+        "164.308(a)(5)(ii)(B)"
+      ],
+      "rationale": "Block DNS resolution of malicious and newly registered domains; stop DNS tunneling."
+    },
+    "sslInspection": {
+      "controls": [
+        "164.312(e)(1)",
+        "164.312(b)"
+      ],
+      "rationale": "Inspect encrypted traffic so malware and ePHI exfiltration controls work; exempt health and finance sites for privacy."
+    },
+    "dlpMonitor": {
+      "controls": [
+        "164.312(b)",
+        "164.308(a)(1)(ii)(D)"
+      ],
+      "rationale": "Monitor-only DLP gives visibility into ePHI in motion without disrupting care workflows."
+    },
+    "dlpBlock": {
+      "controls": [
+        "164.312(e)(1)",
+        "164.312(a)(1)"
+      ],
+      "rationale": "Block ePHI identifiers (SSN, MBI, MRN, ICD-10 with diagnosis context, NPI) leaving to unsanctioned destinations."
+    },
+    "endpointDlp": {
+      "controls": [
+        "164.312(a)(1)",
+        "164.310(d)(1)"
+      ],
+      "rationale": "Monitor ePHI copied to USB storage, personal cloud sync and printers (device and media controls)."
+    },
+    "sandbox": {
+      "controls": [
+        "164.308(a)(5)(ii)(B)"
+      ],
+      "rationale": "Detonate unknown files before delivery; quarantine high-risk types."
+    },
+    "aiPromptCapture": {
+      "controls": [
+        "164.312(b)"
+      ],
+      "rationale": "Record GenAI prompts so PHI shared with AI tools is auditable."
+    }
+  },
+  "dlp": {
+    "monitorEngines": [
+      "HIPAA",
+      "PCI"
+    ],
+    "blockRules": [
+      {
+        "key": "PHI-Identifiers",
+        "label": "PHI-Identifiers",
+        "dictionaries": [
+          "predefined:SSN",
+          "custom:MBI",
+          "custom:MRN"
+        ],
+        "controls": [
+          "164.312(e)(1)"
+        ]
+      },
+      {
+        "key": "PHI-Clinical",
+        "label": "PHI-Clinical",
+        "dictionaries": [
+          "predefined:MEDICAL",
+          "custom:ICD10",
+          "predefined:NPI_LEAKAGE"
+        ],
+        "controls": [
+          "164.312(e)(1)"
+        ]
+      },
+      {
+        "key": "Payment-Cards",
+        "label": "Payment-Cards",
+        "dictionaries": [
+          "predefined:CREDIT_CARD"
+        ],
+        "controls": [
+          "164.312(e)(1)"
+        ]
+      }
+    ],
+    "endpointChannels": [
+      "REMOVABLE_DRIVE_TRANSFER",
+      "PERSONAL_CLOUD_STORAGE",
+      "PRINTING"
+    ]
+  }
+}

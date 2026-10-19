@@ -204,8 +204,27 @@ const PROFILE_BODIES = {
  * Build the full portal-shaped create body for an app profile.
  * platform: 'windows' | 'macos'. Returns { body, applied } where applied = template settings used.
  */
+// ZCC-06..09 (v2.0): per-profile lists. key -> [policyExtension field (comma string), flat field (array)]
+const PROFILE_LISTS = {
+  vpnGateways: 'vpnGateways',
+  ipInclusions: 'packetTunnelIncludeList',
+  ipExclusions: 'packetTunnelExcludeList',
+  dnsInclusions: 'packetTunnelDnsIncludeList',
+  dnsExclusions: 'packetTunnelDnsExcludeList'
+};
+/** Current values of the five lists in a portal-shaped body or a stored profile (null when none). */
+function readProfileLists(b) {
+  const out = {};
+  for (const [k, f] of Object.entries(PROFILE_LISTS)) {
+    const v = b?.policyExtension?.[f] ?? b?.[f];
+    const arr = Array.isArray(v) ? v : String(v || '').split(',');
+    out[k] = arr.map(x => String(x).trim()).filter(Boolean);
+  }
+  return out;
+}
+
 function buildAppProfileBody({ platform = 'windows', name, description = '', ruleOrder, forwardingProfileId = 0, active = false,
-  templateId = 'PORTAL_DEFAULT', enabledSettings = null }) {
+  templateId = 'PORTAL_DEFAULT', enabledSettings = null, bypassAppIds = null, lists = null, id = null }) {
   const plat = getPlatform(platform);
   if (!name || !String(name).trim()) throw new Error('Profile name is required');
   if (!Number.isInteger(ruleOrder) || ruleOrder < 1) throw new Error('ruleOrder must be a positive integer');
@@ -223,7 +242,16 @@ function buildAppProfileBody({ platform = 'windows', name, description = '', rul
   const tpl = getTemplate(plat.id, templateId);
   if (tpl.baseApply) tpl.baseApply(body);
   const applied = selectedSettings(plat.id, templateId, enabledSettings);
+  if (Array.isArray(bypassAppIds)) body.__bypassIds = bypassAppIds.map(Number).filter(n => Number.isFinite(n));
   for (const s of applied) s.apply(body);
+  delete body.__bypassIds;
+  // Lists entered on the wizard replace the template values (null = keep)
+  if (lists) for (const [k, f] of Object.entries(PROFILE_LISTS)) {
+    if (!Array.isArray(lists[k])) continue;
+    body.policyExtension[f] = lists[k].join(',');
+    body[f] = lists[k].slice();
+  }
+  if (id !== null && id !== undefined) body.id = id;   // GLB-05: same name → update in place
   return { body, applied };
 }
 
@@ -268,6 +296,8 @@ function generateZCCTemplate(config) {
 }
 
 module.exports = {
+  PROFILE_LISTS,
+  readProfileLists,
   generateForwardingProfileTemplate,
   generateAppProfileTemplate,
   generateZCCTemplate,

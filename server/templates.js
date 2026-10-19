@@ -1720,10 +1720,10 @@ function generateCloudAppControlRules(tier, complianceFramework, prefix = 'ZTP')
     ruleType: 'SOCIAL_NETWORKING',
     actions: tier === 'STRICT' || tier === 'ZTH_EBOOK'
       ? ['BLOCK_SOCIAL_NETWORKING_VIEW', 'BLOCK_SOCIAL_NETWORKING_POST']
-      : ['BLOCK_SOCIAL_NETWORKING_UPLOAD', 'BLOCK_SOCIAL_NETWORKING_CHAT', 'BLOCK_SOCIAL_NETWORKING_POST'],
+      : ['ALLOW_SOCIAL_NETWORKING_VIEW', 'BLOCK_SOCIAL_NETWORKING_POST'],
     description: tier === 'STRICT' || tier === 'ZTH_EBOOK'
       ? 'Block all 81 social networking apps. Add exceptions above for marketing/communications.'
-      : 'Block uploads/chat/posts on 81 social apps. Read-only viewing allowed.',
+      : 'Block posting on 81 social apps. Read-only viewing allowed.',
     tier,
     complianceMapping: mapToCompliance('cac_social', complianceFramework)
   });
@@ -1793,10 +1793,10 @@ function generateCloudAppControlRules(tier, complianceFramework, prefix = 'ZTP')
     ruleType: 'AI_ML',
     actions: tier === 'STRICT' || tier === 'ZTH_EBOOK'
       ? ['DENY_AI_ML_WEB_USE']
-      : ['CAUTION_AI_ML_WEB_USE', 'DENY_AI_ML_UPLOAD'],
+      : ['CAUTION_AI_ML_WEB_USE'],   // category-wide rules take web-use actions only; upload controls need specific apps (live, ZTH)
     description: tier === 'STRICT' || tier === 'ZTH_EBOOK'
       ? 'Block all 144 AI/ML apps (ChatGPT, Claude, Gemini, DALL-E, etc.). Add exceptions above for approved research teams with DLP.'
-      : 'Caution on 144 AI/ML apps, block uploads. Prevents PHI/PII leakage to AI platforms.',
+      : 'Caution page on 144 AI/ML apps. Upload blocking needs specific apps selected; inline DLP covers PHI/PII leakage to AI platforms.',
     tier,
     complianceMapping: mapToCompliance('cac_aiml', complianceFramework)
   });
@@ -1999,18 +1999,24 @@ const NAME_ABBREV = [[/Advanced-Threat-Protection/g, 'ATP'], [/Inspection/g, 'In
   [/Malware/g, 'Mal'], [/Exemptions?/g, 'Exempt'], [/Communication/g, 'Comm'], [/Applications?/g, 'Apps'], [/Recommended/g, 'Rec'],
   [/Unknown/g, 'Unk'], [/Suspicious/g, 'Susp'], [/Newly-Registered/g, 'NRD'], [/Remaining/g, 'Rest'], [/Control/g, 'Ctl'],
   [/Security/g, 'Sec'], [/Category/g, 'Cat'], [/Block/g, 'Blk'], [/Allow/g, 'Alw']];
-function shortRuleName(name) {
-  let n = String(name || '');
-  for (const [re, to] of NAME_ABBREV) { if (n.length <= MAX_RULE_NAME) break; n = n.replace(re, to); }
-  return n.length <= MAX_RULE_NAME ? n : n.substring(0, MAX_RULE_NAME).replace(/[-_ ]+$/, '');
+function shortRuleName(name, prefix = '') {
+  const full = String(name || '');
+  // Abbreviate only the part after "<prefix>-" so every name keeps the global prefix (GLB-02)
+  const head = prefix && full.startsWith(prefix + '-') ? prefix + '-' : '';
+  let n = full.slice(head.length);
+  const room = MAX_RULE_NAME - head.length;
+  for (const [re, to] of NAME_ABBREV) { if (n.length <= room) break; n = n.replace(re, to); }
+  if (n.length > room) n = n.substring(0, room).replace(/[-_ ]+$/, '');
+  return head + n;
 }
 function clampRuleNames(template) {
+  const prefix = (template.metadata && template.metadata.prefix) || '';
   for (const rules of Object.values(template.policies || {})) {
     if (!Array.isArray(rules)) continue;
     const used = new Set();
     for (const r of rules) {
       if (!r || typeof r.name !== 'string') continue;
-      let n = shortRuleName(r.name);
+      let n = shortRuleName(r.name, prefix);
       for (let i = 2; used.has(n); i++) n = n.substring(0, MAX_RULE_NAME - String(i).length - 1).replace(/[-_ ]+$/, '') + '-' + i;
       if (n !== r.name) { r.fullName = r.fullName || r.name; r.name = n; }
       used.add(n);

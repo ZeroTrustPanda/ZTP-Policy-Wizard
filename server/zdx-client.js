@@ -27,6 +27,7 @@
  * (e.g. MICROSOFT_LOGIN) for predefined apps.
  */
 
+const redactBody = (s) => String(s).replace(/("[^"]*(?:password|secret|provisioningKey|token|apiKey)[^"]*"\s*:\s*)"[^"]*"/gi, '$1"<redacted>"');
 class ZDXClient {
   constructor(ziaClient) {
     this.ziaClient = ziaClient;
@@ -56,7 +57,7 @@ class ZDXClient {
     const payload = body ? JSON.stringify(body) : null;
     const fullPath = `/zdx/v1${path}`;
     console.log(`[ZDX-API] ${method} https://${host}${fullPath}`);
-    if (payload && method !== 'GET') console.log(`[ZDX-API] Request body: ${payload.length > 1500 ? payload.substring(0, 1500) + '...' : payload}`);
+    if (payload && method !== 'GET') console.log(`[ZDX-API] Request body: ${redactBody(payload.length > 1500 ? payload.substring(0, 1500) + '...' : payload)}`);
 
     const response = await this.ziaClient._rawRequest(method, host, fullPath, payload, headers);
     console.log(`[ZDX-API] Response: ${response.statusCode}`);
@@ -64,8 +65,10 @@ class ZDXClient {
     if (response.statusCode === 429) {
       let retryAfter = 2;
       if (response.headers?.['retry-after']) retryAfter = parseInt(response.headers['retry-after']) || 2;
+      const attempt = (arguments[3] || 0) + 1;
+      if (retryAfter > 30 || attempt > 3) throw new Error(`ZDX API rate limit reached (HTTP 429). Wait about ${Math.max(1, Math.ceil(retryAfter / 60))} minute(s) and try again.`);
       await this.ziaClient._sleep(retryAfter * 1000);
-      return this.apiCall(method, path, body);
+      return this.apiCall(method, path, body, attempt);
     }
     if (response.statusCode >= 200 && response.statusCode < 300) return response.body;
 

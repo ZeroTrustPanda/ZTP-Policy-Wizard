@@ -113,7 +113,7 @@ const WINDOWS_BEST_PRACTICE_SETTINGS = [
     description: 'Traffic to the published IP ranges of these apps bypasses the tunnel and goes direct: ' + BYPASS_APPS.map(a => a.name).join(', ') + '.',
     value: BYPASS_APPS.map(a => a.name).join(', '), portalDefault: 'None', impact: 'caution',
     appIds: BYPASS_APPS.map(a => a.id),
-    apply: (b) => { b.appServiceIds = BYPASS_APPS.map(a => a.id); },
+    apply: (b) => { b.appServiceIds = b.__bypassIds ? b.__bypassIds.slice() : BYPASS_APPS.map(a => a.id); },
     verify: (p) => {
       const got = (p.appServiceIds || []).map(String).sort();
       const want = BYPASS_APPS.map(a => String(a.id)).sort();
@@ -245,7 +245,7 @@ const MAC_BEST_PRACTICE_SETTINGS = [
     description: 'Traffic to the published IP ranges of these apps bypasses the tunnel and goes direct: ' + MAC_BYPASS_APPS.map(a => a.name).join(', ') + '.',
     value: MAC_BYPASS_APPS.map(a => a.name).join(', '), portalDefault: 'None', impact: 'caution',
     appIds: MAC_BYPASS_APPS.map(a => a.id),
-    apply: (b) => { b.appServiceIds = MAC_BYPASS_APPS.map(a => a.id); },
+    apply: (b) => { b.appServiceIds = b.__bypassIds ? b.__bypassIds.slice() : MAC_BYPASS_APPS.map(a => a.id); },
     verify: (p) => sameIds(p.appServiceIds, MAC_BYPASS_APPS.map(a => a.id))
   },
   {
@@ -325,6 +325,26 @@ const MAC_BEST_PRACTICE_SETTINGS = [
   }
 ];
 
+// ZCC-05 (v2.0): "Automatically Attempt ZPA Reauthentication" on by default for Windows and macOS.
+// The app profile stops following the global Platform Settings value and turns reauthentication on for every network type.
+const REAUTH_NETWORKS = '{"trusted":1,"vpnTrusted":1,"offTrusted":1,"splitVpnTrusted":1}';
+function reauthSetting(platform) {
+  return {
+    key: 'autoZpaReauth',
+    label: 'Automatically Attempt ZPA Reauthentication',
+    category: 'ZPA',
+    description: 'Client Connector re-authenticates ZPA automatically before the session expires, on trusted, VPN-trusted, off-trusted and split-VPN networks. Set on this profile instead of following the global Platform Settings value.',
+    value: 'On (all networks, 30 min)', portalDefault: 'Follow global setting', impact: 'info',
+    apply: (b) => {
+      b.policyExtension.followGlobalForZpaReauth = '0'; b.followGlobalForZpaReauth = '0';
+      b.policyExtension.zpaAutoReauthTimeout = 30; b.zpaAutoReauthTimeout = [{ label: '30', value: 30 }];
+      // Stored in policyExtension (verified on macOS against a live tenant; the windowsPolicy copy is left as the portal sends it)
+      b.policyExtension.zpaReauthConfig = REAUTH_NETWORKS;
+    },
+    verify: (p) => String(p.policyExtension?.followGlobalForZpaReauth) === '0'
+  };
+}
+
 // ========================
 // Platforms and templates
 // ========================
@@ -340,14 +360,14 @@ const TEMPLATES = {
       description: 'Common Client Connector settings from the Zscaler POV best practice guide: SSL certificate and WFP driver, Microsoft 365 / Teams / Zoom / AVD IP bypass, domain profile detection, notification framework, ZPA re-authentication notice, CLI, applies to all users.',
       source: 'Zscaler POV best practice guide',
       recommendedForwardingProfile: null,
-      settings: WINDOWS_BEST_PRACTICE_SETTINGS
+      settings: [...WINDOWS_BEST_PRACTICE_SETTINGS, reauthSetting('windows')]
     },
     PORTAL_DEFAULT: {
       id: 'PORTAL_DEFAULT', name: 'Portal Default (blank)', icon: '📄',
       description: 'Exactly what the Mobile Admin portal creates when you click Add Windows Policy and save without changes. Use as a clean starting point.',
       source: 'Mobile Admin portal defaults (captured 2026-10-09)',
       recommendedForwardingProfile: null,
-      settings: []
+      settings: [reauthSetting('windows')]
     }
   },
   macos: {
@@ -358,14 +378,14 @@ const TEMPLATES = {
       recommendedForwardingProfile: null,
       // Same values as the portal default, but MAC stores them as strings; keeps the clone byte-identical.
       baseApply: (b) => { b.policyExtension.deleteDHCPOption121Routes = '{"trusted":"1","offTrusted":"1","vpnTrusted":"1","splitVpnTrusted":"1"}'; },
-      settings: MAC_BEST_PRACTICE_SETTINGS
+      settings: [...MAC_BEST_PRACTICE_SETTINGS, reauthSetting('macos')]
     },
     PORTAL_DEFAULT: {
       id: 'PORTAL_DEFAULT', name: 'Portal Default (blank)', icon: '📄',
       description: 'Exactly what the Mobile Admin portal creates when you click Add macOS Policy and save without changes. Use as a clean starting point.',
       source: 'Mobile Admin portal defaults (captured 2026-10-09)',
       recommendedForwardingProfile: null,
-      settings: []
+      settings: [reauthSetting('macos')]
     }
   }
 };
@@ -396,12 +416,15 @@ function getTemplate(platform, templateId) {
 /** Settings from the template that the user left enabled. */
 function selectedSettings(platform, templateId, enabledKeys) {
   const t = getTemplate(platform, templateId);
-  if (!Array.isArray(enabledKeys)) return t.settings; // default: everything in the template
+  // copies: callers set per-request values (e.g. the picked bypass app IDs) and must not change the shared template
+  if (!Array.isArray(enabledKeys)) return t.settings.map(s => ({ ...s })); // default: everything in the template
   const set = new Set(enabledKeys);
-  return t.settings.filter(s => set.has(s.key));
+  return t.settings.filter(s => set.has(s.key)).map(s => ({ ...s }));
 }
 
 module.exports = {
+  REAUTH_NETWORKS,
+  reauthSetting,
   PLATFORMS,
   TEMPLATES,
   BYPASS_APPS,

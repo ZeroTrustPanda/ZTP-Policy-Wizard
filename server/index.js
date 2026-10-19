@@ -18,14 +18,16 @@ const { ZCCClient } = require('./zcc-client');
 const { generateFullTemplate, COMPLIANCE_FRAMEWORKS, getActionCatalog } = require('./templates');
 const { resolveForTenant } = require('./tenant-resolve');
 const { buildFrameworkFile, readFrameworkFile, captureFromTenant } = require('./framework-io');
-const { generateZCCTemplate, buildAppProfileBody } = require('./zcc-templates');
+const { generateZCCTemplate, buildAppProfileBody, readProfileLists, PROFILE_LISTS } = require('./zcc-templates');
+const { validateProfileLists } = require('./v2/validate');
 const { getTemplateCatalog, getTemplate, getPlatform, BYPASS_APPS } = require('./zcc-app-profile-templates');
 const { getFwdTemplateCatalog, getFwdTemplate, buildForwardingProfileBody } = require('./zcc-fwd-profile-templates');
 const { registerZdxRoutes, ZDXClient } = require('./zdx-routes');
+const { registerV2Routes } = require('./v2/routes');
 const { AuditLogger } = require('./audit-logger');
 
 const app = express();
-const APP_VERSION = '1.9.0';
+const APP_VERSION = '2.0.0';
 const PORT = process.env.ZTP_PORT || 3000;
 const HOST = process.env.ZTP_HOST || '0.0.0.0';
 const SESSION_TTL_MS = 60 * 60 * 1000;   // 1 hour
@@ -137,6 +139,9 @@ function requireAuth(req, res, next) {
   req.session = session;
   next();
 }
+
+// Policy Wizard 2.0 routes (scope, baseline frameworks, idempotent ZIA engine, ZPA, bulk managers, report)
+registerV2Routes(app, requireAuth);
 
 // ========================
 // Authentication Routes
@@ -1348,6 +1353,8 @@ app.post('/api/apply', requireAuth, async (req, res) => {
             type: ruleType,
             actions: rule.actions || []
           };
+          // ZIA only accepts a Caution action when the rule names the browsers it applies to
+          if (apiRule.actions.some(a => /^CAUTION_/.test(a))) apiRule.userAgentTypes = rule.userAgentTypes && rule.userAgentTypes.length ? rule.userAgentTypes : ['OPERA', 'FIREFOX', 'MSIE', 'MSEDGE', 'CHROME', 'SAFARI', 'MSCHREDGE'];
 
           const result = await client.createCloudAppControlRule(ruleType, apiRule);
           results.applied.push({ type: 'CREATE', category: 'Cloud App Control', name: rule.name, id: result?.id });
@@ -2263,21 +2270,24 @@ app.get('/api/zcc/fwd-templates', requireAuth, (req, res) => {
  * Plan a new forwarding profile (read-only). Check names are prefixed so they read clearly
  * when merged into the app profile dry run.
  */
-async function planForwardingProfile(zccClient, input, prefix = '') {
+async function planForwardingProfile(zccClient, input, prefix = '', ownPrefix = null) {
   const { name = '', templateId = 'BEST_PRACTICE', enabledSettings = null } = input || {};
   const checks = [];
   const trimmed = String(name).trim();
   const nameOk = /^[\w .()\-]{1,128}$/.test(trimmed);
   checks.push({ name: `${prefix}Name is valid`, status: nameOk ? 'pass' : 'fail',
     detail: nameOk ? trimmed : 'Use letters, numbers, spaces, - _ . ( ) only (max 128).' });
-  let existing = [];
+  let existing = [], dup = null;
   try {
     existing = zccList(await zccClient.getForwardingProfiles());
-    const dup = existing.find(p => String(p.name).toLowerCase() === trimmed.toLowerCase());
-    checks.push({ name: `${prefix}Name is not already used`, status: dup ? 'fail' : 'pass',
-      detail: dup ? `"${dup.name}" already exists (ID ${dup.id})` : `${existing.length} existing forwarding profiles checked` });
+    dup = existing.find(p => String(p.name).toLowerCase() === trimmed.toLowerCase()) || null;
+    // v2.0: only objects named with the global prefix are ever updated; Default and customer profiles are never touched
+    const foreign = dup && (String(dup.id) === '0' || /^default$/i.test(dup.name) || (ownPrefix && !String(dup.name).startsWith(ownPrefix + '-')));
+    checks.push({ name: `${prefix}Existing profile with this name`, status: foreign ? 'fail' : 'pass',
+      detail: foreign ? `"${dup.name}" already exists and was not created by this wizard (it doesn't start with "${ownPrefix || ''}-"). Choose another name.`
+        : dup ? `"${dup.name}" (ID ${dup.id}) exists — it will be updated` : `None (${existing.length} forwarding profiles checked) — it will be created` });
   } catch (e) {
-    checks.push({ name: `${prefix}Name is not already used`, status: 'warn', detail: `Could not list forwarding profiles: ${e.message}` });
+    checks.push({ name: `${prefix}Existing profile with this name`, status: 'warn', detail: `Could not list forwarding profiles: ${e.message}` });
   }
   let template = null, applied = [], body = null;
   try {
@@ -2288,11 +2298,18 @@ async function planForwardingProfile(zccClient, input, prefix = '') {
   } catch (e) {
     checks.push({ name: `${prefix}Template`, status: 'fail', detail: e.message });
   }
+  // v2.0: same name → Update (or No change when every chosen setting already matches)
+  let action = 'CREATE';
+  if (dup && body) {
+    action = 'UPDATE';
+    body.id = String(dup.id);
+    try { if (applied.length && applied.every(st => st.verify(dup))) action = 'NO_CHANGE'; } catch (e) { /* update */ }
+  }
   const warnings = [];
   if (applied.some(s => s.key === 'dropIpv6')) warnings.push('Forwarding profile drops IPv6 traffic, including on IPv6-only networks. Devices on IPv6-only networks lose access to IPv6-only destinations.');
   const ok = !checks.some(c => c.status === 'fail');
   return {
-    ok, checks, warnings, name: trimmed,
+    ok, checks, warnings, name: trimmed, action, existingId: dup ? dup.id : null,
     template: template ? { id: template.id, name: template.name } : null,
     settings: applied.map(({ apply, verify, ...meta }) => meta),
     existing: existing.map(p => ({ id: p.id, name: p.name })),
@@ -2302,9 +2319,18 @@ async function planForwardingProfile(zccClient, input, prefix = '') {
 
 /** Create a forwarding profile from a plan, find it in the list and verify every applied setting. */
 async function createAndVerifyForwardingProfile(zccClient, fplan) {
-  console.log(`[ZCC] Creating forwarding profile "${fplan.body.name}" from ${fplan.template.id} (${fplan.settings.length} settings)`);
-  const result = await zccClient.createForwardingProfile(fplan.body);
-  const id = result?.id;
+  let id;
+  if (fplan.action === 'NO_CHANGE') id = fplan.existingId;
+  else if (fplan.action === 'UPDATE') {
+    console.log(`[ZCC] Updating forwarding profile "${fplan.body.name}" (ID ${fplan.existingId})`);
+    const current = await zccClient.getForwardingProfile(fplan.existingId).catch(() => null);
+    await zccClient.editForwardingProfile({ ...(current || {}), ...fplan.body, id: String(fplan.existingId) });
+    id = fplan.existingId;
+  } else {
+    console.log(`[ZCC] Creating forwarding profile "${fplan.body.name}" from ${fplan.template.id} (${fplan.settings.length} settings)`);
+    const result = await zccClient.createForwardingProfile(fplan.body);
+    id = result?.id;
+  }
   if (!id) throw new Error('ZCC did not return an ID for the new forwarding profile');
   let verification = [];
   try {
@@ -2314,17 +2340,17 @@ async function createAndVerifyForwardingProfile(zccClient, fplan) {
   } catch (e) {
     verification = [{ key: 'readback', label: 'Read back from ZCC', expected: '', ok: false, error: e.message }];
   }
-  return { id: Number(id), name: fplan.body.name, template: fplan.template, verified: verification.every(v => v.ok), verification };
+  return { id: Number(id), name: fplan.body.name, template: fplan.template, action: fplan.action || 'CREATE', verified: verification.every(v => v.ok), verification };
 }
 
 app.post('/api/zcc/forwarding-profiles/dryrun', requireAuth, async (req, res) => {
   const { zccClient, logger } = req.session;
   if (!zccClient) return res.status(400).json({ error: 'ZCC client not initialized' });
   try {
-    const plan = await planForwardingProfile(zccClient, req.body);
+    const plan = await planForwardingProfile(zccClient, req.body, '', req.session.v2 && req.session.v2.prefix);
     logger.log('ZCC_DRY_RUN', { category: 'Forwarding Profile', name: plan.name, template: plan.template?.id, ok: plan.ok, settings: plan.settings.map(s => s.key) });
     const { body, _applied, ...rest } = plan;
-    res.json(rest);
+    res.json({ ...rest, planId: plan.ok ? app.locals.rememberPlan(req.session, 'zcc-fwd', req.body || {}) : null });
   } catch (e) { res.status(502).json({ error: e.message }); }
 });
 
@@ -2332,7 +2358,10 @@ app.post('/api/zcc/forwarding-profiles', requireAuth, async (req, res) => {
   const { zccClient, logger } = req.session;
   if (!zccClient) return res.status(400).json({ error: 'ZCC client not initialized' });
   try {
-    const plan = await planForwardingProfile(zccClient, req.body);
+    const { planId, ...fwdInput } = req.body || {};
+    const notReviewed = app.locals.checkPlan(req.session, 'zcc-fwd', fwdInput, planId);
+    if (notReviewed) return res.status(409).json({ error: notReviewed });
+    const plan = await planForwardingProfile(zccClient, fwdInput, '', req.session.v2 && req.session.v2.prefix);
     if (!plan.ok) return res.status(409).json({ error: 'Pre-flight checks failed: ' + plan.checks.filter(c => c.status === 'fail').map(c => `${c.name}: ${c.detail}`).join('; '), checks: plan.checks });
     const fwd = await createAndVerifyForwardingProfile(zccClient, plan);
     logger.log('ZCC_APPLY', { category: 'Forwarding Profile', action: 'CREATE', name: fwd.name, id: fwd.id, template: plan.template.id, settings: plan.settings.map(s => s.key), verified: fwd.verified });
@@ -2377,9 +2406,10 @@ app.delete('/api/zcc/forwarding-profiles/:id', requireAuth, async (req, res) => 
  * v1.7.0: input.newForwardingProfile = { name, templateId, enabledSettings } plans a new
  * forwarding profile that is created FIRST and linked to the app profile.
  */
-async function planAppProfile(zccClient, platform, input) {
+async function planAppProfile(zccClient, platform, input, ownPrefix = null) {
   const plat = getPlatform(platform);
-  const { name = '', description = '', forwardingProfileId = 0, active = false, templateId = 'BEST_PRACTICE', enabledSettings = null, newForwardingProfile = null } = input || {};
+  const { name = '', description = '', forwardingProfileId = 0, active = false, templateId = 'BEST_PRACTICE', enabledSettings = null, newForwardingProfile = null,
+    bypassAppIds = null, lists = null } = input || {};
   const checks = [];
   const warnings = [];
   const trimmed = String(name).trim();
@@ -2392,11 +2422,17 @@ async function planAppProfile(zccClient, platform, input) {
   // 2. Existing profiles: uniqueness + placement
   const existing = zccList(await zccClient.getAppProfiles(plat.deviceType));
   const dup = existing.find(p => String(p.name).toLowerCase() === trimmed.toLowerCase());
-  checks.push({ name: 'Name is not already used', status: dup ? 'fail' : 'pass',
-    detail: dup ? `"${dup.name}" already exists (ID ${dup.id})` : `${existing.length} existing ${plat.label} profiles checked` });
-  const nonDefault = existing.filter(p => String(p.id) !== '0' && p.name !== 'Default')
+  const foreign = dup && (String(dup.id) === '0' || /^default$/i.test(dup.name) || (ownPrefix && !String(dup.name).startsWith(ownPrefix + '-')));
+  checks.push({ name: 'Existing profile with this name', status: foreign ? 'fail' : 'pass',
+    detail: foreign ? `"${dup.name}" already exists and was not created by this wizard (it doesn't start with "${ownPrefix || ''}-"). Choose another name.`
+      : dup ? `"${dup.name}" (ID ${dup.id}) exists — it will be updated in place (rule order ${dup.ruleOrder} kept)` : `None (${existing.length} ${plat.label} profiles checked) — it will be created` });
+  const nonDefault = existing.filter(p => String(p.id) !== '0' && p.name !== 'Default' && (!dup || String(p.id) !== String(dup.id)))
     .sort((x, y) => (x.ruleOrder || 0) - (y.ruleOrder || 0));
-  const ruleOrder = nonDefault.length + 1;
+  const ruleOrder = dup ? (Number(dup.ruleOrder) || nonDefault.length + 1) : nonDefault.length + 1;
+
+  // v2.0 list inputs (ZCC-06..09) and bypass app choice (ZCC-03)
+  const listErrors = validateProfileLists(lists);
+  checks.push({ name: 'Bypass and inclusion lists', status: listErrors.length ? 'fail' : 'pass', detail: listErrors.length ? listErrors.join(' ') : 'All entries valid' });
   const placement = [
     ...nonDefault.map(p => ({ ruleOrder: p.ruleOrder, name: p.name, active: !!Number(p.active), isNew: false })),
     { ruleOrder, name: trimmed || '(new profile)', active: !!active, isNew: true },
@@ -2408,7 +2444,7 @@ async function planAppProfile(zccClient, platform, input) {
   let fwdName = 'Default';
   let fwdPlan = null;
   if (newForwardingProfile) {
-    fwdPlan = await planForwardingProfile(zccClient, newForwardingProfile, 'Forwarding profile — ');
+    fwdPlan = await planForwardingProfile(zccClient, newForwardingProfile, 'Forwarding profile — ', ownPrefix);
     fwdName = fwdPlan.name;
     checks.unshift(...fwdPlan.checks.map(c => ({ ...c, group: 'forwarding' })));
     warnings.push(...fwdPlan.warnings);
@@ -2430,7 +2466,8 @@ async function planAppProfile(zccClient, platform, input) {
   let template, applied = [], body = null;
   try {
     template = getTemplate(plat.id, templateId);
-    const built = buildAppProfileBody({ platform: plat.id, name: trimmed || 'placeholder', description, ruleOrder, forwardingProfileId, active: !!active, templateId, enabledSettings });
+    const built = buildAppProfileBody({ platform: plat.id, name: trimmed || 'placeholder', description, ruleOrder, forwardingProfileId, active: !!active, templateId, enabledSettings,
+      bypassAppIds: Array.isArray(bypassAppIds) ? bypassAppIds : null, lists, id: dup ? dup.id : null });
     body = built.body; applied = built.applied;
     checks.push({ name: 'Template', status: 'pass', detail: `${template.name}: ${applied.length} of ${template.settings.length} settings selected` });
   } catch (e) {
@@ -2439,7 +2476,8 @@ async function planAppProfile(zccClient, platform, input) {
 
   // 5. App bypass IDs exist in this tenant (best effort)
   const bypass = applied.find(s => Array.isArray(s.appIds) && s.appIds.length);
-  if (bypass) {
+  if (bypass && Array.isArray(bypassAppIds)) bypass.appIds = bypassAppIds.map(Number);
+  if (bypass && bypass.appIds.length) {
     try {
       const svc = zccList(await zccClient.getWebAppServices());
       const have = new Set(svc.map(x => String(x.id)));
@@ -2471,9 +2509,29 @@ async function planAppProfile(zccClient, platform, input) {
     checks.push({ name: 'Created disabled', status: 'pass', detail: 'No device is affected until you enable it' });
   }
 
+  // v2.0: Create / Update / No change (GLB-03/05), with the reasons for an update
+  let action = dup ? 'UPDATE' : 'CREATE';
+  let changeReasons = [];
+  if (dup && body) {
+    try {
+      const stored = await zccClient.getApplicationProfile(dup.id);
+      const ids = (x) => JSON.stringify((x || []).map(String).sort());
+      // the bypass setting is compared against the apps the user picked (not the template default list)
+      const settingMatches = (st) => (st.key === 'appBypass' && Array.isArray(st.appIds)) ? ids(stored.appServiceIds) === ids(st.appIds) : st.verify(stored);
+      for (const st of applied) if (!st.manual && !settingMatches(st)) changeReasons.push(st.label);
+      const listsNow = readProfileLists(stored), listsWant = readProfileLists(body);
+      for (const k of Object.keys(listsWant)) if (JSON.stringify(listsNow[k]) !== JSON.stringify(listsWant[k])) changeReasons.push(`${k}: ${listsNow[k].join(',') || 'none'} → ${listsWant[k].join(',') || 'none'}`);
+      if (ids(stored.appServiceIds) !== ids(body.appServiceIds)) changeReasons.push(`bypass apps: ${ids(stored.appServiceIds)} → ${ids(body.appServiceIds)}`);
+      if (String(Number(stored.active) || 0) !== String(Number(body.active) || 0)) changeReasons.push('enabled state');
+      const storedFwd = String(stored?.onNetPolicy?.id ?? stored?.forwardingProfileId ?? 0);
+      if (fwdPlan) { if (fwdPlan.action !== 'NO_CHANGE' || storedFwd !== String(fwdPlan.existingId)) changeReasons.push('forwarding profile'); }
+      else if (storedFwd !== String(Number(forwardingProfileId) || 0)) changeReasons.push('forwarding profile');
+      if (!changeReasons.length) action = 'NO_CHANGE';
+    } catch (e) { changeReasons = [`could not compare (${e.message})`]; }
+  }
   const ok = !checks.some(c => c.status === 'fail');
   return {
-    ok, checks, warnings, ruleOrder, placement,
+    ok, checks, warnings, ruleOrder, placement, action, changeReasons, existingId: dup ? dup.id : null,
     platform: { id: plat.id, label: plat.label, deviceType: plat.deviceType },
     forwardingProfile: fwdPlan
       ? { id: null, name: fwdName, isNew: true, template: fwdPlan.template, settings: fwdPlan.settings, existing: fwdPlan.existing }
@@ -2490,10 +2548,12 @@ app.post('/api/zcc/app-profiles/:platform/dryrun', requireAuth, async (req, res)
   const { zccClient, logger } = req.session;
   if (!zccClient) return res.status(400).json({ error: 'ZCC client not initialized' });
   try {
-    const plan = await planAppProfile(zccClient, req.params.platform, req.body);
-    logger.log('ZCC_DRY_RUN', { platform: plan.platform.id, name: req.body?.name, template: plan.template?.id, ok: plan.ok, settings: plan.settings.map(s => s.key) });
+    const { planId: _ignored, ...planInput } = req.body || {};
+    const plan = await planAppProfile(zccClient, req.params.platform, planInput, req.session.v2 && req.session.v2.prefix);
+    logger.log('ZCC_DRY_RUN', { platform: plan.platform.id, name: req.body?.name, template: plan.template?.id, ok: plan.ok, action: plan.action, settings: plan.settings.map(s => s.key) });
     const { body, _applied, _fwdPlan, ...rest } = plan;
-    res.json({ ...rest, payloadPreview: body ? { fieldCount: Object.keys(body).length, bytes: JSON.stringify(body).length } : null,
+    const planId = plan.ok ? app.locals.rememberPlan(req.session, `zcc-${req.params.platform}`, planInput) : null;
+    res.json({ ...rest, planId, forwardingAction: _fwdPlan ? _fwdPlan.action : null, payloadPreview: body ? { fieldCount: Object.keys(body).length, bytes: JSON.stringify(body).length } : null,
       fwdPayloadPreview: _fwdPlan?.body ? { fieldCount: Object.keys(_fwdPlan.body).length, bytes: JSON.stringify(_fwdPlan.body).length } : null });
   } catch (error) {
     res.status(502).json({ error: error.message });
@@ -2505,7 +2565,10 @@ app.post('/api/zcc/app-profiles/:platform', requireAuth, async (req, res) => {
   const { zccClient, logger } = req.session;
   if (!zccClient) return res.status(400).json({ error: 'ZCC client not initialized' });
   try {
-    const plan = await planAppProfile(zccClient, req.params.platform, req.body);
+    const { planId, ...planInput } = req.body || {};
+    const notReviewed = app.locals.checkPlan(req.session, `zcc-${req.params.platform}`, planInput, planId);
+    if (notReviewed) return res.status(409).json({ error: notReviewed });
+    const plan = await planAppProfile(zccClient, req.params.platform, planInput, req.session.v2 && req.session.v2.prefix);
     if (!plan.ok) {
       return res.status(409).json({ error: 'Pre-flight checks failed: ' + plan.checks.filter(c => c.status === 'fail').map(c => `${c.name}: ${c.detail}`).join('; '), checks: plan.checks });
     }
@@ -2525,14 +2588,15 @@ app.post('/api/zcc/app-profiles/:platform', requireAuth, async (req, res) => {
     }
 
     // Step 2: the app profile
-    console.log(`[ZCC] Creating ${plan.platform.label} app profile "${plan.body.name}" from ${plan.template.id} (${plan.settings.length} settings, ruleOrder ${plan.ruleOrder}, active ${plan.body.active}, fwd ${plan.body.forwardingProfileId})`);
+    console.log(`[ZCC] ${plan.action} ${plan.platform.label} app profile "${plan.body.name}" from ${plan.template.id} (${plan.settings.length} settings, ruleOrder ${plan.ruleOrder}, active ${plan.body.active}, fwd ${plan.body.forwardingProfileId})`);
     let result;
     try {
-      result = await zccClient.saveAppProfile(plan.body);
+      result = plan.action === 'NO_CHANGE' ? { id: plan.existingId } : await zccClient.saveAppProfile(plan.body);
+      if (plan.action === 'UPDATE') result = { ...(result || {}), id: plan.existingId };
     } catch (e) {
       // Roll back the forwarding profile we just created so a failed run leaves nothing behind
       let rollback = null;
-      if (fwdResult) {
+      if (fwdResult && fwdResult.action === 'CREATE') {
         try { await zccClient.deleteForwardingProfile(fwdResult.id); rollback = `Forwarding profile "${fwdResult.name}" (ID ${fwdResult.id}) was deleted again.`; }
         catch (re) { rollback = `Forwarding profile "${fwdResult.name}" (ID ${fwdResult.id}) was created but could not be removed: ${re.message}`; }
         logger.log('ZCC_APPLY', { category: 'Forwarding Profile', action: 'ROLLBACK', id: fwdResult.id, detail: rollback });
@@ -2548,7 +2612,11 @@ app.post('/api/zcc/app-profiles/:platform', requireAuth, async (req, res) => {
       stored = await zccClient.getApplicationProfile(newId);
       verification = plan._applied.map(s => s.manual
         ? { key: s.key, label: s.label, expected: s.value, ok: true, manual: true }
-        : { key: s.key, label: s.label, expected: s.value, ok: !!s.verify(stored) });
+        : s.key === 'appBypass'
+          ? { key: s.key, label: s.label, expected: (s.appIds || []).join(', '), ok: JSON.stringify((stored.appServiceIds || []).map(String).sort()) === JSON.stringify((s.appIds || []).map(String).sort()) }
+          : { key: s.key, label: s.label, expected: s.value, ok: !!s.verify(stored) });
+      const wantLists = readProfileLists(plan.body), gotLists = readProfileLists(stored);
+      for (const k of Object.keys(wantLists)) verification.push({ key: `list:${k}`, label: k, expected: wantLists[k].join(', ') || 'None', ok: JSON.stringify(wantLists[k]) === JSON.stringify(gotLists[k]) });
       const storedFwd = stored?.onNetPolicy?.id ?? stored?.forwardingProfileId; // ZCC returns the linked forwarding profile as onNetPolicy
       if (storedFwd !== undefined && storedFwd !== null) {
         verification.unshift({ key: 'forwardingProfile', label: 'Linked forwarding profile', expected: `${plan.forwardingProfile.name} (ID ${plan.body.forwardingProfileId})`,
@@ -2559,10 +2627,16 @@ app.post('/api/zcc/app-profiles/:platform', requireAuth, async (req, res) => {
     }
     const verified = verification.every(v => v.ok);
 
-    logger.log('ZCC_APPLY', { category: 'App Profile', action: 'CREATE', platform: plan.platform.id, name: plan.body.name, id: newId, template: plan.template.id,
+    logger.log('ZCC_APPLY', { category: 'App Profile', action: plan.action, platform: plan.platform.id, name: plan.body.name, id: newId, template: plan.template.id,
       settings: plan.settings.map(s => s.key), ruleOrder: plan.ruleOrder, active: plan.body.active, verified });
+    const zccLedger = [];
+    if (fwdResult) zccLedger.push({ product: 'ZCC', category: 'Forwarding Profile', name: fwdResult.name, action: fwdResult.action || 'CREATE', id: fwdResult.id,
+      ...(fwdResult.verified ? {} : { note: 'Some settings did not verify on read-back' }) });
+    zccLedger.push({ product: 'ZCC', category: `${plan.platform.label} App Profile`, name: plan.body.name, action: plan.action, id: newId,
+      ...(verified ? {} : { note: 'Some settings did not verify on read-back: ' + verification.filter(v => !v.ok).map(v => v.label).join(', ') }) });
+    app.locals.recordZccRun(req.session, { ledger: zccLedger, warnings: plan.warnings, manualSteps: plan._applied.filter(s => s.manual).map(s => ({ key: s.key, label: s.label })) });
     res.json({
-      success: true, id: newId, name: plan.body.name, ruleOrder: plan.ruleOrder, active: plan.body.active === '1',
+      success: true, action: plan.action, id: newId, name: plan.body.name, ruleOrder: plan.ruleOrder, active: plan.body.active === '1',
       forwardingProfile: fwdResult ? { ...fwdResult, created: true } : { id: plan.body.forwardingProfileId, name: plan.forwardingProfile.name, created: false },
       template: plan.template, platform: plan.platform, verified, verification,
       manualSteps: plan._applied.filter(s => s.manual).map(s => ({ key: s.key, label: s.label, value: s.value, description: s.description })),
@@ -2571,6 +2645,7 @@ app.post('/api/zcc/app-profiles/:platform', requireAuth, async (req, res) => {
   } catch (error) {
     console.log(`[ZCC] Create app profile failed: ${error.message}`);
     logger.log('ZCC_APPLY', { category: 'App Profile', action: 'CREATE', error: error.message }, 'error');
+    try { app.locals.recordZccRun(req.session, { ledger: [{ product: 'ZCC', category: 'App Profile', name: (req.body && req.body.name) || '', action: 'FAILED', error: error.message }], warnings: [] }); } catch (e) { /* report only */ }
     res.status(502).json({ error: error.message, zccResponse: error.zccResponse || null });
   }
 });

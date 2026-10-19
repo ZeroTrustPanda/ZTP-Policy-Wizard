@@ -1,6 +1,6 @@
 {
   "name": "ztp-policy-wizard",
-  "version": "1.9.0",
+  "version": "2.0.0",
   "description": "Zscaler Template Policy Wizard - ZIA Policy Configuration Tool",
   "main": "server/index.js",
   "scripts": {
@@ -9,7 +9,9 @@
     "build:standalone": "node standalone/build.js"
   },
   "dependencies": {
-    "express": "^4.18.2"
+    "express": "^4.18.2",
+    "cors": "^2.8.5",
+    "uuid": "^9.0.0"
   },
   "engines": {
     "node": ">=18.0.0"

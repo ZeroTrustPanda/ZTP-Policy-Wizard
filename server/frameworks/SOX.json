@@ -1,0 +1,181 @@
+{
+  "id": "SOX",
+  "type": "compliance",
+  "name": "SOX",
+  "fullName": "Sarbanes-Oxley Act",
+  "description": "Internal control over financial reporting for public companies, enforced through IT general controls.",
+  "version": "2026.10.1",
+  "researchedAt": "2026-10-16",
+  "baseTier": "BALANCED",
+  "complianceKey": "SOX",
+  "sources": [
+    {
+      "id": "sox",
+      "title": "Sarbanes-Oxley Act of 2002 \u00a7302 / \u00a7404 (SEC)",
+      "url": "https://www.sec.gov/about/laws/soa2002.pdf"
+    },
+    {
+      "id": "pcaob2201",
+      "title": "PCAOB AS 2201: Audit of Internal Control Over Financial Reporting (ITGCs)",
+      "url": "https://pcaobus.org/oversight/standards/auditing-standards/details/AS2201"
+    },
+    {
+      "id": "zs-sandbox",
+      "title": "Zscaler: Recommended Sandbox Policy",
+      "url": "https://help.zscaler.com/zia/recommended-sandbox-policy"
+    },
+    {
+      "id": "zs-edlp",
+      "title": "Zscaler: Configuring Endpoint DLP Policy Rules",
+      "url": "https://help.zscaler.com/zia/configuring-endpoint-dlp-policy-rules"
+    },
+    {
+      "id": "zs-api-adv-url",
+      "title": "Zscaler SDK (Go): URL & Cloud App advanced settings incl. GenAI prompt capture flags",
+      "url": "https://github.com/zscaler/zscaler-sdk-go/blob/master/zscaler/zia/services/urlfilteringpolicies/urlfilteringpolicies.go"
+    },
+    {
+      "id": "cis",
+      "title": "CIS Critical Security Controls v8.1 (Safeguards 9.2 DNS filtering, 9.3 URL filters, 9.6 block unnecessary file types, 10.1 anti-malware, 3.13 DLP)",
+      "url": "https://myctrl.tools/frameworks/cis-controls-v8"
+    }
+  ],
+  "controls": [
+    {
+      "id": "\u00a7302",
+      "name": "Corporate responsibility for financial reports",
+      "source": "sox"
+    },
+    {
+      "id": "\u00a7404",
+      "name": "Management assessment of internal controls",
+      "source": "sox"
+    },
+    {
+      "id": "AS2201-ITGC",
+      "name": "IT general controls supporting ICFR (access, change, operations)",
+      "source": "pcaob2201"
+    }
+  ],
+  "areas": {
+    "urlFiltering": {
+      "controls": [
+        "\u00a7404",
+        "AS2201-ITGC"
+      ],
+      "rationale": "Protect financial systems from web-borne threats."
+    },
+    "cloudAppControl": {
+      "controls": [
+        "\u00a7404",
+        "AS2201-ITGC"
+      ],
+      "rationale": "Control financial data in unsanctioned cloud apps."
+    },
+    "fileTypeControl": {
+      "controls": [
+        "\u00a7404",
+        "AS2201-ITGC"
+      ],
+      "rationale": "Block malware delivery file types."
+    },
+    "advancedThreatProtection": {
+      "controls": [
+        "\u00a7404",
+        "AS2201-ITGC"
+      ],
+      "rationale": "Protect integrity of financial systems."
+    },
+    "firewallFiltering": {
+      "controls": [
+        "\u00a7404",
+        "AS2201-ITGC"
+      ],
+      "rationale": "Restrict outbound connectivity."
+    },
+    "dnsSecurity": {
+      "controls": [
+        "\u00a7404",
+        "AS2201-ITGC"
+      ],
+      "rationale": "DNS-layer protection."
+    },
+    "sslInspection": {
+      "controls": [
+        "\u00a7404",
+        "AS2201-ITGC"
+      ],
+      "rationale": "Inspect TLS; exempt banking and health sites for privacy."
+    },
+    "dlpMonitor": {
+      "controls": [
+        "\u00a7404",
+        "AS2201-ITGC"
+      ],
+      "rationale": "Log movement of financial statements and MNPI."
+    },
+    "dlpBlock": {
+      "controls": [
+        "\u00a7404",
+        "AS2201-ITGC"
+      ],
+      "rationale": "Block MNPI and financial statement leakage before disclosure."
+    },
+    "endpointDlp": {
+      "controls": [
+        "\u00a7404",
+        "AS2201-ITGC"
+      ],
+      "rationale": "Monitor financial data copied to removable media, cloud sync and print."
+    },
+    "sandbox": {
+      "controls": [
+        "\u00a7404",
+        "AS2201-ITGC"
+      ],
+      "rationale": "Detonate unknown files."
+    },
+    "aiPromptCapture": {
+      "controls": [
+        "\u00a7404",
+        "AS2201-ITGC"
+      ],
+      "rationale": "Capture GenAI prompts that may contain unreleased financial data."
+    }
+  },
+  "dlp": {
+    "monitorEngines": [
+      "GLBA",
+      "PCI"
+    ],
+    "blockRules": [
+      {
+        "key": "Financial-Statements",
+        "label": "Financial-Statements",
+        "dictionaries": [
+          "predefined:FINANCIAL",
+          "custom:MNPI"
+        ],
+        "controls": [
+          "\u00a7302"
+        ]
+      },
+      {
+        "key": "Bank-Routing",
+        "label": "Bank-Routing",
+        "dictionaries": [
+          "predefined:ABA_LEAKAGE",
+          "predefined:CREDIT_CARD"
+        ],
+        "controls": [
+          "\u00a7404"
+        ]
+      }
+    ],
+    "endpointChannels": [
+      "REMOVABLE_DRIVE_TRANSFER",
+      "PERSONAL_CLOUD_STORAGE",
+      "PRINTING"
+    ]
+  }
+}

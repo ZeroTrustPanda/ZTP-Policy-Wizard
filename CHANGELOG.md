@@ -1,8 +1,52 @@
 # Changelog
 
-## v1.9.0-standalone — 2026-10-14 (branch `standalone`)
+## v2.0.0 — 2026-10-16 (feature/v2.0, in testing)
 
-- Standalone downloads rebuilt as **1.9.0** with everything below.
+Implements the *Policy Wizard 2.0 Requirements Specification*.
+
+**Live-test findings (ZTH, 2026-10-16), fixed in this build:**
+- The ZIA API session can end before the OAuth token expires. ZIA then returns 403 "Resource Access Blocked". The client now signs in again once and retries.
+- A failed rule create gives back its rule order, so one failure no longer causes "Rule is not allowed at order N" for every later rule.
+- Cloud Sandbox: DMG needs the Sandbox macOS subscription. It is left out with a warning, and re-runs stay No change.
+- Descriptions are clamped to 255 bytes, because DLP dictionaries reject anything longer.
+- Cloud App Control rules that cover a whole category accept only web-use actions. Upload, chat and post sub-actions need specific apps selected. Balanced now uses Social "Allow view + Block post" and AI/ML "Caution".
+- ZCC IP Inclusions and Exclusions take an IP address or CIDR only. A domain name there makes ZCC reject the whole app profile (HTTP 200, success:false), so the dry run now refuses it. This deviates from ZCC-08, which allows FQDNs.
+- ZCC re-runs compare bypass apps against the apps that were picked, not the template default, so they now show No change.
+- Cloud App Control Caution actions need the browsers named. ZIA answers "Caution Action can be applied only for specific user agents", so Caution rules now set the user agent types.
+- A timed-out ZIA GET or PUT (both safe to repeat) is retried once. A timeout on the AI prompt settings update was seen live.
+
+- **Global:**
+  - One global prefix (GLB-02).
+  - A mandatory dry run enforced by the server, showing Create / Update / No change (GLB-03).
+  - Automatic ZIA activation (GLB-04).
+  - Same-name objects are updated, not duplicated, across ZIA, ZCC and ZPA (GLB-05).
+  - Choices persist across Back / Next (GLB-06).
+  - A summary report after every run (GLB-07).
+  - Licensing is detected from the tenant (GLB-08).
+  - No secrets in logs (GLB-09).
+- **ZIA:**
+  - A new Scope screen (§1).
+  - The Baseline Framework page replaces the Strict / Balanced / Permissive page (§2).
+  - Data-driven framework definitions with sources and research date.
+  - New areas: DLP Monitor and Block (custom dictionaries and engines), Endpoint DLP, Sandbox Standard and Advanced tiers, AI Prompt Capture, ATP defaults.
+  - The rule review page has category and global select, plus Allow / Block.
+- **ZCC:**
+  - The predefined IP bypass list is read live, behind a warning.
+  - New inputs for VPN gateway, IP and DNS inclusions / exclusions, with validation.
+  - ZPA reauthentication is on by default.
+  - Profiles are updated in place.
+- **ZPA:**
+  - A new wizard: connector group, provisioning key, segment group, server group, application segment.
+  - A bulk manager.
+- **ZDX:** a bulk manager.
+- **Navigation:** ZCC → ZIA → ZPA → ZDX.
+- **Fixed during live testing on ZTH:**
+  - The framework files were missing from the standalone build.
+  - The Windows reauth field was rejected by ZCC; it is now stored in `policyExtension`.
+  - Waits on long rate-limit Retry-After values are now capped, given the ZCC and ZDX limit of about 100 calls per hour.
+  - ZPA re-runs showed a false update.
+- **Not live-tested:** Endpoint DLP rule creation. The test tenant isn't licensed, and the wizard correctly reports it as not licensed.
+
 
 ## v1.9.0 — 2026-10-14
 
@@ -24,27 +68,16 @@
 - SSL rules failed with "Rule with rank 7 is not allowed at order 1"; they now go right after Zscaler's predefined rules, or at the end if the tenant refuses that spot.
 - Sandbox rules failed with "ANY/NONE/null are not valid entries"; file types and protocols are now named explicitly.
 - A Do Not Inspect rule left with no categories is skipped (it would have exempted all traffic).
-## v1.8.2-standalone — 2026-10-12 (branch `standalone`)
-
-- Standalone downloads rebuilt as **1.8.2** with the ZDX new-tenant fix below.
 
 ## v1.8.2 — 2026-10-12
 
 ### 🐛 Fixed
 - **ZDX wizard failed on brand-new ZDX tenants:** the dry run stopped with `Custom app "zscaler.com": collection — No "Custom Apps Collection" in this tenant`. A new ZDX tenant only has the *Unified Communication* and *Predefined Apps* collections; ZDX creates the *Custom Apps Collection* when the first custom app is added in the portal, and the API requires every custom app to belong to a collection. The wizard now plans a **ZDX tenant setup** step that creates the missing collection first (`POST /zdx/v1/config/collections`), then creates the apps in it. If the setup step fails, the apps are skipped so nothing half-built is left behind. The same applies to a missing *Predefined Apps Collection*. Verified live on a fresh tenant.
 
-## v1.8.1-standalone — 2026-10-12 (branch `standalone`)
-
-- Standalone downloads rebuilt as **1.8.1** with the macOS fix below.
-
 ## v1.8.1 — 2026-10-12
 
 ### 🐛 Fixed
 - **macOS profiles failed on every tenant except ZTH:** creating a macOS app profile, and with it the forwarding profile created in the same run, failed on other tenants. The macOS *Zscaler POV Best Practice* template set notification template ID 2221, which exists only in the ZTH lab tenant. ZCC rejects the whole profile (`{"success":"false"}`) when the ID doesn't exist, and the wizard then rolled back the new forwarding profile, so both looked broken. The setting is removed, and new macOS profiles keep the portal default (Legacy Notification Settings). The macOS template now has 16 settings. Reproduced and verified on a second tenant.
-
-## v1.8.0-standalone — 2026-10-12 (branch `standalone`)
-
-- Standalone downloads rebuilt as **1.8.0** with the new Digital Experience (ZDX) module below.
 
 ## v1.8.0 — 2026-10-12
 
@@ -60,10 +93,6 @@
 
 Requires the ZDX scope on the OneAPI client.
 
-## v1.7.1-standalone — 2026-10-12 (branch `standalone`)
-
-- Standalone downloads rebuilt as **1.7.1** with the Zscaler POV best practice wording below. No other changes.
-
 ## v1.7.1 — 2026-10-12
 
 ### Changed
@@ -72,17 +101,6 @@ Requires the ZDX scope on the OneAPI client.
 - **Steps explain the concepts:** the Forwarding Profile step explains what a forwarding profile is, and the App Profile step explains what an app profile is.
 - **macOS creates its own forwarding profile:** macOS now also defaults to creating a new forwarding profile instead of linking an existing one named "MAC", so it works the same on any tenant.
 - **Notification template flagged:** the macOS notification template setting (ID 2221) is marked **REVIEW**, because template IDs differ per tenant.
-
-## v1.7.0-standalone — 2026-10-12 (branch `standalone`)
-
-Same features as v1.7.0, packaged to run without Node.js or npm.
-
-- **Single executables** for Windows x64, macOS Apple Silicon and macOS Intel (`standalone/release/`), built with Bun.
-- **UI compiled ahead of time:** React, ReactDOM and the IBM Plex fonts are embedded; no cdnjs, no in-browser Babel, no Google Fonts. Faster page load and works where CDNs are blocked.
-- **Launcher:** binds to `127.0.0.1` only, picks port 3000 or the next free one, opens the default browser, logs to `~/ZTP-Wizard/logs`.
-- **Fewer dependencies:** `uuid` and `cors` removed (built-in `crypto.randomUUID`, same-origin UI). Express is the only runtime package and is bundled into the executable.
-- **macOS builds re-signed ad-hoc** so Apple Silicon runs them; they are not Developer ID signed or notarized.
-- Server mode (`npm start`) is unchanged apart from the dependency cleanup; `ZTP_LOG_DIR` can move the log folder.
 
 ## v1.7.0 — 2026-10-11
 
