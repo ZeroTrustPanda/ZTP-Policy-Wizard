@@ -37,9 +37,10 @@ const PREDEFINED_INFO = {
 const TEMPLATES = {
   POV_BEST_PRACTICE: {
     id: 'POV_BEST_PRACTICE', name: 'Zscaler POV Best Practice', icon: '⭐',
-    description: 'The probes the Zscaler POV best practice guide starts with: Microsoft Login (Zscaler predefined app) and zscaler.com (custom app), each with a Web probe and a CloudPath probe, for all users.',
+    description: 'The probes the Zscaler POV best practice guide starts with: Microsoft Login (Zscaler predefined app) and zscaler.com (custom app), plus the UCaaS apps Microsoft Teams, Zoom and Webex for call-quality monitoring. Each has a Web probe and a CloudPath probe, for all users. Zoom and Webex need the customer\'s account prefix (left out when blank).',
     source: 'Zscaler POV best practice guide',
-    predefined: [{ provider: 'MICROSOFT_LOGIN', web: true, cloudpath: true }],
+    predefined: [{ provider: 'MICROSOFT_LOGIN', web: true, cloudpath: true }, { provider: 'MICROSOFT_TEAMS', web: true, cloudpath: true },
+      { provider: 'ZOOM', web: true, cloudpath: true }, { provider: 'WEBEX', web: true, cloudpath: true }],
     custom: [{ name: 'zscaler.com', url: 'https://zscaler.com/', web: true, cloudpath: true, frequency: 300, protocol: 'ADAPTIVE' }]
   },
   BLANK: {

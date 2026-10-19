@@ -224,7 +224,7 @@ function readProfileLists(b) {
 }
 
 function buildAppProfileBody({ platform = 'windows', name, description = '', ruleOrder, forwardingProfileId = 0, active = false,
-  templateId = 'PORTAL_DEFAULT', enabledSettings = null, bypassAppIds = null, lists = null, id = null }) {
+  templateId = 'PORTAL_DEFAULT', enabledSettings = null, bypassAppIds = null, lists = null, id = null, tamperPassword = null }) {
   const plat = getPlatform(platform);
   if (!name || !String(name).trim()) throw new Error('Profile name is required');
   if (!Number.isInteger(ruleOrder) || ruleOrder < 1) throw new Error('ruleOrder must be a positive integer');
@@ -243,8 +243,10 @@ function buildAppProfileBody({ platform = 'windows', name, description = '', rul
   if (tpl.baseApply) tpl.baseApply(body);
   const applied = selectedSettings(plat.id, templateId, enabledSettings);
   if (Array.isArray(bypassAppIds)) body.__bypassIds = bypassAppIds.map(Number).filter(n => Number.isFinite(n));
+  if (tamperPassword) body.__tamperPassword = String(tamperPassword);
   for (const s of applied) s.apply(body);
   delete body.__bypassIds;
+  delete body.__tamperPassword;
   // Lists entered on the wizard replace the template values (null = keep)
   if (lists) for (const [k, f] of Object.entries(PROFILE_LISTS)) {
     if (!Array.isArray(lists[k])) continue;

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ZeroTrustPanda ZS Policy Wizard v2.0.0 - Zscaler Template Policy Configuration</title>
+  <title>ZeroTrustPanda ZS Policy Wizard v2.1.0 - Zscaler Template Policy Configuration</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
   <style>
@@ -506,7 +506,7 @@
     // ========================
     // App Version
     // ========================
-    const APP_VERSION = '2.0.0';
+    const APP_VERSION = '2.1.0';
     const BUILD_DATE = '2026-03-30';
 
     // ========================
@@ -815,6 +815,7 @@
                     <p>HIPAA, HITRUST CSF, NIST 800-53, NIST 800-171, PCI-DSS, CJIS, SOX, FERPA, GDPR</p>
                     <h3 style={{fontSize:'15px', color:'var(--accent-cyan)', margin:'1.5rem 0 0.5rem'}}>Version History</h3>
                     <div style={{paddingLeft:'1rem', fontSize:'12px'}}>
+                      <div><strong>v2.1.0</strong> — More policies built into the templates, so each one can be shown during a POV: SSL inspect-remaining always last (below Zscaler Recommended Exemptions) with TLS 1.2 minimum; DNS over HTTPS inspected; DNS sent to the Zscaler Trusted Resolver; SSH / RDP / FTP dropped to and from high-risk countries; ZPA timeout, AppProtection inspection and isolation policies; Privileged Remote Access RDP / SSH consoles; Client Connector tamper protection passwords; Teams, Zoom and Webex in the ZDX template.</div>
                       <div><strong>v2.0.0</strong> — POV release: global prefix; mandatory dry run with Create / Update / No change and re-runs that update instead of duplicating; ZIA scope screen, Baseline Framework page (compliance frameworks or Strict / Balanced / Permissive), DLP Monitor / Block with custom dictionaries, Endpoint DLP, Sandbox Standard / Advanced, AI Prompt Capture, UCaaS, granular app-specific Cloud App Control, Isolate for Miscellaneous / Unknown, ATP defaults; ZCC bypass app checklist, VPN / IP / DNS lists, ZPA reauthentication on, separate IPv6 switches; new ZPA wizard with CSV bulk upload of application segments; ZPA and ZDX bulk managers; summary report. Sidebar order ZCC → ZIA → ZPA → ZDX.</div>
                       <div><strong>v1.9.0</strong> — Rules step: an on/off switch for every rule in every policy type, and URL rules can be set to Isolate. Isolation profile picker (Default Isolation Profile, ↻ Refresh for new ones) used by Isolate rules and Sandbox Quarantine & Isolate. SSL interception certificate picker for the Inspect rules this creates, plus a new SSL Certificate Manager page to move existing rules between certificates in bulk. Frameworks: save your choices to a file, load it in another tenant, or capture a tenant's current policies (with custom categories). Live-tenant fixes: rule names kept to 31 characters, URL categories / deprecated firewall apps the tenant doesn't have are left out, SSL rules placed after Zscaler's predefined rules, Sandbox file types named instead of ANY, isolation profile endpoint fixed.</div>
                       <div><strong>v1.8.2</strong> — Fix: the ZDX wizard failed on brand-new ZDX tenants with "No Custom Apps Collection in this tenant". ZDX only creates that collection when the first custom app is added in the portal, so the wizard now creates it first as a setup step (and skips the apps if that step fails).</div>
@@ -1297,6 +1298,8 @@
       const [form, setForm] = useState({ domains: '', tcpPorts: '1-52, 54-65535', udpPorts: '1-52, 54-65535', connectorGroupId: '',
         descriptions: { connectorGroup: meta.copy.zpa.connectorGroupDescription, appSegment: meta.copy.zpa.appSegmentDescription } });
       const [settings, setSettings] = useState({ ...meta.zpaDefaults });
+      const [policies, setPolicies] = useState({ timeout: true, inspection: true, isolation: true });
+      const [pra, setPra] = useState({ rdpHost: '', sshHost: '' });
       const [bulk, setBulk] = useState(false);
       const [apps, setApps] = useState([]);            // [{ name, destinations[], tcpPorts, udpPorts, row, settings }]
       const [csvErrors, setCsvErrors] = useState([]);
@@ -1309,13 +1312,13 @@
       const [reveal, setReveal] = useState(false);
       const [confirmed, setConfirmed] = useState(false);
       useEffect(() => { api.call('GET', '/v2/zpa/context').then(setCtx).catch(e => setCtx({ error: e.message })); }, []);
-      useEffect(() => { setPlan(null); setConfirmed(false); }, [JSON.stringify([form, settings, bulk, apps])]);
+      useEffect(() => { setPlan(null); setConfirmed(false); }, [JSON.stringify([form, settings, bulk, apps, policies, pra])]);
       useEffect(() => {
         if (bulk && !apps.length) { setErrors([]); return; }
-        const t = setTimeout(() => api.call('POST', '/v2/zpa/validate', bulk ? { apps, settings } : { domains: form.domains, tcpPorts: form.tcpPorts, udpPorts: form.udpPorts, settings }).then(r => setErrors(r.errors)).catch(() => {}), 250);
+        const t = setTimeout(() => api.call('POST', '/v2/zpa/validate', bulk ? { apps, settings, pra } : { domains: form.domains, tcpPorts: form.tcpPorts, udpPorts: form.udpPorts, settings, pra }).then(r => setErrors(r.errors)).catch(() => {}), 250);
         return () => clearTimeout(t);
-      }, [form.domains, form.tcpPorts, form.udpPorts, settings.healthReporting, bulk, JSON.stringify(apps)]);
-      const body = () => ({ prefix, ...(bulk ? { apps } : { domains: form.domains, tcpPorts: form.tcpPorts, udpPorts: form.udpPorts }), settings, connectorGroupId: form.connectorGroupId || null, descriptions: form.descriptions });
+      }, [form.domains, form.tcpPorts, form.udpPorts, settings.healthReporting, bulk, JSON.stringify(apps), pra.rdpHost, pra.sshHost]);
+      const body = () => ({ prefix, ...(bulk ? { apps } : { domains: form.domains, tcpPorts: form.tcpPorts, udpPorts: form.udpPorts }), settings, connectorGroupId: form.connectorGroupId || null, descriptions: form.descriptions, policies, pra });
       const downloadTemplate = () => {
         const blob = new Blob([meta.copy.zpa.bulkTemplate], { type: 'text/csv' });
         const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'zpa-app-segments-template.csv'; document.body.appendChild(a); a.click(); a.remove();
@@ -1338,7 +1341,7 @@
       const masked = (k) => k.length > 12 ? k.slice(0, 6) + '•'.repeat(18) + k.slice(-4) : '•'.repeat(k.length);
       return (
         <div className="card" data-step="zpa">
-          <div className="card-header"><h2>Zscaler Private Access</h2><p>Creates, in order: App Connector Group → Provisioning Key → Segment Group → Server Group → Application Segment. Objects that already exist with these names are updated.</p></div>
+          <div className="card-header"><h2>Zscaler Private Access</h2><p>Creates, in order: App Connector Group → Provisioning Key → Segment Group → Server Group → Application Segment → timeout, inspection and isolation policies. Objects that already exist with these names are updated.</p></div>
           <div className="alert alert-warning" data-zpalocation><span>📍 {meta.copy.zpa.locationBanner}</span></div>
           {ctx && ctx.error && <div className="alert alert-danger"><span>Could not reach ZPA: {ctx.error}</span></div>}
           <table className="diff-table" style={{marginBottom:'1rem'}}><tbody>
@@ -1347,6 +1350,10 @@
             <tr><td>Segment Group</td><td><code>{n('segment-group')}</code></td></tr>
             <tr><td>Server Group</td><td><code>{n('server-group')}</code> · Dynamic Server Discovery on</td></tr>
             <tr><td>Application Segment{bulk ? 's' : ''}</td><td>{bulk ? (apps.length ? apps.map(a => <code key={a.name} style={{marginRight:'6px'}}>{segName(a.name)}</code>) : 'One per application in the uploaded CSV') : <code>{n('app-segment')}</code>}</td></tr>
+            {policies.timeout && <tr><td>Timeout policy</td><td><code>{n('timeout-policy')}</code> · re-authenticate every 8 hours, or after 1 hour idle</td></tr>}
+            {policies.inspection && <tr><td>Inspection</td><td><code>{n('inspection-profile')}</code> (OWASP, all predefined controls) · <code>{n('inspection-policy')}</code></td></tr>}
+            {policies.isolation && <tr><td>Isolation policy</td><td><code>{n('isolation-policy')}</code> · Browser Access users get an isolated session</td></tr>}
+            {(pra.rdpHost || pra.sshHost) && <tr><td>Privileged Remote Access</td><td>{pra.rdpHost && <><code>{n('pra-rdp')}</code> + <code>{n('pra-rdp-console')}</code> </>}{pra.sshHost && <><code>{n('pra-ssh')}</code> + <code>{n('pra-ssh-console')}</code></>}</td></tr>}
           </tbody></table>
           <div className="form-group">
             <label className="form-label">App Connector Group description</label>
@@ -1421,6 +1428,24 @@
             <summary style={{cursor:'pointer', fontSize:'13px'}}>{bulk ? 'Shared application segment settings (every uploaded application starts with these)' : 'Application segment settings (defaults from the POV guide)'}</summary>
             <div className="form-hint" style={{margin:'6px 0'}}>{meta.copy.zpa.defaultsNote}</div>
             <ZpaSegmentSettings value={settings} onChange={setSettings} />
+          </details>
+          <details style={{margin:'0.5rem 0 1rem'}} open data-zpapolicies>
+            <summary style={{cursor:'pointer', fontSize:'13px'}}>Policies for the application segment{bulk ? 's' : ''}</summary>
+            {[['timeout', 'Timeout policy', 'Users re-authenticate every 8 hours, or after 1 hour idle.'],
+              ['inspection', 'AppProtection inspection', 'Inspect traffic with an OWASP Core Rule Set profile (needs AppProtection on the tenant).'],
+              ['isolation', 'Browser isolation', 'Users who reach these applications through Browser Access get an isolated browser session.']].map(([k, label, hint]) => (
+              <div className="toggle-item" key={k} data-zpapolicy={k}>
+                <div><label onClick={() => setPolicies({ ...policies, [k]: !policies[k] })} style={{cursor:'pointer'}}>{label}</label><div className="form-hint">{hint}</div></div>
+                <div className={`toggle-switch ${policies[k] ? 'active' : ''}`} onClick={() => setPolicies({ ...policies, [k]: !policies[k] })}><div className="toggle-knob"></div></div>
+              </div>))}
+          </details>
+          <details style={{margin:'0.5rem 0 1rem'}} data-zpapra>
+            <summary style={{cursor:'pointer', fontSize:'13px'}}>Privileged Remote Access (optional)</summary>
+            <div className="form-hint" style={{margin:'6px 0'}}>Enter a server to reach over RDP and/or SSH from the PRA portal (no client needed). The wizard creates the PRA application and a console in your existing PRA portal; when the tenant has no portal yet, create one (domain and certificate) in the ZPA portal and run again. Leave blank to skip.</div>
+            <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:'12px'}}>
+              <div className="form-group"><label className="form-label">RDP server (port 3389)</label><input type="text" value={pra.rdpHost} placeholder="jumpbox.hospital.local" onChange={e => setPra({ ...pra, rdpHost: e.target.value })} data-zprardp /></div>
+              <div className="form-group"><label className="form-label">SSH server (port 22)</label><input type="text" value={pra.sshHost} placeholder="10.0.0.22" onChange={e => setPra({ ...pra, sshHost: e.target.value })} data-zprassh /></div>
+            </div>
           </details>
           {errors.length > 0 && <div className="alert alert-danger" style={{display:'block'}} data-zpaerrors>{errors.map((e, i) => <div key={i}>✕ {e}</div>)}</div>}
           {plan && !result && (<>
@@ -3081,6 +3106,14 @@
     ];
 
     // Settings toggles grouped by category (shared by the forwarding and app profile steps)
+    // Random tamper-protection password (letters, digits and a few symbols ZCC accepts); generated in the browser
+    function genPassword(len = 16) {
+      const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789!@#%*_+=';
+      const a = new Uint32Array(len); (window.crypto || window.msCrypto).getRandomValues(a);
+      let pw = Array.from(a, x => chars[x % chars.length]).join('');
+      if (!/[0-9]/.test(pw)) pw = pw.slice(0, -1) + '7';
+      return pw;
+    }
     function ZccSettingToggles({ settings, enabled, onToggle, extras }) {
       const cats = [...new Set(settings.map(s => s.category))];
       return cats.map(cat => (
@@ -3171,6 +3204,8 @@
       // v2.0: predefined IP-based bypass apps from the tenant (ZCC-03) and the five lists (ZCC-06..09)
       const [bypassApps, setBypassApps] = useState(null);
       const [bypassChecked, setBypassChecked] = useState(null);
+      const [tamperPassword, setTamperPassword] = useState(() => genPassword());
+      const [showPw, setShowPw] = useState(false);
       const [listDefaults, setListDefaults] = useState(null);
       const [lists, setLists] = useState(null);      // { key: text } per list; null = defaults not loaded yet
       const [v2meta, setV2meta] = useState(null);
@@ -3253,12 +3288,25 @@
 
       const payload = () => ({
         ...form, templateId, enabledSettings: [...(enabled || [])],
+        tamperPassword: enabled && enabled.has('tamperPasswords') ? tamperPassword : '',
         bypassAppIds: bypassChecked ? [...bypassChecked] : null,
         lists: lists ? Object.fromEntries(((v2meta && v2meta.zccListKeys) || []).map(k => [k, splitList(lists[k])])) : null,
         forwardingProfileId: isNewFwd ? 0 : form.forwardingProfileId,
         newForwardingProfile: isNewFwd ? { name: fwdName.trim(), templateId: fwdTemplateId, enabledSettings: [...(fwdEnabled || [])] } : null
       });
 
+      const tamperPanel = (
+        <div data-tamperpanel>
+          <div className="form-hint" style={{marginBottom:'4px'}}>Password for this profile (shown in the summary report, which is then marked as containing secrets):</div>
+          <div style={{display:'flex', gap:'6px', alignItems:'center', flexWrap:'wrap'}}>
+            <input type={showPw ? 'text' : 'password'} value={tamperPassword} maxLength={64} autoComplete="new-password" style={{maxWidth:'260px', fontFamily:'IBM Plex Mono, monospace'}}
+              onChange={e => { setPlan(null); setTamperPassword(e.target.value); }} data-tamperpw />
+            <button className="btn btn-ghost btn-sm" onClick={() => setShowPw(!showPw)}>{showPw ? 'Hide' : 'Show'}</button>
+            <button className="btn btn-ghost btn-sm" onClick={() => { setPlan(null); setTamperPassword(genPassword()); }} data-tampergen>Generate new</button>
+            <button className="btn btn-ghost btn-sm" onClick={() => { try { navigator.clipboard.writeText(tamperPassword); } catch (e) {} }}>Copy</button>
+          </div>
+        </div>
+      );
       const pickTemplate = (id) => {
         setTemplateId(id); setPlan(null);
         const t = catalog.find(x => x.id === id);
@@ -3501,7 +3549,7 @@
                       <button className="btn btn-ghost btn-sm" onClick={() => { setPlan(null); setEnabled(new Set()); }}>Clear</button>
                     </div>
                   </div>
-                  <ZccSettingToggles settings={template.settings} enabled={enabled} onToggle={toggle} extras={{ appBypass: bypassPanel }} />
+                  <ZccSettingToggles settings={template.settings} enabled={enabled} onToggle={toggle} extras={{ appBypass: bypassPanel, tamperPasswords: tamperPanel }} />
                 </div>
               )}
 

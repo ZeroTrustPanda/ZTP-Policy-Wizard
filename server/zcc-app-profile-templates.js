@@ -345,6 +345,30 @@ function reauthSetting(platform) {
   };
 }
 
+// Tamper protection: one generated password protects logout, uninstall, exit and turning off ZIA, ZPA or ZDX.
+// The password itself is per run (typed or generated in the wizard) and is set on the body as __tamperPassword before apply.
+const PASSWORD_FIELDS = { top: ['disable_password', 'logout_password', 'uninstall_password'], ext: ['exitPassword', 'zpaDisablePassword', 'zdxDisablePassword'] };
+function tamperSetting(platform) {
+  const policyKey = platform === 'macos' ? 'macPolicy' : 'windowsPolicy';
+  return {
+    key: 'tamperPasswords',
+    label: 'Tamper protection passwords',
+    category: 'Security',
+    description: 'Users need a password to log out of, exit or uninstall Client Connector, and to turn off ZIA (Internet Security), ZPA (Private Access) or ZDX. The wizard sets one password for all of them and shows it in the summary report. One-time passwords per device are available in the Mobile Admin portal (Enrolled Devices).',
+    value: 'Password set', portalDefault: 'No password', impact: 'caution', password: true,
+    apply: (b) => {
+      const pw = b.__tamperPassword;
+      if (!pw) return;
+      for (const f of PASSWORD_FIELDS.top) { b[policyKey][f] = pw; b[f] = pw; }
+      for (const f of PASSWORD_FIELDS.ext) b.policyExtension[f] = pw;
+      b.exit_password = pw;
+    },
+    // Compared with the password wanted for this run (passed in by the caller); never logged
+    verify: (p, want) => !!want && PASSWORD_FIELDS.top.every(f => String(p[f] ?? p[policyKey]?.[f] ?? '') === want)
+      && PASSWORD_FIELDS.ext.every(f => String(p.policyExtension?.[f] ?? '') === want)
+  };
+}
+
 // ========================
 // Platforms and templates
 // ========================
@@ -360,7 +384,7 @@ const TEMPLATES = {
       description: 'Common Client Connector settings from the Zscaler POV best practice guide: SSL certificate and WFP driver, Microsoft 365 / Teams / Zoom / AVD IP bypass, domain profile detection, notification framework, ZPA re-authentication notice, CLI, applies to all users.',
       source: 'Zscaler POV best practice guide',
       recommendedForwardingProfile: null,
-      settings: [...WINDOWS_BEST_PRACTICE_SETTINGS, reauthSetting('windows')]
+      settings: [...WINDOWS_BEST_PRACTICE_SETTINGS, tamperSetting('windows'), reauthSetting('windows')]
     },
     PORTAL_DEFAULT: {
       id: 'PORTAL_DEFAULT', name: 'Portal Default (blank)', icon: '📄',
@@ -378,7 +402,7 @@ const TEMPLATES = {
       recommendedForwardingProfile: null,
       // Same values as the portal default, but MAC stores them as strings; keeps the clone byte-identical.
       baseApply: (b) => { b.policyExtension.deleteDHCPOption121Routes = '{"trusted":"1","offTrusted":"1","vpnTrusted":"1","splitVpnTrusted":"1"}'; },
-      settings: [...MAC_BEST_PRACTICE_SETTINGS, reauthSetting('macos')]
+      settings: [...MAC_BEST_PRACTICE_SETTINGS, tamperSetting('macos'), reauthSetting('macos')]
     },
     PORTAL_DEFAULT: {
       id: 'PORTAL_DEFAULT', name: 'Portal Default (blank)', icon: '📄',
@@ -423,6 +447,7 @@ function selectedSettings(platform, templateId, enabledKeys) {
 }
 
 module.exports = {
+  PASSWORD_FIELDS,
   REAUTH_NETWORKS,
   reauthSetting,
   PLATFORMS,

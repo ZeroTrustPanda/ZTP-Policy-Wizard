@@ -85,6 +85,11 @@ async function planZdx(zdx, input) {
     entry.host = needsPrefix ? String(sup.host).replace('<prefix>', prefix || '<prefix>') : sup.host;
 
     if (!existing) {
+      if (needsPrefix && !prefix) {   // e.g. Zoom or Webex picked by the template without the customer's account prefix: left out, not failed
+        warnings.push(`${label} left out: enter the customer's ${label} prefix (the part before ${String(sup.host).replace('<prefix>', '')}) to monitor it.`);
+        entry.steps.push({ op: 'none', label: 'Left out: no prefix entered' });
+        continue;
+      }
       if (needsPrefix && !PREFIX_RE.test(prefix)) {
         checks.push({ name: `${label}: tenant prefix`, status: 'fail', detail: `Enter the customer's ${label} prefix (the part before ${String(sup.host).replace('<prefix>', '')}).` });
         continue;
