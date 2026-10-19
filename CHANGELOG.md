@@ -20,6 +20,7 @@ Implements the *Policy Wizard 2.0 Requirements Specification*.
     App IDs and actions were read live from the tenant. If the tenant refuses the first action set, the rule falls back to a second one.
   - UCaaS (Zoom, GoTo, RingCentral, Webex, Talkdesk) is its own settings group, enabled on every Zscaler Internet Access run and shown on the rule review page.
   - Cloud Sandbox groups list only the file types the sandbox accepts, so the "left out" warnings are gone. Probed live: ZIA rejects JavaScript, IMG, LNK, GZIP, text, CSV and image types for sandbox rules, and DMG needs Sandbox macOS.
+- **Fix:** opening Mobile Admin could show "UI Render Error: Cannot read properties of null (reading 'has')" when the tenant's bypass-app list arrived while the first step was on screen.
 - **ZPA:** *Bulk upload application segments from a CSV* (Application Name, Destinations, Ports; several values per cell separated by `;`, `udp:53` for UDP). It comes with a downloadable template, per-application settings overrides and row-numbered validation, including overlapping destinations. ZPA refuses Continuous health checks on subnet destinations, so the dry run blocks that combination (seen live). The shared ZPA objects are still created, and each application gets its own segment `<prefix>-<name>`.
 
 **Live-test findings (ZTH, 2026-10-16), fixed in this build:**
