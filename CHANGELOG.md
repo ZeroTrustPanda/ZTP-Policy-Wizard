@@ -1,5 +1,81 @@
 # Changelog
 
+## v2.0.0 — 2026-10-19
+
+Implements the *Policy Wizard 2.0 Requirements Specification* plus the review feedback below. Live-tested end to end on a Zscaler tenant (ZIA, ZCC Windows and macOS, ZPA): every run creates, re-runs, updates and cleans up its objects.
+
+### Everywhere
+- **Global prefix** (GLB-02): set once after sign-in, it names every object the wizard creates. Running again with the same prefix **updates** objects instead of duplicating them, across ZIA, ZCC and ZPA (GLB-05).
+- **Mandatory dry run** (GLB-03): the server refuses an apply that doesn't match a dry run of exactly the same choices. Each object is listed as Create / Update / No change, and the apply does exactly that.
+- **Automatic ZIA activation** (GLB-04). One failed object never stops the rest: failures are listed with their reason, and anything that depends on them is skipped.
+- **Licensing detection** (GLB-08): features the tenant isn't licensed for are greyed out.
+- **Summary report** (GLB-07): Markdown and printable HTML, marked *sensitive* when it holds a ZPA provisioning key.
+- **No secrets in logs** (GLB-09): request bodies are redacted, and the provisioning key is never logged.
+- **Sidebar in POV order:** Zscaler Client Connector → Zscaler Internet Access → Zscaler Private Access → Zscaler Digital Experience → Summary Report.
+
+### Zscaler Internet Access
+- Renamed from "ZIA POV Policy Wizard" to **Zscaler Internet Access**.
+- **Scope screen** (§1), then a **Baseline Framework** step (§2):
+  - Compliance baselines: HIPAA, HITRUST, NIST 800-53, NIST 800-171, PCI DSS, CJIS, SOX, FERPA, GDPR.
+  - Non-mapped baselines: Strict, Balanced, Permissive, Zero Trust Hospital.
+  - Each framework is a data file with cited sources.
+- **Rule review:** Select / Deselect all and Allow / Block all, per category and for the whole page. Isolate is available for URL rules. Choices persist across Back / Next. Selections can be saved and loaded.
+- **New policy areas:**
+  - **Inline DLP Monitor:** Zscaler's predefined engines.
+  - **Inline DLP Block:** custom dictionaries (ICD-10, MBI, MRN and others, with cited sources) and custom engines.
+  - **Endpoint DLP:** USB, personal cloud storage and printing.
+  - **Cloud Sandbox:** Standard and Advanced tiers. AI Instant Verdict on every Advanced rule.
+  - **AI Prompt Capture:** 14 GenAI apps.
+  - **ATP defaults.**
+- **UCaaS:** Zoom, GoTo, RingCentral, Webex and Talkdesk are their own settings group, enabled on every Zscaler Internet Access run and shown on the rule review page.
+- **Granular Cloud App Control:** app-specific rules sit above the category-wide rules, with app IDs and actions read live from the tenant:
+  - Google Drive, Dropbox and Box: view-only.
+  - Facebook and X: view but no posting.
+  - LinkedIn: read-only.
+  - ChatGPT, Gemini and Copilot: allowed, but no file uploads.
+  - Slack: chat but no file uploads.
+  If a tenant refuses the first action set, the wizard uses a fallback set, and re-runs accept either.
+- **Isolate Miscellaneous / Unknown:** a URL rule opens these categories in Cloud Browser Isolation with the tenant's profile, and falls back to Caution when the tenant has none. Those categories were removed from the Security-Risk block rule.
+- **Cloud Sandbox file types:** groups list only types the sandbox accepts. JavaScript, IMG, LNK, GZIP, text, CSV and image types are rejected by ZIA for sandbox rules, and DMG needs Sandbox macOS.
+
+### Zscaler Client Connector
+- The predefined IP-based bypass apps are read live and shown directly under the *Bypass IP-based Applications* switch, behind a warning.
+- New inputs for **VPN Gateway Bypasses, IP Inclusions / Exclusions and DNS Inclusions / Exclusions**, validated before anything is sent. IP lists take an IP address or CIDR only.
+- **ZPA reauthentication** is on by default, stored in `policyExtension` on Windows and macOS.
+- **Two IPv6 switches** in the forwarding profile: *Drop IPv6 Traffic (dual-stack networks)* and *Drop IPv6 Traffic in IPv6-only networks*.
+- Same-name profiles are updated in place; customer profiles and Default are never overwritten.
+
+### Zscaler Private Access (new)
+- **Wizard:** App Connector Group (San Jose, CA) → Provisioning Key (max 5; masked, with reveal and copy) → Segment Group → Server Group (dynamic discovery) → Application Segment, with the recommended defaults.
+- **CSV bulk upload of application segments** (optional): columns Application Name, Destinations, Ports. Separate several values with `;`, and write UDP ports as `udp:53`. The screen offers a template download, per-application settings overrides and row-numbered validation. Each application becomes `<prefix>-<name>`, in place of the wildcard segment.
+- **Bulk Manager:** deletes prefixed objects in dependency order.
+
+### Zscaler Digital Experience
+- **Bulk Manager** for prefixed custom apps and collections.
+
+### Standalone builds
+- Windows x64, macOS Apple silicon and macOS Intel. Logs go to `ZTP-Wizard/logs` in the home folder.
+
+### Found and fixed during live testing
+- **ZIA:**
+  - The ZIA API session can end before the OAuth token does (403 "Resource Access Blocked"); the client signs in again and retries.
+  - A failed rule create gives back its rule order, so later rules don't fail with "not allowed at order N".
+  - A timed-out GET or PUT is retried once.
+  - Descriptions are clamped to 255 bytes (DLP dictionaries).
+  - Cloud App Control: Caution needs browsers named. Category-wide rules accept web-use actions only.
+- **ZCC:**
+  - A domain name in an IP list makes ZCC reject the whole app profile. The dry run now refuses it; this deviates from ZCC-08.
+  - Re-runs compare bypass apps with the apps that were picked, so they report No change.
+  - The Mobile Admin page could show a render error when the bypass-app list arrived early.
+  - Long rate-limit waits are capped with a clear message (about 100 calls per hour for ZCC and ZDX).
+- **ZPA:**
+  - Continuous health checks aren't allowed on subnet destinations; the dry run refuses them.
+  - Re-runs no longer report a false update.
+- **Standalone:** the first Mac build crashed at start because it tried to create the build machine's log folder.
+
+### Not live-tested
+- Endpoint DLP rule creation. The test tenant isn't licensed, and the wizard correctly reports it as not licensed.
+
 ## v1.9.0 — 2026-10-14
 
 ### ✨ New

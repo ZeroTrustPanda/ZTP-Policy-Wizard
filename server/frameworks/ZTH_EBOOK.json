@@ -1,0 +1,219 @@
+{
+  "id": "ZTH_EBOOK",
+  "type": "tier",
+  "name": "Zero Trust Hospital (eBook)",
+  "fullName": "Zero Trust Hospital Architects Policy",
+  "description": "Policy set from the Zero Trust Hospital architects eBook: healthcare-tuned blocks, TLS 1.2 minimum, full ATP. Kept from 1.x so existing ZTH POVs do not regress.",
+  "version": "2026.10.1",
+  "researchedAt": "2026-10-16",
+  "baseTier": "ZTH_EBOOK",
+  "complianceKey": null,
+  "sources": [
+    {
+      "id": "zth",
+      "title": "Zero Trust Hospital Architects Policy (internal eBook)",
+      "url": "https://www.zerotrusthospital.org"
+    },
+    {
+      "id": "cis",
+      "title": "CIS Critical Security Controls v8.1 (Safeguards 9.2 DNS filtering, 9.3 URL filters, 9.6 block unnecessary file types, 10.1 anti-malware, 3.13 DLP)",
+      "url": "https://myctrl.tools/frameworks/cis-controls-v8"
+    },
+    {
+      "id": "cis93",
+      "title": "CIS Controls v8 Safeguard 9.3: Maintain and Enforce Network-Based URL Filters",
+      "url": "https://controls-assessment-specification.readthedocs.io/en/latest/control-9/control-9.3.html"
+    },
+    {
+      "id": "nistcsf",
+      "title": "NIST Cybersecurity Framework 2.0 (PR.DS, PR.PS, DE.CM)",
+      "url": "https://www.nist.gov/cyberframework"
+    },
+    {
+      "id": "cisa-dns",
+      "title": "CISA: Protective DNS guidance",
+      "url": "https://www.cisa.gov/resources-tools/services/protective-domain-name-system-resolver"
+    },
+    {
+      "id": "zs-sandbox",
+      "title": "Zscaler: Recommended Sandbox Policy",
+      "url": "https://help.zscaler.com/zia/recommended-sandbox-policy"
+    },
+    {
+      "id": "zs-edlp",
+      "title": "Zscaler: Configuring Endpoint DLP Policy Rules",
+      "url": "https://help.zscaler.com/zia/configuring-endpoint-dlp-policy-rules"
+    },
+    {
+      "id": "zs-api-adv-url",
+      "title": "Zscaler SDK (Go): URL & Cloud App advanced settings incl. GenAI prompt capture flags",
+      "url": "https://github.com/zscaler/zscaler-sdk-go/blob/master/zscaler/zia/services/urlfilteringpolicies/urlfilteringpolicies.go"
+    }
+  ],
+  "controls": [
+    {
+      "id": "CIS-3.13",
+      "name": "Deploy a data loss prevention solution",
+      "source": "cis"
+    },
+    {
+      "id": "CIS-9.2",
+      "name": "Use DNS filtering services",
+      "source": "cis"
+    },
+    {
+      "id": "CIS-9.3",
+      "name": "Maintain and enforce network-based URL filters",
+      "source": "cis93"
+    },
+    {
+      "id": "CIS-9.6",
+      "name": "Block unnecessary file types",
+      "source": "cis"
+    },
+    {
+      "id": "CIS-10.1",
+      "name": "Deploy and maintain anti-malware software",
+      "source": "cis"
+    },
+    {
+      "id": "CIS-13.4",
+      "name": "Perform traffic filtering between network segments",
+      "source": "cis"
+    },
+    {
+      "id": "CSF-PR.DS",
+      "name": "Data security",
+      "source": "nistcsf"
+    },
+    {
+      "id": "CSF-DE.CM",
+      "name": "Continuous monitoring",
+      "source": "nistcsf"
+    }
+  ],
+  "areas": {
+    "urlFiltering": {
+      "controls": [
+        "CIS-9.3"
+      ],
+      "rationale": "URL category filtering by risk class."
+    },
+    "cloudAppControl": {
+      "controls": [
+        "CSF-PR.DS"
+      ],
+      "rationale": "Govern sanctioned vs unsanctioned cloud apps."
+    },
+    "fileTypeControl": {
+      "controls": [
+        "CIS-9.6"
+      ],
+      "rationale": "Block unnecessary file types."
+    },
+    "advancedThreatProtection": {
+      "controls": [
+        "CIS-10.1"
+      ],
+      "rationale": "Anti-malware, anti-phishing and botnet protections."
+    },
+    "firewallFiltering": {
+      "controls": [
+        "CIS-13.4"
+      ],
+      "rationale": "Outbound traffic filtering."
+    },
+    "dnsSecurity": {
+      "controls": [
+        "CIS-9.2"
+      ],
+      "rationale": "Protective DNS."
+    },
+    "sslInspection": {
+      "controls": [
+        "CSF-DE.CM"
+      ],
+      "rationale": "Inspect encrypted traffic so other controls work."
+    },
+    "dlpMonitor": {
+      "controls": [
+        "CIS-3.13",
+        "CSF-DE.CM"
+      ],
+      "rationale": "Visibility into sensitive data movement."
+    },
+    "dlpBlock": {
+      "controls": [
+        "CIS-3.13",
+        "CSF-PR.DS"
+      ],
+      "rationale": "Prevent sensitive data loss."
+    },
+    "endpointDlp": {
+      "controls": [
+        "CIS-3.13"
+      ],
+      "rationale": "Endpoint channels: removable media, personal cloud, print."
+    },
+    "sandbox": {
+      "controls": [
+        "CIS-10.1"
+      ],
+      "rationale": "Behavioral analysis of unknown files."
+    },
+    "aiPromptCapture": {
+      "controls": [
+        "CSF-DE.CM"
+      ],
+      "rationale": "Monitor GenAI usage."
+    }
+  },
+  "dlp": {
+    "monitorEngines": [
+      "HIPAA",
+      "PCI",
+      "GLBA"
+    ],
+    "blockRules": [
+      {
+        "key": "PHI-Identifiers",
+        "label": "PHI-Identifiers",
+        "dictionaries": [
+          "predefined:SSN",
+          "custom:MBI",
+          "custom:MRN"
+        ],
+        "controls": [
+          "164.312(e)(1)"
+        ]
+      },
+      {
+        "key": "PHI-Clinical",
+        "label": "PHI-Clinical",
+        "dictionaries": [
+          "predefined:MEDICAL",
+          "custom:ICD10",
+          "predefined:NPI_LEAKAGE"
+        ],
+        "controls": [
+          "164.312(e)(1)"
+        ]
+      },
+      {
+        "key": "Payment-Cards",
+        "label": "Payment-Cards",
+        "dictionaries": [
+          "predefined:CREDIT_CARD"
+        ],
+        "controls": [
+          "164.312(e)(1)"
+        ]
+      }
+    ],
+    "endpointChannels": [
+      "REMOVABLE_DRIVE_TRANSFER",
+      "PERSONAL_CLOUD_STORAGE",
+      "PRINTING"
+    ]
+  }
+}

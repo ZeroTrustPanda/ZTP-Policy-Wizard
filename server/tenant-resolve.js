@@ -63,7 +63,9 @@ async function resolveForTenant(client, templateIn, { cbiProfile = null } = {}) 
       for (const r of [...isoRules, ...sbIso]) r.cbiProfile = cbi;
       Object.assign(info.cbi, cbi, { defaultProfile: !!chosen.defaultProfile });
     } else {
-      if (isoRules.length) errors.push(`This tenant has no Cloud Browser Isolation profile, so ${isoRules.map(r => r.name).join(', ')} cannot Isolate. Create a profile in the Isolation portal, or set those rules back to Block / Allow.`);
+      for (const r of isoRules.filter(r => r.isolateFallback && !r.userChoice)) { r.action = r.isolateFallback; r.effectiveAction = r.isolateFallback; warnings.push(`${r.name}: this tenant has no Cloud Browser Isolation profile, so the rule uses ${r.isolateFallback === 'CAUTION' ? 'Caution' : r.isolateFallback} instead of Isolate.`); }
+      const stuck = isoRules.filter(r => r.action === 'ISOLATE');
+      if (stuck.length) errors.push(`This tenant has no Cloud Browser Isolation profile, so ${stuck.map(r => r.name).join(', ')} cannot Isolate. Create a profile in the Isolation portal, or set those rules back to Block / Allow.`);
       for (const r of sbIso) { r.firstTimeOperation = 'QUARANTINE'; delete r.cbiProfile; warnings.push(`${r.name}: no isolation profile in this tenant — first-time action falls back to Quarantine.`); }
     }
     if (isoRules.length) {

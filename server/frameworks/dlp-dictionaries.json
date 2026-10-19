@@ -1,0 +1,141 @@
+{
+  "version": "2026.10.1",
+  "researchedAt": "2026-10-16",
+  "notes": "Custom dictionaries created by the wizard as <prefix>-Dict-<key>. Predefined Zscaler dictionaries are referenced as predefined:<internal name>. NPI uses Zscaler's predefined NPI dictionary (NPI_LEAKAGE) instead of a custom one (FWK-20 reuse).",
+  "custom": {
+    "ICD10": {
+      "name": "ICD10-Diagnosis",
+      "description": "ICD-10-CM diagnosis codes (letter + 2 characters + decimal subcode) near diagnosis keywords.",
+      "customPhraseMatchType": "MATCH_ALL_CUSTOM_PHRASE_PATTERN_DICTIONARY",
+      "patterns": [
+        "\\b[A-TV-Z][0-9][0-9AB]\\.[0-9A-KXZ]{1,4}\\b"
+      ],
+      "phrases": [
+        "diagnosis",
+        "ICD-10",
+        "ICD10",
+        "dx code",
+        "diagnosis code"
+      ],
+      "source": {
+        "title": "CDC/NCHS ICD-10-CM Official Guidelines FY2026 (code structure)",
+        "url": "https://ftp.cdc.gov/pub/health_statistics/nchs/publications/ICD10CM/2026/ICD-10-CM-October-2025-Guidelines.pdf"
+      }
+    },
+    "MBI": {
+      "name": "Medicare-MBI",
+      "description": "Medicare Beneficiary Identifier: 11 characters in the CMS-defined position pattern.",
+      "customPhraseMatchType": "MATCH_ANY_CUSTOM_PHRASE_PATTERN_DICTIONARY",
+      "patterns": [
+        "\\b[1-9][AC-HJKMNP-RT-Y][AC-HJKMNP-RT-Y0-9][0-9]-?[AC-HJKMNP-RT-Y][AC-HJKMNP-RT-Y0-9][0-9]-?[AC-HJKMNP-RT-Y]{2}[0-9]{2}\\b"
+      ],
+      "phrases": [],
+      "source": {
+        "title": "CMS: Understanding the MBI",
+        "url": "https://www.hhs.gov/guidance/sites/default/files/hhs-guidance-documents/Understanding-the-MBI-052918.pdf"
+      }
+    },
+    "MRN": {
+      "name": "Medical-Record-Number",
+      "description": "Medical record numbers labelled MRN / Medical Record Number.",
+      "customPhraseMatchType": "MATCH_ANY_CUSTOM_PHRASE_PATTERN_DICTIONARY",
+      "patterns": [
+        "\\b(MRN|Medical Record (Number|No\\.?|#))\\s*[:#]?\\s*[A-Z0-9]{6,12}\\b"
+      ],
+      "phrases": [],
+      "source": {
+        "title": "45 CFR 164.514(b)(2)(i)(H) \u2014 medical record numbers are a HIPAA identifier",
+        "url": "https://www.ecfr.gov/current/title-45/subtitle-A/subchapter-C/part-164/subpart-E/section-164.514"
+      }
+    },
+    "CARD_TRACK": {
+      "name": "Card-Track-Data",
+      "description": "Magnetic-stripe track 1 / track 2 data (sensitive authentication data).",
+      "customPhraseMatchType": "MATCH_ANY_CUSTOM_PHRASE_PATTERN_DICTIONARY",
+      "patterns": [
+        "%B[0-9]{13,19}\\^[^^]{2,26}\\^[0-9]{4}",
+        ";[0-9]{13,19}=[0-9]{4}[0-9]*\\?"
+      ],
+      "phrases": [],
+      "source": {
+        "title": "PCI DSS v4.0.1 Requirement 3.3.1 \u2014 SAD (full track) not retained",
+        "url": "https://opensecurityarchitecture.org/frameworks/pci-dss-v4"
+      }
+    },
+    "CUI_MARKINGS": {
+      "name": "CUI-Markings",
+      "description": "Controlled Unclassified Information banner and portion markings.",
+      "customPhraseMatchType": "MATCH_ANY_CUSTOM_PHRASE_PATTERN_DICTIONARY",
+      "patterns": [
+        "\\bCUI//[A-Z][A-Z\\-/ ]+"
+      ],
+      "phrases": [
+        "CONTROLLED UNCLASSIFIED INFORMATION",
+        "CUI//SP-",
+        "CONTROLLED//",
+        "FOR OFFICIAL USE ONLY"
+      ],
+      "source": {
+        "title": "NARA CUI Registry and marking guidance",
+        "url": "https://www.archives.gov/cui/registry/category-list"
+      }
+    },
+    "CJI_TERMS": {
+      "name": "CJI-Records",
+      "description": "Criminal Justice Information record terms (CHRI, NCIC, III, FBI/UCN/SID numbers).",
+      "customPhraseMatchType": "MATCH_ANY_CUSTOM_PHRASE_PATTERN_DICTIONARY",
+      "patterns": [],
+      "phrases": [
+        "criminal history record information",
+        "CHRI",
+        "NCIC",
+        "Interstate Identification Index",
+        "FBI Number",
+        "Universal Control Number",
+        "State Identification Number"
+      ],
+      "source": {
+        "title": "FBI CJIS Security Policy v6.0 \u2014 definition of CJI",
+        "url": "https://www.fdle.state.fl.us/CJJIS/CJIS_Security_Policy_v6-0_20241227-(2).aspx"
+      }
+    },
+    "STUDENT_RECORDS": {
+      "name": "Student-Records",
+      "description": "Education record terms defined by FERPA.",
+      "customPhraseMatchType": "MATCH_ANY_CUSTOM_PHRASE_PATTERN_DICTIONARY",
+      "patterns": [],
+      "phrases": [
+        "student ID",
+        "transcript",
+        "grade point average",
+        "Individualized Education Program",
+        "IEP",
+        "disciplinary record",
+        "education record"
+      ],
+      "source": {
+        "title": "34 CFR 99.3 \u2014 education records",
+        "url": "https://www.ecfr.gov/current/title-34/subtitle-A/part-99/subpart-A/section-99.3"
+      }
+    },
+    "MNPI": {
+      "name": "MNPI-Financial",
+      "description": "Material non-public information and pre-release financial reporting terms.",
+      "customPhraseMatchType": "MATCH_ANY_CUSTOM_PHRASE_PATTERN_DICTIONARY",
+      "patterns": [],
+      "phrases": [
+        "material non-public",
+        "MNPI",
+        "draft 10-K",
+        "draft 10-Q",
+        "earnings release draft",
+        "embargoed until",
+        "insider list"
+      ],
+      "source": {
+        "title": "Sarbanes-Oxley Act \u00a7302 / SEC Regulation FD",
+        "url": "https://www.sec.gov/about/laws/soa2002.pdf"
+      }
+    }
+  }
+}

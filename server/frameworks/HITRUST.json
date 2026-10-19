@@ -1,0 +1,220 @@
+{
+  "id": "HITRUST",
+  "type": "compliance",
+  "name": "HITRUST CSF",
+  "fullName": "Health Information Trust Alliance Common Security Framework v11",
+  "description": "Prescriptive, certifiable control framework for healthcare that harmonizes HIPAA, NIST and ISO controls.",
+  "version": "2026.10.1",
+  "researchedAt": "2026-10-16",
+  "baseTier": "STRICT",
+  "complianceKey": "HITRUST",
+  "sources": [
+    {
+      "id": "hitrust",
+      "title": "HITRUST CSF v11 control reference (09.j malicious code, 09.m network controls, 09.s information exchange, 01.v access restriction)",
+      "url": "https://opensecurityarchitecture.org/frameworks/hitrust-csf/controls"
+    },
+    {
+      "id": "hipaa-312",
+      "title": "45 CFR 164.312 Technical safeguards (eCFR)",
+      "url": "https://www.ecfr.gov/current/title-45/subtitle-A/subchapter-C/part-164/subpart-C/section-164.312"
+    },
+    {
+      "id": "icd10",
+      "title": "CDC/NCHS ICD-10-CM Official Guidelines for Coding and Reporting FY2026",
+      "url": "https://ftp.cdc.gov/pub/health_statistics/nchs/publications/ICD10CM/2026/ICD-10-CM-October-2025-Guidelines.pdf"
+    },
+    {
+      "id": "mbi",
+      "title": "CMS: Understanding the Medicare Beneficiary Identifier (MBI) format",
+      "url": "https://www.hhs.gov/guidance/sites/default/files/hhs-guidance-documents/Understanding-the-MBI-052918.pdf"
+    },
+    {
+      "id": "zs-sandbox",
+      "title": "Zscaler: Recommended Sandbox Policy",
+      "url": "https://help.zscaler.com/zia/recommended-sandbox-policy"
+    },
+    {
+      "id": "zs-edlp",
+      "title": "Zscaler: Configuring Endpoint DLP Policy Rules",
+      "url": "https://help.zscaler.com/zia/configuring-endpoint-dlp-policy-rules"
+    },
+    {
+      "id": "zs-api-adv-url",
+      "title": "Zscaler SDK (Go): URL & Cloud App advanced settings incl. GenAI prompt capture flags",
+      "url": "https://github.com/zscaler/zscaler-sdk-go/blob/master/zscaler/zia/services/urlfilteringpolicies/urlfilteringpolicies.go"
+    },
+    {
+      "id": "cis",
+      "title": "CIS Critical Security Controls v8.1 (Safeguards 9.2 DNS filtering, 9.3 URL filters, 9.6 block unnecessary file types, 10.1 anti-malware, 3.13 DLP)",
+      "url": "https://myctrl.tools/frameworks/cis-controls-v8"
+    }
+  ],
+  "controls": [
+    {
+      "id": "01.v",
+      "name": "Information access restriction",
+      "source": "hitrust"
+    },
+    {
+      "id": "09.j",
+      "name": "Controls against malicious code",
+      "source": "hitrust"
+    },
+    {
+      "id": "09.m",
+      "name": "Network controls",
+      "source": "hitrust"
+    },
+    {
+      "id": "09.s",
+      "name": "Information exchange policies and procedures",
+      "source": "hitrust"
+    },
+    {
+      "id": "09.aa",
+      "name": "Audit logging",
+      "source": "hitrust"
+    },
+    {
+      "id": "10.d",
+      "name": "Message integrity / cryptographic controls",
+      "source": "hitrust"
+    }
+  ],
+  "areas": {
+    "urlFiltering": {
+      "controls": [
+        "09.j",
+        "01.v"
+      ],
+      "rationale": "Block malicious and non-business categories per HITRUST web filtering requirements."
+    },
+    "cloudAppControl": {
+      "controls": [
+        "09.s"
+      ],
+      "rationale": "Restrict information exchange through unsanctioned cloud apps."
+    },
+    "fileTypeControl": {
+      "controls": [
+        "09.j"
+      ],
+      "rationale": "Block high-risk file types."
+    },
+    "advancedThreatProtection": {
+      "controls": [
+        "09.j"
+      ],
+      "rationale": "Full ATP protections."
+    },
+    "firewallFiltering": {
+      "controls": [
+        "09.m"
+      ],
+      "rationale": "Default-deny outbound with explicit allows."
+    },
+    "dnsSecurity": {
+      "controls": [
+        "09.m"
+      ],
+      "rationale": "DNS filtering and tunnel blocking."
+    },
+    "sslInspection": {
+      "controls": [
+        "09.m",
+        "10.d"
+      ],
+      "rationale": "Inspect TLS to enforce network controls."
+    },
+    "dlpMonitor": {
+      "controls": [
+        "09.aa"
+      ],
+      "rationale": "Log sensitive data movement."
+    },
+    "dlpBlock": {
+      "controls": [
+        "09.s"
+      ],
+      "rationale": "Block ePHI and card data exchange."
+    },
+    "endpointDlp": {
+      "controls": [
+        "09.s"
+      ],
+      "rationale": "Monitor removable media, personal cloud and print."
+    },
+    "sandbox": {
+      "controls": [
+        "09.j"
+      ],
+      "rationale": "Sandbox unknown files."
+    },
+    "aiPromptCapture": {
+      "controls": [
+        "09.aa",
+        "09.s"
+      ],
+      "rationale": "Capture GenAI prompts for audit."
+    }
+  },
+  "dlp": {
+    "monitorEngines": [
+      "HIPAA",
+      "PCI"
+    ],
+    "blockRules": [
+      {
+        "key": "PHI-Identifiers",
+        "label": "PHI-Identifiers",
+        "dictionaries": [
+          "predefined:SSN",
+          "custom:MBI",
+          "custom:MRN"
+        ],
+        "controls": [
+          "09.s"
+        ]
+      },
+      {
+        "key": "PHI-Clinical",
+        "label": "PHI-Clinical",
+        "dictionaries": [
+          "predefined:MEDICAL",
+          "custom:ICD10",
+          "predefined:NPI_LEAKAGE"
+        ],
+        "controls": [
+          "09.s"
+        ]
+      },
+      {
+        "key": "Payment-Cards",
+        "label": "Payment-Cards",
+        "dictionaries": [
+          "predefined:CREDIT_CARD",
+          "custom:CARD_TRACK"
+        ],
+        "controls": [
+          "09.s"
+        ]
+      },
+      {
+        "key": "Credentials",
+        "label": "Credentials",
+        "dictionaries": [
+          "predefined:CRED_LEAKAGE"
+        ],
+        "controls": [
+          "01.v"
+        ]
+      }
+    ],
+    "endpointChannels": [
+      "REMOVABLE_DRIVE_TRANSFER",
+      "PERSONAL_CLOUD_STORAGE",
+      "PRINTING"
+    ]
+  }
+}

@@ -1,0 +1,195 @@
+{
+  "id": "CJIS",
+  "type": "compliance",
+  "name": "CJIS",
+  "fullName": "FBI Criminal Justice Information Services Security Policy v6.0",
+  "description": "Security requirements for agencies and vendors that access Criminal Justice Information (CJI); v6.0 aligns to NIST 800-53 controls.",
+  "version": "2026.10.1",
+  "researchedAt": "2026-10-16",
+  "baseTier": "STRICT",
+  "complianceKey": "CJIS",
+  "sources": [
+    {
+      "id": "cjis",
+      "title": "FBI CJIS Security Policy v6.0 (2024-12-27)",
+      "url": "https://www.fdle.state.fl.us/CJJIS/CJIS_Security_Policy_v6-0_20241227-(2).aspx"
+    },
+    {
+      "id": "nist53",
+      "title": "NIST SP 800-53 Rev. 5 Security and Privacy Controls",
+      "url": "https://csrc.nist.gov/pubs/sp/800/53/r5/upd1/final"
+    },
+    {
+      "id": "zs-sandbox",
+      "title": "Zscaler: Recommended Sandbox Policy",
+      "url": "https://help.zscaler.com/zia/recommended-sandbox-policy"
+    },
+    {
+      "id": "zs-edlp",
+      "title": "Zscaler: Configuring Endpoint DLP Policy Rules",
+      "url": "https://help.zscaler.com/zia/configuring-endpoint-dlp-policy-rules"
+    },
+    {
+      "id": "zs-api-adv-url",
+      "title": "Zscaler SDK (Go): URL & Cloud App advanced settings incl. GenAI prompt capture flags",
+      "url": "https://github.com/zscaler/zscaler-sdk-go/blob/master/zscaler/zia/services/urlfilteringpolicies/urlfilteringpolicies.go"
+    },
+    {
+      "id": "cis",
+      "title": "CIS Critical Security Controls v8.1 (Safeguards 9.2 DNS filtering, 9.3 URL filters, 9.6 block unnecessary file types, 10.1 anti-malware, 3.13 DLP)",
+      "url": "https://myctrl.tools/frameworks/cis-controls-v8"
+    }
+  ],
+  "controls": [
+    {
+      "id": "SC-7",
+      "name": "Boundary protection (CJIS v6.0 adopts 800-53 SC family)",
+      "source": "cjis"
+    },
+    {
+      "id": "SC-8",
+      "name": "Transmission confidentiality",
+      "source": "cjis"
+    },
+    {
+      "id": "SI-3",
+      "name": "Malicious code protection",
+      "source": "cjis"
+    },
+    {
+      "id": "SI-4",
+      "name": "System monitoring",
+      "source": "cjis"
+    },
+    {
+      "id": "AC-4",
+      "name": "Information flow enforcement",
+      "source": "cjis"
+    },
+    {
+      "id": "AU-2",
+      "name": "Event logging",
+      "source": "cjis"
+    },
+    {
+      "id": "MP-7",
+      "name": "Media use",
+      "source": "cjis"
+    }
+  ],
+  "areas": {
+    "urlFiltering": {
+      "controls": [
+        "SC-7",
+        "SI-3"
+      ],
+      "rationale": "Control and monitor internet access."
+    },
+    "cloudAppControl": {
+      "controls": [
+        "AC-4"
+      ],
+      "rationale": "Restrict CJI flow to unapproved cloud services."
+    },
+    "fileTypeControl": {
+      "controls": [
+        "SI-3"
+      ],
+      "rationale": "Block high-risk file types."
+    },
+    "advancedThreatProtection": {
+      "controls": [
+        "SI-3",
+        "SI-4"
+      ],
+      "rationale": "Malicious code protection."
+    },
+    "firewallFiltering": {
+      "controls": [
+        "SC-7"
+      ],
+      "rationale": "Boundary protection."
+    },
+    "dnsSecurity": {
+      "controls": [
+        "SC-7",
+        "SI-4"
+      ],
+      "rationale": "DNS-layer boundary protection."
+    },
+    "sslInspection": {
+      "controls": [
+        "SC-8",
+        "SI-4"
+      ],
+      "rationale": "Inspect encrypted traffic."
+    },
+    "dlpMonitor": {
+      "controls": [
+        "AU-2"
+      ],
+      "rationale": "Log CJI movement."
+    },
+    "dlpBlock": {
+      "controls": [
+        "AC-4"
+      ],
+      "rationale": "Block CJI leaving to unauthorized destinations."
+    },
+    "endpointDlp": {
+      "controls": [
+        "MP-7"
+      ],
+      "rationale": "Media use restrictions."
+    },
+    "sandbox": {
+      "controls": [
+        "SI-3"
+      ],
+      "rationale": "Detonate unknown files."
+    },
+    "aiPromptCapture": {
+      "controls": [
+        "AU-2"
+      ],
+      "rationale": "Log AI tool use."
+    }
+  },
+  "dlp": {
+    "monitorEngines": [
+      "HIPAA",
+      "GLBA"
+    ],
+    "blockRules": [
+      {
+        "key": "CJI-Records",
+        "label": "CJI-Records",
+        "dictionaries": [
+          "custom:CJI_TERMS"
+        ],
+        "controls": [
+          "AC-4"
+        ]
+      },
+      {
+        "key": "PII",
+        "label": "PII",
+        "dictionaries": [
+          "predefined:SSN",
+          "predefined:USDL_LEAKAGE"
+        ],
+        "controls": [
+          "AC-4"
+        ]
+      }
+    ],
+    "endpointChannels": [
+      "REMOVABLE_DRIVE_TRANSFER",
+      "PERSONAL_CLOUD_STORAGE",
+      "PRINTING"
+    ]
+  },
+  "notes": [
+    "No out-of-the-box Zscaler DLP engine targets CJI; Monitor mode uses PII-oriented engines, Block mode adds the CJI terms dictionary."
+  ]
+}

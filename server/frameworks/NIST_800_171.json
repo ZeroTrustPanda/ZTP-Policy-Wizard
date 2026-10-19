@@ -1,0 +1,214 @@
+{
+  "id": "NIST_800_171",
+  "type": "compliance",
+  "name": "NIST 800-171",
+  "fullName": "NIST Special Publication 800-171 Rev. 3",
+  "description": "Security requirements for protecting Controlled Unclassified Information (CUI) in nonfederal systems (CMMC Level 2).",
+  "version": "2026.10.1",
+  "researchedAt": "2026-10-16",
+  "baseTier": "STRICT",
+  "complianceKey": "NIST_800_171",
+  "sources": [
+    {
+      "id": "nist171",
+      "title": "NIST SP 800-171 Rev. 3 Protecting CUI in Nonfederal Systems",
+      "url": "https://csrc.nist.gov/News/2024/updated-security-requirements-for-protecting-cui"
+    },
+    {
+      "id": "cui",
+      "title": "NARA CUI Registry and marking guidance",
+      "url": "https://www.archives.gov/cui/registry/category-list"
+    },
+    {
+      "id": "zs-sandbox",
+      "title": "Zscaler: Recommended Sandbox Policy",
+      "url": "https://help.zscaler.com/zia/recommended-sandbox-policy"
+    },
+    {
+      "id": "zs-edlp",
+      "title": "Zscaler: Configuring Endpoint DLP Policy Rules",
+      "url": "https://help.zscaler.com/zia/configuring-endpoint-dlp-policy-rules"
+    },
+    {
+      "id": "zs-api-adv-url",
+      "title": "Zscaler SDK (Go): URL & Cloud App advanced settings incl. GenAI prompt capture flags",
+      "url": "https://github.com/zscaler/zscaler-sdk-go/blob/master/zscaler/zia/services/urlfilteringpolicies/urlfilteringpolicies.go"
+    },
+    {
+      "id": "cis",
+      "title": "CIS Critical Security Controls v8.1 (Safeguards 9.2 DNS filtering, 9.3 URL filters, 9.6 block unnecessary file types, 10.1 anti-malware, 3.13 DLP)",
+      "url": "https://myctrl.tools/frameworks/cis-controls-v8"
+    }
+  ],
+  "controls": [
+    {
+      "id": "03.01.03",
+      "name": "Information flow enforcement",
+      "source": "nist171"
+    },
+    {
+      "id": "03.03.01",
+      "name": "Event logging",
+      "source": "nist171"
+    },
+    {
+      "id": "03.04.06",
+      "name": "Least functionality",
+      "source": "nist171"
+    },
+    {
+      "id": "03.08.07",
+      "name": "Media use",
+      "source": "nist171"
+    },
+    {
+      "id": "03.13.01",
+      "name": "Boundary protection",
+      "source": "nist171"
+    },
+    {
+      "id": "03.13.06",
+      "name": "Network communications \u2014 deny by default",
+      "source": "nist171"
+    },
+    {
+      "id": "03.13.08",
+      "name": "Transmission and storage confidentiality",
+      "source": "nist171"
+    },
+    {
+      "id": "03.14.02",
+      "name": "Malicious code protection",
+      "source": "nist171"
+    },
+    {
+      "id": "03.14.06",
+      "name": "System monitoring",
+      "source": "nist171"
+    }
+  ],
+  "areas": {
+    "urlFiltering": {
+      "controls": [
+        "03.13.01",
+        "03.14.02"
+      ],
+      "rationale": "Boundary protection and malicious code protection."
+    },
+    "cloudAppControl": {
+      "controls": [
+        "03.01.03"
+      ],
+      "rationale": "Control CUI flow to cloud services."
+    },
+    "fileTypeControl": {
+      "controls": [
+        "03.04.06",
+        "03.14.02"
+      ],
+      "rationale": "Least functionality."
+    },
+    "advancedThreatProtection": {
+      "controls": [
+        "03.14.02",
+        "03.14.06"
+      ],
+      "rationale": "Malicious code protection and monitoring."
+    },
+    "firewallFiltering": {
+      "controls": [
+        "03.13.06"
+      ],
+      "rationale": "Deny by default."
+    },
+    "dnsSecurity": {
+      "controls": [
+        "03.13.01",
+        "03.14.06"
+      ],
+      "rationale": "Boundary protection at DNS."
+    },
+    "sslInspection": {
+      "controls": [
+        "03.13.08",
+        "03.14.06"
+      ],
+      "rationale": "Inspect encrypted traffic."
+    },
+    "dlpMonitor": {
+      "controls": [
+        "03.03.01"
+      ],
+      "rationale": "Log CUI movement."
+    },
+    "dlpBlock": {
+      "controls": [
+        "03.01.03"
+      ],
+      "rationale": "Block CUI flow to unauthorized destinations."
+    },
+    "endpointDlp": {
+      "controls": [
+        "03.08.07"
+      ],
+      "rationale": "Media use restrictions."
+    },
+    "sandbox": {
+      "controls": [
+        "03.14.02"
+      ],
+      "rationale": "Detonate unknown files."
+    },
+    "aiPromptCapture": {
+      "controls": [
+        "03.03.01"
+      ],
+      "rationale": "Log AI tool use."
+    }
+  },
+  "dlp": {
+    "monitorEngines": [
+      "HIPAA",
+      "PCI",
+      "GLBA"
+    ],
+    "blockRules": [
+      {
+        "key": "CUI-Markings",
+        "label": "CUI-Markings",
+        "dictionaries": [
+          "custom:CUI_MARKINGS"
+        ],
+        "controls": [
+          "03.01.03"
+        ]
+      },
+      {
+        "key": "PII",
+        "label": "PII",
+        "dictionaries": [
+          "predefined:SSN",
+          "predefined:TIN_LEAKAGE"
+        ],
+        "controls": [
+          "03.01.03"
+        ]
+      },
+      {
+        "key": "Credentials",
+        "label": "Credentials",
+        "dictionaries": [
+          "predefined:CRED_LEAKAGE"
+        ],
+        "controls": [
+          "03.01.03"
+        ]
+      }
+    ],
+    "endpointChannels": [
+      "REMOVABLE_DRIVE_TRANSFER",
+      "PERSONAL_CLOUD_STORAGE",
+      "PRINTING"
+    ]
+  }
+}
