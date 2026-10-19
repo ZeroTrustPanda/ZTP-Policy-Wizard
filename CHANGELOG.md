@@ -13,6 +13,7 @@ Implements the *Policy Wizard 2.0 Requirements Specification*.
 - ZCC IP Inclusions and Exclusions take an IP address or CIDR only. A domain name there makes ZCC reject the whole app profile (HTTP 200, success:false), so the dry run now refuses it. This deviates from ZCC-08, which allows FQDNs.
 - ZCC re-runs compare bypass apps against the apps that were picked, not the template default, so they now show No change.
 - Cloud App Control Caution actions need the browsers named. ZIA answers "Caution Action can be applied only for specific user agents", so Caution rules now set the user agent types.
+- **Standalone:** logs go to `ZTP-Wizard/logs` in the home folder. The first 2.0 Mac build crashed at start ("ENOTSUP … mkdir '/home/claude'") because it tried to create the build machine's folder.
 - A timed-out ZIA GET or PUT (both safe to repeat) is retried once. A timeout on the AI prompt settings update was seen live.
 
 - **Global:**
