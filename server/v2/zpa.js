@@ -112,6 +112,11 @@ function validateZpaInput(input) {
     const b = validateBulkApps(input.apps);
     if (!['ON_ACCESS', 'CONTINUOUS', 'NONE'].includes(input.settings?.healthReporting || 'ON_ACCESS')) b.errors.push('Health check must be On Access, Continuous or None.');
     for (const a of input.apps) if (a.settings && a.settings.healthReporting && !['ON_ACCESS', 'CONTINUOUS', 'NONE'].includes(a.settings.healthReporting)) b.errors.push(`${a.name}: health check must be On Access, Continuous or None.`);
+    for (const a of b.apps) {
+      const health = (a.settings && a.settings.healthReporting) || input.settings?.healthReporting || 'ON_ACCESS';
+      const subnets = a.entries.filter(e => classifyEntry(e).type === 'cidr');
+      if (health === 'CONTINUOUS' && subnets.length) b.errors.push(`${a.name}: ZPA does not allow Continuous health checks on subnet destinations (${subnets.join(', ')}). Use On Access or None for this application.`);
+    }
     return { errors: b.errors, bulk: b.apps, entries: [], tcp: [], udp: [] };
   }
   const errors = [];
@@ -122,6 +127,8 @@ function validateZpaInput(input) {
   errors.push(...tcp.errors.map(e => `TCP ports: ${e}`), ...udp.errors.map(e => `UDP ports: ${e}`));
   if (!tcp.ranges.length && !udp.ranges.length) errors.push('Enter at least one TCP or UDP port range.');
   if (!['ON_ACCESS', 'CONTINUOUS', 'NONE'].includes(input.settings?.healthReporting || 'ON_ACCESS')) errors.push('Health check must be On Access, Continuous or None.');
+  const subnets = entries.filter(e => classifyEntry(e).type === 'cidr');
+  if (input.settings?.healthReporting === 'CONTINUOUS' && subnets.length) errors.push(`ZPA does not allow Continuous health checks on subnet destinations (${subnets.join(', ')}). Use On Access or None.`);
   return { errors, entries, tcp: tcp.ranges, udp: udp.ranges };
 }
 
