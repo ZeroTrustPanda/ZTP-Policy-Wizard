@@ -1,0 +1,74 @@
+{
+ "id": "2026-10-19T20-59-09-528Z-zpa-ZPOVTEST",
+ "at": "2026-10-19T20:59:09.528Z",
+ "product": "zpa",
+ "prefix": "ZPOVTEST",
+ "tenant": "acme",
+ "steps": [
+  {
+   "op": "DELETE",
+   "path": "/zpa/mgmtconfig/v1/admin/customers/72000001/appConnectorGroup/5050",
+   "label": "App Connector Group: ZPOVTEST-appconnector-group"
+  },
+  {
+   "op": "DELETE",
+   "path": "/zpa/mgmtconfig/v1/admin/customers/72000001/associationType/CONNECTOR_GRP/provisioningKey/5051",
+   "label": "Provisioning Key: ZPOVTEST-provisioning-key"
+  },
+  {
+   "op": "DELETE",
+   "path": "/zpa/mgmtconfig/v1/admin/customers/72000001/segmentGroup/5052",
+   "label": "Segment Group: ZPOVTEST-segment-group"
+  },
+  {
+   "op": "DELETE",
+   "path": "/zpa/mgmtconfig/v1/admin/customers/72000001/serverGroup/5053",
+   "label": "Server Group: ZPOVTEST-server-group"
+  },
+  {
+   "op": "DELETE",
+   "path": "/zpa/mgmtconfig/v1/admin/customers/72000001/application/5054?forceDelete=true",
+   "label": "Application Segment: ZPOVTEST-app-segment"
+  },
+  {
+   "op": "DELETE",
+   "path": "/zpa/mgmtconfig/v1/admin/customers/72000001/policySet/159/rule/5055",
+   "label": "Policy Rule: ZPOVTEST-timeout-policy"
+  },
+  {
+   "op": "DELETE",
+   "path": "/zpa/mgmtconfig/v1/admin/customers/72000001/inspectionProfile/5056",
+   "label": "Inspection Profile: ZPOVTEST-inspection-profile"
+  },
+  {
+   "op": "DELETE",
+   "path": "/zpa/mgmtconfig/v1/admin/customers/72000001/policySet/163/rule/5057",
+   "label": "Policy Rule: ZPOVTEST-inspection-policy"
+  },
+  {
+   "op": "DELETE",
+   "path": "/zpa/cbiconfig/cbi/api/customers/72000001/profiles/cbi-5058",
+   "label": "Isolation Profile: ZPOVTEST-isolation-profile"
+  },
+  {
+   "op": "DELETE",
+   "path": "/zpa/mgmtconfig/v1/admin/customers/72000001/policySet/422/rule/5060",
+   "label": "Policy Rule: ZPOVTEST-isolation-policy"
+  },
+  {
+   "op": "DELETE",
+   "path": "/zpa/mgmtconfig/v1/admin/customers/72000001/application/5061?forceDelete=true",
+   "label": "PRA Application: ZPOVTEST-pra-rdp"
+  },
+  {
+   "op": "DELETE",
+   "path": "/zpa/mgmtconfig/v1/admin/customers/72000001/praConsole/5063",
+   "label": "PRA Console: ZPOVTEST-pra-rdp-console"
+  },
+  {
+   "op": "DELETE",
+   "path": "/zpa/mgmtconfig/v1/admin/customers/72000001/policySet/157/rule/5064",
+   "label": "Policy Rule: ZPOVTEST-access-policy"
+  }
+ ]
+}

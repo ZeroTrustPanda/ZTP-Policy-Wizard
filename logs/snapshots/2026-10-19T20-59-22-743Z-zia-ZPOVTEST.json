@@ -1,0 +1,29 @@
+{
+ "id": "2026-10-19T20-59-22-743Z-zia-ZPOVTEST",
+ "at": "2026-10-19T20:59:22.743Z",
+ "product": "zia",
+ "prefix": "ZPOVTEST",
+ "tenant": "acme",
+ "steps": [
+  {
+   "op": "DELETE",
+   "path": "/api/v1/firewallDnsRules/5068",
+   "label": "DNS Security: ZPOVTEST-DNS-Blk-Critical-Tunne"
+  },
+  {
+   "op": "DELETE",
+   "path": "/api/v1/firewallDnsRules/5069",
+   "label": "DNS Security: ZPOVTEST-DNS-Block-High-Tunnels"
+  },
+  {
+   "op": "DELETE",
+   "path": "/api/v1/firewallDnsRules/5070",
+   "label": "DNS Security: ZPOVTEST-DNS-DoH-Block-Risky"
+  },
+  {
+   "op": "DELETE",
+   "path": "/api/v1/firewallDnsRules/5071",
+   "label": "DNS Security: ZPOVTEST-DNS-Trusted-Resolver"
+  }
+ ]
+}

@@ -521,8 +521,24 @@
         if (body) opts.body = JSON.stringify(body);
         const res = await fetch(`/api${path}`, opts);
         const data = await res.json();
-        if (!res.ok) throw new Error(data.error || 'Request failed');
+        if (!res.ok) { const e = new Error(data.error || 'Request failed'); e.data = data; e.status = res.status; throw e; }
         return data;
+      },
+      /** v2.2 live progress: newline-delimited JSON from /api/v2/events; returns a stop function. */
+      events(onEvent) {
+        const ctl = new AbortController();
+        (async () => {
+          try {
+            const res = await fetch('/api/v2/events', { headers: { 'X-Session-Id': this.sessionId || '' }, signal: ctl.signal });
+            const reader = res.body.getReader(); const dec = new TextDecoder(); let buf = '';
+            for (;;) {
+              const { value, done } = await reader.read(); if (done) break;
+              buf += dec.decode(value, { stream: true });
+              let i; while ((i = buf.indexOf('\n')) >= 0) { const line = buf.slice(0, i); buf = buf.slice(i + 1); try { const ev = JSON.parse(line); if (!ev.beat && !ev.hello) onEvent(ev); } catch (e) { /* partial */ } }
+            }
+          } catch (e) { /* stopped */ }
+        })();
+        return () => ctl.abort();
       }
     };
 
@@ -623,6 +639,7 @@
         else if (['zpa', 'zpa-bulk', 'zdx-bulk', 'report'].includes(mod)) setStep(mod);
         else if (mod === 'zia-ssl') setStep('ssl');
         else if (mod === 'zcc') setStep('zcc');
+        else if (['start', 'tests', 'zcc-devices', 'restore'].includes(mod)) setStep(mod);
         else if (mod === 'zdx') setStep('zdx');
         else if (mod === 'about') setStep('about');
         else if (mod === 'catalog') setStep('catalog');
@@ -640,6 +657,7 @@
       const zpaExpanded = activeModule === 'zpa' || activeModule === 'zpa-bulk';
       const zdxExpanded = activeModule === 'zdx' || activeModule === 'zdx-bulk';
       const needsPrefix = auth.connected && !globalPrefix && ['zia-pov', 'zpa', 'zcc'].includes(activeModule);
+      const zccExpanded = activeModule === 'zcc' || activeModule === 'zcc-devices';
       const sub = (mod, icon, label, extra = {}) => (
         <div className={`sidebar-item ${activeModule === mod ? 'active' : ''}`} data-nav={mod} onClick={() => switchModule(mod)}
           style={{paddingLeft:'2.2rem', fontSize:'12px', cursor:'pointer', ...extra}}>
@@ -654,6 +672,7 @@
               <div className="logo" style={{fontSize:'16px'}}>🐼</div>
               <div><h1 style={{fontSize:'15px'}}>ZeroTrustPanda ZS Policy Wizard</h1></div>
               <span className="tag">v{APP_VERSION}</span>
+              <UpdateBadge />
             </div>
             <div className="header-right">
               <div className={`auth-badge ${auth.connected ? 'connected' : 'disconnected'}`}>
@@ -679,11 +698,16 @@
               </div>
               {auth.connected && (
                 <div className="sidebar-section">
+                  <div className={`sidebar-item ${activeModule === 'start' ? 'active' : ''}`} data-nav="start"
+                    onClick={() => switchModule('start')} style={{cursor:'pointer', fontWeight:600}}>
+                    <span className="step-num">🚀</span> POV Start
+                  </div>
                   <div className="sidebar-section-title">Modules</div>
-                  <div className={`sidebar-item ${activeModule === 'zcc' ? 'active' : ''}`} data-nav="zcc-top"
-                    onClick={() => switchModule('zcc')} style={{cursor:'pointer'}}>
+                  <div className={`sidebar-item ${zccExpanded ? 'active' : ''}`} data-nav="zcc-top"
+                    onClick={() => switchModule('zcc')} style={{cursor:'pointer', fontWeight: zccExpanded ? 600 : 400}}>
                     <span className="step-num">📱</span> Zscaler Client Connector
                   </div>
+                  {zccExpanded && (<>{sub('zcc', '🧭', 'Profiles')}{sub('zcc-devices', '💻', 'Devices & Install')}</>)}
                   <div className={`sidebar-item ${ziaExpanded ? 'active' : ''}`} data-nav="zia-top"
                     onClick={() => switchModule('zia-pov')} style={{cursor:'pointer', fontWeight: ziaExpanded ? 600 : 400}}>
                     <span className="step-num">🌐</span> Zscaler Internet Access
@@ -718,8 +742,16 @@
                     <span className="step-num">📈</span> Zscaler Digital Experience
                   </div>
                   {zdxExpanded && (<>{sub('zdx', '🧭', 'Probes & Apps')}{sub('zdx-bulk', '🗑️', 'Bulk Manager')}</>)}
+                  <div className={`sidebar-item ${activeModule === 'tests' ? 'active' : ''}`} data-nav="tests"
+                    onClick={() => switchModule('tests')} style={{cursor:'pointer', marginTop:'0.5rem'}}>
+                    <span className="step-num">🧪</span> POV Tests
+                  </div>
+                  <div className={`sidebar-item ${activeModule === 'restore' ? 'active' : ''}`} data-nav="restore"
+                    onClick={() => switchModule('restore')} style={{cursor:'pointer'}}>
+                    <span className="step-num">🛟</span> Restore & Drift
+                  </div>
                   <div className={`sidebar-item ${activeModule === 'report' ? 'active' : ''}`} data-nav="report"
-                    onClick={() => switchModule('report')} style={{cursor:'pointer', marginTop:'0.5rem'}}>
+                    onClick={() => switchModule('report')} style={{cursor:'pointer'}}>
                     <span className="step-num">🧾</span> Summary Report
                   </div>
                 </div>
@@ -750,8 +782,13 @@
               {auth.connected && activeModule === 'zpa-bulk' && meta && <BulkManagerV2 key="zpa" product="zpa" prefix={globalPrefix} meta={meta} setError={setError} />}
               {auth.connected && activeModule === 'zdx-bulk' && meta && <BulkManagerV2 key="zdx" product="zdx" prefix={globalPrefix} meta={meta} setError={setError} />}
               {auth.connected && activeModule === 'report' && <ReportStep setError={setError} />}
+              {auth.connected && <RateLimitBar />}
+              {auth.connected && activeModule === 'start' && <PovStart meta={meta} prefix={globalPrefix} setPrefix={setGlobalPrefix} licensing={licensing} setError={setError} onReport={() => switchModule('report')} />}
+              {auth.connected && activeModule === 'tests' && <PovTests setError={setError} />}
+              {auth.connected && activeModule === 'zcc-devices' && <ZccDevicesInstall setError={setError} />}
+              {auth.connected && activeModule === 'restore' && <RestoreDrift prefix={globalPrefix} setError={setError} />}
               {showConnect && (<ConnectStep auth={auth} setAuth={setAuth} setError={setError} loading={loading} setLoading={setLoading}
-                onComplete={() => { markComplete('connect'); setActiveModule(null); setStep('select'); }} />)}
+                onComplete={() => { markComplete('connect'); setActiveModule('start'); setStep('start'); }} />)}
               {auth.connected && !activeModule && (
                 <div className="card">
                   <div className="card-header"><h2>🐼 Welcome to ZeroTrustPanda</h2><p>Select a module from the sidebar or choose below.</p></div>
@@ -1043,6 +1080,9 @@
     function PovRulesStep({ meta, pov, setPov, prefix, auth, setError, onNext, onBack }) {
       const [tpl, setTpl] = useState(null);
       const [open, setOpen] = useState({});
+      const [q, setQ] = useState('');
+      const [changedOnly, setChangedOnly] = useState(false);
+      const searchRef = useRef(null);
       const [certs, reloadCerts] = useSslCertificates(!!(pov.scope && pov.scope.sslInspection) && auth.connected);
       const key = JSON.stringify([pov.baseline, pov.scope, prefix]);
       useEffect(() => {
@@ -1070,6 +1110,21 @@
         return /^(ALLOW)/.test(d) ? 'ALLOW' : /^(BLOCK|DENY)/.test(d) ? 'BLOCK' : d === 'ISOLATE' ? 'ISOLATE' : null;
       };
       const settingValue = (s) => pov.settingOverrides[s.key] !== undefined ? pov.settingOverrides[s.key] : s.defaultValue;
+      // 19: search, changed-from-default filter, expand / collapse, keyboard shortcuts
+      const isChanged = (g, r) => !!disabled[r.key] || !!choices.rules[r.key] || !!choices.policy[g.type] || pov.settingOverrides[r.key] !== undefined;
+      const visible = (g, r) => (!q || `${r.name || r.label} ${r.description || ''}`.toLowerCase().includes(q.toLowerCase())) && (!changedOnly || isChanged(g, r));
+      const setAllOpen = (v) => tpl && setOpen(Object.fromEntries(tpl.catalog.map(g => [g.type, v])));
+      useEffect(() => {
+        const onKey = (e) => {
+          const typing = /INPUT|TEXTAREA|SELECT/.test((e.target && e.target.tagName) || '');
+          if (e.key === '/' && !typing) { e.preventDefault(); searchRef.current && searchRef.current.focus(); }
+          else if (e.key === 'Escape' && typing && e.target === searchRef.current) { setQ(''); e.target.blur(); }
+          else if (!typing && (e.key === 'e' || e.key === 'E')) setAllOpen(true);
+          else if (!typing && (e.key === 'c' || e.key === 'C')) setAllOpen(false);
+        };
+        window.addEventListener('keydown', onKey);
+        return () => window.removeEventListener('keydown', onKey);
+      }, [tpl]);
       if (!tpl) return <div className="card"><div style={{textAlign:'center', padding:'2rem'}}><div className="spinner" style={{margin:'0 auto'}}></div><div className="form-hint">Building the rule set for {pov.baseline}…</div></div></div>;
       const total = tpl.catalog.reduce((n, g) => n + (g.rules || g.settings).length, 0);
       const off = tpl.catalog.reduce((n, g) => n + (g.rules || g.settings).filter(r => disabled[r.key]).length, 0);
@@ -1080,9 +1135,15 @@
             <p>Every rule the baseline creates for the features in scope, grouped by category. Switch rules on or off, and choose Allow or Block per category or per rule. A rule you change after using the category control keeps your choice until you use the category control again.</p></div>
           <div className="alert alert-info"><span>{total - off} of {total} rules and settings on · names start with <code>{prefix}-</code></span></div>
           {(tpl.generationNotes || []).length > 0 && <div className="alert alert-warning" style={{display:'block'}}>{tpl.generationNotes.map((n, i) => <div key={i}>⚠ {n}</div>)}</div>}
-          <div style={{display:'flex', gap:'6px', marginBottom:'0.75rem'}}>
+          <div style={{display:'flex', gap:'6px', marginBottom:'0.75rem', flexWrap:'wrap', alignItems:'center'}}>
             <button className="btn btn-ghost btn-sm" onClick={() => setAll(true)} data-globalselect>Select all</button>
             <button className="btn btn-ghost btn-sm" onClick={() => setAll(false)} data-globaldeselect>Deselect all</button>
+            <span style={{width:'12px'}}></span>
+            <input ref={searchRef} type="search" value={q} placeholder="Search rules  ( / )" onChange={e => setQ(e.target.value)} style={{width:'220px'}} data-rulesearch />
+            <label style={{fontSize:'12px', display:'flex', gap:'4px', alignItems:'center', cursor:'pointer'}}><input type="checkbox" checked={changedOnly} onChange={e => setChangedOnly(e.target.checked)} data-changedonly /> Changed from default</label>
+            <button className="btn btn-ghost btn-sm" onClick={() => setAllOpen(true)} title="E" data-expandall>Expand all</button>
+            <button className="btn btn-ghost btn-sm" onClick={() => setAllOpen(false)} title="C" data-collapseall>Collapse all</button>
+            <span className="form-hint" style={{margin:0}}>Keys: / search · E expand · C collapse · Esc clear</span>
           </div>
           {(anyIsolate || (pov.scope.sandboxAdvanced)) && <IsolationProfilePicker config={pov} setConfig={(c) => setPov(typeof c === 'function' ? c : () => c)} auth={auth} />}
           {pov.scope.sslInspection && (
@@ -1092,16 +1153,19 @@
             </div>
           )}
           {tpl.catalog.map(g => {
-            const items = g.rules || g.settings;
-            const onCount = items.filter(r => !disabled[r.key]).length;
+            const all = g.rules || g.settings;
+            const items = all.filter(r => visible(g, r));
+            if ((q || changedOnly) && !items.length) return null;
+            const isOpen = open[g.type] || ((q || changedOnly) && items.length > 0);
+            const onCount = all.filter(r => !disabled[r.key]).length;
             const pol = choices.policy[g.type] || 'DEFAULT';
             return (
               <div className="ab-group" key={g.type} data-rulegroup={g.type}>
                 <div className="ab-group-header" onClick={() => setOpen({ ...open, [g.type]: !open[g.type] })}>
-                  <div><div className="ab-group-title">{open[g.type] ? '▾' : '▸'} {g.label}</div><div className="ab-group-sub">{onCount} of {items.length} on</div></div>
+                  <div><div className="ab-group-title">{isOpen ? '▾' : '▸'} {g.label}</div><div className="ab-group-sub">{onCount} of {all.length} on{(q || changedOnly) ? ` · ${items.length} shown` : ''}</div></div>
                   <div style={{display:'flex', gap:'8px'}} onClick={e => e.stopPropagation()}>
                     <div className="ab-seg">
-                      <button className={onCount === items.length ? 'on-default' : ''} onClick={() => setGroupOn(g, true)} data-allon>Select all</button>
+                      <button className={onCount === all.length ? 'on-default' : ''} onClick={() => setGroupOn(g, true)} data-allon>Select all</button>
                       <button className={onCount === 0 ? 'on-block' : ''} onClick={() => setGroupOn(g, false)} data-alloff>Deselect all</button>
                     </div>
                     {g.canOverride && (
@@ -1113,7 +1177,7 @@
                     )}
                   </div>
                 </div>
-                {open[g.type] && (
+                {isOpen && (
                   <div className="ab-rows">
                     {g.type === 'aiPromptCapture' && <div className="alert alert-warning" style={{margin:'0.5rem'}}><span>⚠ {meta.copy.aiPrompt.note}</span></div>}
                     {g.type === 'ucaas' && <div className="form-hint" style={{margin:'0.5rem'}}>Advanced Settings → Unified communications as a service (UCaaS). Enabled for every Zscaler Internet Access run so these apps are recognised and handled correctly.</div>}
@@ -1178,7 +1242,17 @@
                   {!filterProduct && <td>{e.product}</td>}
                   <td>{e.category}</td><td style={{fontFamily:'IBM Plex Mono, monospace', fontSize:'12px'}}>{e.name}</td>
                   <td><ActionBadge action={e.action} /></td>
-                  <td style={{fontSize:'12px'}}>{e.error || (e.changes ? 'Changes: ' + e.changes.join(', ') : '') || e.note || ''}</td>
+                  <td style={{fontSize:'12px'}}>
+                    {e.error || (!e.details && e.changes ? 'Changes: ' + e.changes.join(', ') : '') || e.note || e.why || ''}
+                    {e.details && e.details.length > 0 && (
+                      <div data-fielddiff>{e.why && <div>{e.why}</div>}{e.details.map((d, j) => (
+                        <div key={j} style={{fontFamily:'IBM Plex Mono, monospace', fontSize:'11px', margin:'2px 0'}}>
+                          <strong>{d.field}</strong>: <span style={{color:'var(--accent-red)', textDecoration:'line-through'}}>{d.from}</span> → <span style={{color:'var(--accent-green)'}}>{d.to}</span>
+                        </div>))}
+                        {(e.changes || []).filter(c => /^order /.test(c)).map((c, j) => <div key={'o' + j} style={{fontSize:'11px'}}>{c}</div>)}
+                      </div>
+                    )}
+                  </td>
                 </tr>
               ))}
               {!rows.length && <tr><td colSpan={5} style={{color:'var(--text-muted)'}}>Nothing to change.</td></tr>}
@@ -1298,8 +1372,10 @@
       const [form, setForm] = useState({ domains: '', tcpPorts: '1-52, 54-65535', udpPorts: '1-52, 54-65535', connectorGroupId: '',
         descriptions: { connectorGroup: meta.copy.zpa.connectorGroupDescription, appSegment: meta.copy.zpa.appSegmentDescription } });
       const [settings, setSettings] = useState({ ...meta.zpaDefaults });
-      const [policies, setPolicies] = useState({ timeout: true, inspection: true, isolation: true });
+      const [policies, setPolicies] = useState({ access: true, timeout: true, inspection: true, isolation: true });
       const [pra, setPra] = useState({ rdpHost: '', sshHost: '' });
+      const [iso, setIso] = useState({ enabled: true, copyPaste: 'none', uploadDownload: 'none', allowPrinting: false, watermark: true, watermarkMessage: 'Zscaler POV' });
+      const [ba, setBa] = useState({ domain: '', port: '443', certificateId: '' });
       const [bulk, setBulk] = useState(false);
       const [apps, setApps] = useState([]);            // [{ name, destinations[], tcpPorts, udpPorts, row, settings }]
       const [csvErrors, setCsvErrors] = useState([]);
@@ -1312,13 +1388,14 @@
       const [reveal, setReveal] = useState(false);
       const [confirmed, setConfirmed] = useState(false);
       useEffect(() => { api.call('GET', '/v2/zpa/context').then(setCtx).catch(e => setCtx({ error: e.message })); }, []);
-      useEffect(() => { setPlan(null); setConfirmed(false); }, [JSON.stringify([form, settings, bulk, apps, policies, pra])]);
+      useEffect(() => { setPlan(null); setConfirmed(false); }, [JSON.stringify([form, settings, bulk, apps, policies, pra, iso, ba])]);
       useEffect(() => {
         if (bulk && !apps.length) { setErrors([]); return; }
-        const t = setTimeout(() => api.call('POST', '/v2/zpa/validate', bulk ? { apps, settings, pra } : { domains: form.domains, tcpPorts: form.tcpPorts, udpPorts: form.udpPorts, settings, pra }).then(r => setErrors(r.errors)).catch(() => {}), 250);
+        const t = setTimeout(() => api.call('POST', '/v2/zpa/validate', bulk ? { apps, settings, pra, browserAccess: ba } : { domains: form.domains, tcpPorts: form.tcpPorts, udpPorts: form.udpPorts, settings, pra, browserAccess: ba }).then(r => setErrors(r.errors)).catch(() => {}), 250);
         return () => clearTimeout(t);
-      }, [form.domains, form.tcpPorts, form.udpPorts, settings.healthReporting, bulk, JSON.stringify(apps), pra.rdpHost, pra.sshHost]);
-      const body = () => ({ prefix, ...(bulk ? { apps } : { domains: form.domains, tcpPorts: form.tcpPorts, udpPorts: form.udpPorts }), settings, connectorGroupId: form.connectorGroupId || null, descriptions: form.descriptions, policies, pra });
+      }, [form.domains, form.tcpPorts, form.udpPorts, settings.healthReporting, bulk, JSON.stringify(apps), pra.rdpHost, pra.sshHost, ba.domain, ba.port]);
+      const body = () => ({ prefix, ...(bulk ? { apps } : { domains: form.domains, tcpPorts: form.tcpPorts, udpPorts: form.udpPorts }), settings, connectorGroupId: form.connectorGroupId || null, descriptions: form.descriptions, policies, pra,
+        isolationProfile: policies.isolation ? iso : { ...iso, enabled: false }, browserAccess: ba.domain.trim() ? ba : {} });
       const downloadTemplate = () => {
         const blob = new Blob([meta.copy.zpa.bulkTemplate], { type: 'text/csv' });
         const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'zpa-app-segments-template.csv'; document.body.appendChild(a); a.click(); a.remove();
@@ -1350,9 +1427,11 @@
             <tr><td>Segment Group</td><td><code>{n('segment-group')}</code></td></tr>
             <tr><td>Server Group</td><td><code>{n('server-group')}</code> · Dynamic Server Discovery on</td></tr>
             <tr><td>Application Segment{bulk ? 's' : ''}</td><td>{bulk ? (apps.length ? apps.map(a => <code key={a.name} style={{marginRight:'6px'}}>{segName(a.name)}</code>) : 'One per application in the uploaded CSV') : <code>{n('app-segment')}</code>}</td></tr>
+            {policies.access && <tr><td>Access policy</td><td><code>{n('access-policy')}</code> · anyone signed in to ZPA can reach these applications</td></tr>}
+            {ba.domain.trim() && <tr><td>Browser Access</td><td><code>{n('browser-access')}</code> · https://{ba.domain.trim()} with no client</td></tr>}
             {policies.timeout && <tr><td>Timeout policy</td><td><code>{n('timeout-policy')}</code> · re-authenticate every 8 hours, or after 1 hour idle</td></tr>}
             {policies.inspection && <tr><td>Inspection</td><td><code>{n('inspection-profile')}</code> (OWASP, all predefined controls) · <code>{n('inspection-policy')}</code></td></tr>}
-            {policies.isolation && <tr><td>Isolation policy</td><td><code>{n('isolation-policy')}</code> · Browser Access users get an isolated session</td></tr>}
+            {policies.isolation && <tr><td>Isolation policy</td><td><code>{n('isolation-policy')}</code> · Browser Access users get an isolated session{iso.enabled ? <> in <code>{n('isolation-profile')}</code></> : ''}</td></tr>}
             {(pra.rdpHost || pra.sshHost) && <tr><td>Privileged Remote Access</td><td>{pra.rdpHost && <><code>{n('pra-rdp')}</code> + <code>{n('pra-rdp-console')}</code> </>}{pra.sshHost && <><code>{n('pra-ssh')}</code> + <code>{n('pra-ssh-console')}</code></>}</td></tr>}
           </tbody></table>
           <div className="form-group">
@@ -1431,13 +1510,59 @@
           </details>
           <details style={{margin:'0.5rem 0 1rem'}} open data-zpapolicies>
             <summary style={{cursor:'pointer', fontSize:'13px'}}>Policies for the application segment{bulk ? 's' : ''}</summary>
-            {[['timeout', 'Timeout policy', 'Users re-authenticate every 8 hours, or after 1 hour idle.'],
+            {[['access', 'Access policy (everyone)', 'Anyone signed in to ZPA can reach these applications. Narrow it to groups later in the ZPA portal.'],
+              ['timeout', 'Timeout policy', 'Users re-authenticate every 8 hours, or after 1 hour idle.'],
               ['inspection', 'AppProtection inspection', 'Inspect traffic with an OWASP Core Rule Set profile (needs AppProtection on the tenant).'],
               ['isolation', 'Browser isolation', 'Users who reach these applications through Browser Access get an isolated browser session.']].map(([k, label, hint]) => (
               <div className="toggle-item" key={k} data-zpapolicy={k}>
                 <div><label onClick={() => setPolicies({ ...policies, [k]: !policies[k] })} style={{cursor:'pointer'}}>{label}</label><div className="form-hint">{hint}</div></div>
                 <div className={`toggle-switch ${policies[k] ? 'active' : ''}`} onClick={() => setPolicies({ ...policies, [k]: !policies[k] })}><div className="toggle-knob"></div></div>
               </div>))}
+          </details>
+          {policies.isolation && (
+            <details style={{margin:'0.5rem 0 1rem'}} data-zpaiso>
+              <summary style={{cursor:'pointer', fontSize:'13px'}}>Isolation profile settings</summary>
+              <div className="toggle-item">
+                <div><label onClick={() => setIso({ ...iso, enabled: !iso.enabled })} style={{cursor:'pointer'}}>Create a POV isolation profile (<code>{n('isolation-profile')}</code>)</label>
+                  <div className="form-hint">Off: the isolation policy uses the tenant's default isolation profile.</div></div>
+                <div className={`toggle-switch ${iso.enabled ? 'active' : ''}`} onClick={() => setIso({ ...iso, enabled: !iso.enabled })} data-isoenabled><div className="toggle-knob"></div></div>
+              </div>
+              {iso.enabled && (<>
+                <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:'12px', marginTop:'8px'}}>
+                  <div className="form-group"><label className="form-label">Copy and paste</label>
+                    <select value={iso.copyPaste} onChange={e => setIso({ ...iso, copyPaste: e.target.value })} data-isocopy>
+                      <option value="none">Blocked both ways</option><option value="upstream">Only into the isolated page</option><option value="downstream">Only out of the isolated page</option><option value="all">Allowed both ways</option>
+                    </select></div>
+                  <div className="form-group"><label className="form-label">Upload and download</label>
+                    <select value={iso.uploadDownload} onChange={e => setIso({ ...iso, uploadDownload: e.target.value })} data-isoupload>
+                      <option value="none">Blocked</option><option value="upstream">Uploads only</option><option value="all">Uploads and downloads</option>
+                    </select></div>
+                </div>
+                <div className="toggle-item"><div><label onClick={() => setIso({ ...iso, allowPrinting: !iso.allowPrinting })} style={{cursor:'pointer'}}>Allow printing</label></div>
+                  <div className={`toggle-switch ${iso.allowPrinting ? 'active' : ''}`} onClick={() => setIso({ ...iso, allowPrinting: !iso.allowPrinting })}><div className="toggle-knob"></div></div></div>
+                <div className="toggle-item"><div><label onClick={() => setIso({ ...iso, watermark: !iso.watermark })} style={{cursor:'pointer'}}>Watermark (user, time and a message)</label></div>
+                  <div className={`toggle-switch ${iso.watermark ? 'active' : ''}`} onClick={() => setIso({ ...iso, watermark: !iso.watermark })} data-isowatermark><div className="toggle-knob"></div></div></div>
+                {iso.watermark && <div className="form-group"><label className="form-label">Watermark message</label><input type="text" maxLength={64} value={iso.watermarkMessage} onChange={e => setIso({ ...iso, watermarkMessage: e.target.value })} /></div>}
+                <div className="form-hint">ZIA Isolate rules keep the ZIA isolation profile; set its controls in ZIA › Cloud Browser Isolation (listed in the report's follow-ups).</div>
+              </>)}
+            </details>
+          )}
+          <details style={{margin:'0.5rem 0 1rem'}} data-zpaba>
+            <summary style={{cursor:'pointer', fontSize:'13px'}}>Browser Access (optional, no client)</summary>
+            <div className="form-hint" style={{margin:'6px 0'}}>Publish one internal web app so users can open it in a browser without Client Connector. Pick a web server certificate that covers the domain (upload it in the ZPA portal first if none is listed). Leave the domain blank to skip.</div>
+            <div style={{display:'grid', gridTemplateColumns:'2fr 1fr', gap:'12px'}}>
+              <div className="form-group"><label className="form-label">Web app domain</label><input type="text" value={ba.domain} placeholder="ehr.hospital.org" onChange={e => setBa({ ...ba, domain: e.target.value })} data-badomain /></div>
+              <div className="form-group"><label className="form-label">Port</label><input type="text" value={ba.port} onChange={e => setBa({ ...ba, port: e.target.value })} /></div>
+            </div>
+            <div className="form-group"><label className="form-label">Web server certificate</label>
+              <select value={ba.certificateId} onChange={e => setBa({ ...ba, certificateId: e.target.value })} data-bacert>
+                <option value="">Pick a certificate…</option>
+                {ctx && (ctx.certificates || []).map(c => <option key={c.id} value={c.id}>{c.name}{c.cn ? ` (${c.cn})` : ''}{c.validTo && c.validTo * 1000 < Date.now() ? ' — expired' : ''}</option>)}
+              </select>
+              {ba.domain.trim() && ba.certificateId && ctx && (() => { const c = (ctx.certificates || []).find(x => x.id === ba.certificateId); const d = ba.domain.trim().toLowerCase();
+                const fits = c && [c.cn, ...(c.san || [])].some(n => n && (n.toLowerCase() === d || (n.startsWith('*.') && d.endsWith(n.slice(1).toLowerCase()) && d.split('.').length === n.split('.').length)));
+                return fits ? null : <div className="form-hint" style={{color:'var(--accent-amber)'}}>⚠ This certificate does not cover {d}; browsers will warn.</div>; })()}
+            </div>
           </details>
           <details style={{margin:'0.5rem 0 1rem'}} data-zpapra>
             <summary style={{cursor:'pointer', fontSize:'13px'}}>Privileged Remote Access (optional)</summary>
@@ -1478,6 +1603,582 @@
             {!result && <button className="btn btn-primary" onClick={dry} disabled={busy || errors.length > 0 || (bulk ? (!apps.length || csvErrors.length > 0) : !form.domains.trim())} data-zpadry>{busy && !plan ? <><span className="spinner"></span> Checking…</> : 'Run Dry Run'}</button>}
             {plan && !result && <button className="btn btn-success" onClick={apply} disabled={busy || !confirmed} data-zpaapply>{busy ? <><span className="spinner"></span> Applying…</> : '🚀 Apply'}</button>}
             {result && <button className="btn btn-primary" onClick={onReport}>Summary report →</button>}
+          </div>
+        </div>
+      );
+    }
+
+    // ========================
+    // v2.2 — POV Start (readiness, intake, combined run), live progress, rate limits, POV tests, Client Connector devices & install,
+    //        snapshots / restore / drift, update check
+    // ========================
+    const STATUS_ICON = { pass: '✅', warn: '⚠️', fail: '❌', info: 'ℹ️' };
+    const fmtLeft = (iso) => { const s = Math.max(0, Math.round((new Date(iso).getTime() - Date.now()) / 1000)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
+    const download = (name, content, type = 'text/plain') => { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([content], { type })); a.download = name; document.body.appendChild(a); a.click(); a.remove(); };
+
+    // 17: live progress feed (objects appear as they are created / updated)
+    function LiveProgress({ active, title }) {
+      const [events, setEvents] = useState([]);
+      useEffect(() => {
+        if (!active) return;
+        setEvents([]);
+        const stop = api.events(ev => { if (ev.name || ev.message) setEvents(prev => [...prev.slice(-299), ev]); });
+        return stop;
+      }, [active]);
+      if (!active && !events.length) return null;
+      const label = (e) => e.result || e.action;
+      return (
+        <div className="card" style={{background:'var(--bg-input)', maxHeight:'280px', overflowY:'auto', padding:'0.75rem'}} data-liveprogress>
+          <div style={{fontSize:'12px', fontWeight:600, marginBottom:'6px'}}>{active && <span className="spinner" style={{width:'10px', height:'10px', marginRight:'6px'}}></span>}{title || 'Live progress'} · {events.length} event{events.length === 1 ? '' : 's'}</div>
+          {events.slice().reverse().map((e, i) => (
+            <div key={i} style={{fontFamily:'IBM Plex Mono, monospace', fontSize:'11px', padding:'1px 0', color: e.status === 'error' || e.error ? 'var(--accent-red)' : undefined}}>
+              {new Date(e.at).toLocaleTimeString()} · {e.category || e.product || e.action} {e.name ? `· ${e.name}` : ''} {label(e) ? `· ${label(e)}` : ''}{e.message ? ` · ${e.message}` : ''}{e.error ? ` — ${e.error}` : ''}
+            </div>
+          ))}
+        </div>
+      );
+    }
+
+    // 16: Client Connector / ZDX call budget, with a countdown when Zscaler asks the wizard to wait
+    function RateLimitBar() {
+      const [rl, setRl] = useState(null);
+      const [, tick] = useState(0);
+      useEffect(() => {
+        let gone = false;
+        const load = () => api.call('GET', '/v2/ratelimits').then(r => { if (!gone) setRl(r); }).catch(() => {});
+        load(); const t = setInterval(load, 20000); const t2 = setInterval(() => tick(x => x + 1), 1000);
+        return () => { gone = true; clearInterval(t); clearInterval(t2); };
+      }, []);
+      if (!rl) return null;
+      const items = [['Client Connector', rl.zcc], ['ZDX', rl.zdx]].filter(([, v]) => v && (v.usedLastHour > 0 || v.blockedUntil));
+      if (!items.length) return null;
+      return (
+        <div style={{display:'flex', gap:'10px', flexWrap:'wrap', marginBottom:'0.75rem'}} data-ratelimits>
+          {items.map(([name, v]) => {
+            const blocked = v.blockedUntil && new Date(v.blockedUntil).getTime() > Date.now();
+            return (
+              <span key={name} className={`badge ${blocked ? 'badge-risk' : v.remaining < 20 ? 'badge-update' : 'badge-category'}`} style={{fontSize:'11px'}}>
+                {name} API: {blocked ? `paused by Zscaler, resumes in ${fmtLeft(v.blockedUntil)}` : `${v.remaining} of ${v.budget} calls left this hour`}
+              </span>
+            );
+          })}
+        </div>
+      );
+    }
+
+    // 20: update check (standalone builds and the server version)
+    function UpdateBadge() {
+      const [u, setU] = useState(null);
+      useEffect(() => { api.call('GET', '/v2/update-check').then(setU).catch(() => {}); }, []);
+      if (!u || !u.newer) return null;
+      return <a className="tag" href={u.downloads} target="_blank" rel="noreferrer" style={{background:'var(--accent-amber)', color:'#111', textDecoration:'none'}} data-update>Update available: v{u.latest}</a>;
+    }
+
+    // ---------- POV Start ----------
+    function ReadinessPanel({ setError }) {
+      const [r, setR] = useState(null);
+      const [busy, setBusy] = useState(false);
+      const run = async () => { setBusy(true); try { setR(await api.call('GET', '/v2/readiness')); } catch (e) { setError('Readiness check failed: ' + e.message); } setBusy(false); };
+      useEffect(() => { run(); }, []);
+      const areas = r ? [...new Set(r.checks.map(c => c.area))] : [];
+      return (
+        <div className="card" data-readiness>
+          <div className="card-header" style={{display:'flex', justifyContent:'space-between', alignItems:'flex-start'}}>
+            <div><h2>1. Tenant readiness</h2><p>Read-only checks of what the POV needs, so blockers show up before the customer sees them.</p></div>
+            <button className="btn btn-ghost btn-sm" onClick={run} disabled={busy}>{busy ? <span className="spinner"></span> : '↻ Check again'}</button>
+          </div>
+          {busy && !r && <div className="form-hint"><span className="spinner"></span> Checking ZIA, ZPA, Client Connector and ZDX…</div>}
+          {r && (<>
+            <div className="alert alert-info"><span>{Object.entries(r.counts).map(([k, v]) => `${STATUS_ICON[k]} ${v}`).join('   ')}</span></div>
+            <table className="diff-table"><tbody>
+              {areas.map(a => r.checks.filter(c => c.area === a).map((c, i) => (
+                <tr key={a + i} data-check={c.name}>
+                  <td style={{width:'60px'}}>{i === 0 ? <strong>{a}</strong> : ''}</td>
+                  <td style={{width:'24px'}}>{STATUS_ICON[c.status]}</td>
+                  <td style={{width:'230px'}}>{c.name}</td>
+                  <td style={{fontSize:'12px'}}>{c.detail}{c.fix && <div className="form-hint" style={{margin:0}}>→ {c.fix}</div>}</td>
+                </tr>
+              )))}
+            </tbody></table>
+          </>)}
+        </div>
+      );
+    }
+
+    const PRODUCT_LABEL = { zcc: 'Client Connector', zia: 'Internet Access', zpa: 'Private Access', zdx: 'Digital Experience' };
+    const INTAKE_DEFAULT = { customerName: '', domain: '', presetId: 'HEALTHCARE', vpnGateways: '', apps: [], zdxUrls: [], products: { zcc: true, zccMac: true, zia: true, zpa: true, zdx: true }, baseline: 'HIPAA' };
+    const splitItems = (v) => String(v || '').split(/[,;\n]+/).map(x => x.trim()).filter(Boolean);
+
+    function IntakePanel({ meta, intake, setIntake, prefix, setPrefix, setError }) {
+      const [presets, setPresets] = useState([]);
+      const [suggested, setSuggested] = useState('');
+      const [notes, setNotes] = useState([]);
+      useEffect(() => { api.call('GET', '/v2/intake/presets').then(setPresets).catch(() => {}); }, []);
+      const set = (patch) => setIntake(prev => ({ ...prev, ...patch }));
+      const fill = async (id) => {
+        try {
+          const r = await api.call('POST', '/v2/intake/preset', { id, domain: intake.domain, customerName: intake.customerName });
+          set({ presetId: id, baseline: r.preset.baseline, apps: r.preset.apps.map(a => ({ name: a.name, destinations: a.destinations.join('; '), ports: a.ports })), zdxUrls: r.preset.apps.filter(a => a.zdx).map(a => ({ name: a.name, url: a.zdx })) });
+          setSuggested(r.suggestedPrefix); setNotes(r.preset.notes);
+        } catch (e) { setError(e.message); }
+      };
+      const usePrefix = async () => { try { await api.call('POST', '/v2/prefix', { prefix: suggested }); setPrefix(suggested); safeStore.set('zpw.prefix', suggested); } catch (e) { setError(e.message); } };
+      const setApp = (i, patch) => set({ apps: intake.apps.map((a, j) => j === i ? { ...a, ...patch } : a) });
+      const baselines = meta ? [...meta.baselines.compliance, ...meta.baselines.nonMapped] : [];
+      return (
+        <div className="card" data-intake>
+          <div className="card-header"><h2>2. Customer intake</h2><p>Fill this once at the start of the call. It pre-fills the prefix, baseline, Client Connector lists, ZPA applications and ZDX apps. Everything stays editable in each module.</p></div>
+          <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:'12px'}}>
+            <div className="form-group"><label className="form-label">Customer name</label><input type="text" value={intake.customerName} onChange={e => set({ customerName: e.target.value })} placeholder="Maine Medical Center" data-intakename /></div>
+            <div className="form-group"><label className="form-label">Internal domain</label><input type="text" value={intake.domain} onChange={e => set({ domain: e.target.value.trim() })} placeholder="hospital.org" data-intakedomain /></div>
+          </div>
+          <div className="form-label">Preset</div>
+          <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(200px, 1fr))', gap:'8px', marginBottom:'0.75rem'}}>
+            {presets.map(p => (
+              <div key={p.id} className={`tier-card ${intake.presetId === p.id ? 'selected' : ''}`} onClick={() => fill(p.id)} style={{cursor:'pointer', padding:'0.75rem'}} data-preset={p.id}>
+                <div className="tier-name" style={{fontSize:'13px'}}>{p.icon} {p.name}</div><div className="tier-desc" style={{fontSize:'11px'}}>{p.description}</div>
+              </div>
+            ))}
+          </div>
+          {suggested && (
+            <div className="alert alert-info"><span>Suggested prefix: <code>{suggested}</code> {prefix === suggested ? '✓ in use' : <button className="btn btn-primary btn-sm" style={{marginLeft:'8px'}} onClick={usePrefix} data-usesuggested>Use it</button>}</span></div>
+          )}
+          {notes.map((n, i) => <div key={i} className="form-hint">• {n}</div>)}
+          <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:'12px', marginTop:'0.5rem'}}>
+            <div className="form-group"><label className="form-label">Baseline (Internet Access)</label>
+              <select value={intake.baseline} onChange={e => set({ baseline: e.target.value })} data-intakebaseline>{baselines.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}</select></div>
+            <div className="form-group"><label className="form-label">VPN gateways to bypass (Client Connector)</label><input type="text" value={intake.vpnGateways} onChange={e => set({ vpnGateways: e.target.value })} placeholder="vpn.hospital.org, 203.0.113.10" /></div>
+          </div>
+          <div className="form-label">Private applications (one ZPA segment each)</div>
+          <table className="diff-table" data-intakeapps>
+            <thead><tr><th>Name</th><th>Destinations (; between)</th><th>Ports (TCP, or udp:53)</th><th></th></tr></thead>
+            <tbody>
+              {intake.apps.map((a, i) => (
+                <tr key={i}>
+                  <td><input type="text" value={a.name} onChange={e => setApp(i, { name: e.target.value })} /></td>
+                  <td><input type="text" value={a.destinations} onChange={e => setApp(i, { destinations: e.target.value })} /></td>
+                  <td><input type="text" value={a.ports} onChange={e => setApp(i, { ports: e.target.value })} style={{width:'140px'}} /></td>
+                  <td><button className="btn btn-ghost btn-sm" onClick={() => set({ apps: intake.apps.filter((_, j) => j !== i) })}>✕</button></td>
+                </tr>
+              ))}
+              {!intake.apps.length && <tr><td colSpan={4} className="form-hint">None: ZPA uses one wildcard segment for *.{intake.domain || 'domain'}.</td></tr>}
+            </tbody>
+          </table>
+          <button className="btn btn-ghost btn-sm" onClick={() => set({ apps: [...intake.apps, { name: '', destinations: '', ports: '443' }] })}>+ Add application</button>
+          <div className="form-label" style={{marginTop:'0.75rem'}}>ZDX web apps to monitor</div>
+          {intake.zdxUrls.map((z, i) => (
+            <div key={i} style={{display:'flex', gap:'6px', marginBottom:'4px'}}>
+              <input type="text" value={z.name} style={{width:'180px'}} onChange={e => set({ zdxUrls: intake.zdxUrls.map((x, j) => j === i ? { ...x, name: e.target.value } : x) })} />
+              <input type="text" value={z.url} onChange={e => set({ zdxUrls: intake.zdxUrls.map((x, j) => j === i ? { ...x, url: e.target.value } : x) })} />
+              <button className="btn btn-ghost btn-sm" onClick={() => set({ zdxUrls: intake.zdxUrls.filter((_, j) => j !== i) })}>✕</button>
+            </div>
+          ))}
+          <button className="btn btn-ghost btn-sm" onClick={() => set({ zdxUrls: [...intake.zdxUrls, { name: '', url: 'https://' }] })}>+ Add web app</button>
+        </div>
+      );
+    }
+
+    // 3: one dry run and one apply across the products in scope (toggles), in order ZCC → ZIA → ZPA → ZDX
+    function CombinedRun({ meta, intake, setIntake, prefix, licensing, setError, onReport }) {
+      const [plans, setPlans] = useState({});        // key → { status, rows, error, payload, planId, until }
+      const [results, setResults] = useState({});
+      const [busy, setBusy] = useState(null);         // 'plan' | 'apply' | null
+      const [confirmed, setConfirmed] = useState(false);
+      const [pw] = useState(() => genPassword());
+      const [showPw, setShowPw] = useState(false);
+      const [, tick] = useState(0);
+      useEffect(() => { const t = setInterval(() => tick(x => x + 1), 1000); return () => clearInterval(t); }, []);
+      const P = intake.products;
+      const toggle = (k) => { setIntake(prev => ({ ...prev, products: { ...prev.products, [k]: !prev.products[k] } })); setPlans({}); setResults({}); setConfirmed(false); };
+      const steps = [
+        P.zcc && { key: 'zccWin', product: 'zcc', label: 'Client Connector (Windows)', platform: 'windows' },
+        P.zccMac && { key: 'zccMac', product: 'zcc', label: 'Client Connector (macOS)', platform: 'macos' },
+        P.zia && { key: 'zia', product: 'zia', label: 'Internet Access' },
+        P.zpa && { key: 'zpa', product: 'zpa', label: 'Private Access' },
+        P.zdx && { key: 'zdx', product: 'zdx', label: 'Digital Experience' }
+      ].filter(Boolean);
+
+      // only the VPN gateways come from the intake; the DNS / IP lists keep the template values (the template includes all DNS so ZPA resolves internal names)
+      const lists = () => { const v = splitItems(intake.vpnGateways); return v.length ? { vpnGateways: v } : null; };
+      const ziaScope = () => { const sc = Object.fromEntries(meta.scopeItems.map(i => [i.key, i.default])); for (const [k, v] of Object.entries((licensing && licensing.items) || {})) if (v.licensed === false) sc[k] = false; return sc; };
+      const zpaPayload = async () => {
+        const base = { prefix, policies: { access: true, timeout: true, inspection: true, isolation: true }, pra: {}, settings: {} };
+        const apps = intake.apps.filter(a => a.name.trim() && a.destinations.trim());
+        if (!apps.length) return { ...base, domains: intake.domain ? `*.${intake.domain}` : '', tcpPorts: '1-52, 54-65535', udpPorts: '1-52, 54-65535' };
+        const csv = 'Application Name,Destinations,Ports\r\n' + apps.map(a => [a.name, a.destinations, a.ports].map(x => `"${String(x).replace(/"/g, '""')}"`).join(',')).join('\r\n');
+        const r = await api.call('POST', '/v2/zpa/parse-csv', { text: csv });
+        if (r.errors.length) throw new Error('Private applications: ' + r.errors.join(' '));
+        return { ...base, apps: r.apps.map(a => ({ ...a, settings: {} })) };
+      };
+      const zdxPayload = async () => {
+        const cat = await api.call('GET', '/zdx/catalog');
+        const t = cat.templates.find(x => x.id === 'POV_BEST_PRACTICE');
+        const predefined = t.predefined.filter(x => cat.predefined.some(a => a.provider === x.provider)).map(x => ({ provider: x.provider, prefix: (cat.predefined.find(a => a.provider === x.provider) || {}).prefix || '', web: true, cloudpath: !!x.cloudpath }));
+        const custom = [...t.custom, ...intake.zdxUrls.filter(z => z.name.trim() && /^https?:\/\/\S+\.\S+/.test(z.url))].map(c => ({ name: c.name.trim(), url: c.url.trim(), cloudpath: c.cloudpath !== false, frequency: c.frequency || 300, protocol: c.protocol || 'ADAPTIVE' }));
+        return { templateId: t.id, predefined, custom };
+      };
+      const zccPayload = (platform) => {
+        const tag = platform === 'macos' ? 'macOS' : 'Windows';
+        return { name: `${prefix}-${tag}-BestPractice`, description: `${intake.customerName || 'POV'} — created by the ZTP Policy Wizard`, forwardingProfileId: 0, active: false,
+          templateId: 'BEST_PRACTICE', enabledSettings: null, newForwardingProfile: { name: `${prefix}-FWD-${tag}`, templateId: 'BEST_PRACTICE', enabledSettings: null },
+          bypassAppIds: null, lists: lists(), tamperPassword: pw };
+      };
+
+      const planOne = async (st) => {
+        try {
+          if (st.product === 'zia') {
+            const payload = { baseline: intake.baseline, scope: ziaScope(), prefix, disabledRules: { 'firewallFiltering:Default-Block-All': true }, actionSettings: { policy: {}, rules: {} }, settingOverrides: {}, cbiProfile: null, sslCertificate: null };
+            const p = await api.call('POST', '/v2/zia/plan', payload);
+            return { status: 'ok', payload, planId: p.planId, counts: p.counts, rows: p.ledger, warnings: p.warnings };
+          }
+          if (st.product === 'zpa') {
+            const payload = await zpaPayload();
+            const p = await api.call('POST', '/v2/zpa/plan', payload);
+            return { status: 'ok', payload, planId: p.planId, counts: p.counts, rows: p.ledger, warnings: p.warnings };
+          }
+          if (st.product === 'zcc') {
+            const payload = zccPayload(st.platform);
+            const p = await api.call('POST', `/zcc/app-profiles/${st.platform}/dryrun`, payload);
+            const rows = [];
+            if (p.forwardingProfile && p.forwardingProfile.isNew) rows.push({ product: 'ZCC', category: 'Forwarding Profile', name: p.forwardingProfile.name, action: p.forwardingAction || 'CREATE' });
+            rows.push({ product: 'ZCC', category: 'App Profile', name: payload.name, action: p.action, changes: p.changeReasons });
+            const fails = (p.checks || []).filter(c => c.status === 'fail');
+            return { status: p.ok ? 'ok' : 'error', error: fails.map(c => `${c.name}: ${c.detail}`).join(' '), payload, planId: p.planId, rows, warnings: p.warnings || [] };
+          }
+          if (st.product === 'zdx') {
+            const payload = await zdxPayload();
+            const p = await api.call('POST', '/zdx/dryrun', payload);
+            const rows = (p.apps || []).flatMap(a => (a.steps || []).filter(s => s.op !== 'none').map(s => ({ product: 'ZDX', category: a.kind === 'setup' ? 'Setup' : 'App', name: a.name, action: /create/i.test(s.op) ? 'CREATE' : 'UPDATE', note: s.label })));
+            const fails = (p.checks || []).filter(c => c.status === 'fail');
+            return { status: p.ok ? 'ok' : 'error', error: fails.map(c => `${c.name}: ${c.detail}`).join(' '), payload, rows, warnings: p.warnings || [] };
+          }
+        } catch (e) {
+          if (e.status === 429 || /rate limit/i.test(e.message)) {
+            const rl = await api.call('GET', '/v2/ratelimits').catch(() => null);
+            const until = rl && (st.product === 'zdx' ? rl.zdx : rl.zcc).blockedUntil;
+            return { status: 'waiting', error: e.message, until };
+          }
+          return { status: 'error', error: e.message };
+        }
+      };
+      const planAll = async () => {
+        setBusy('plan'); setError(null); setResults({}); setConfirmed(false);
+        const out = {};
+        for (const st of steps) { out[st.key] = { status: 'running' }; setPlans({ ...out }); out[st.key] = await planOne(st); setPlans({ ...out }); }
+        setBusy(null);
+      };
+      // a step paused by a rate limit is re-run on its own when the wait is over
+      useEffect(() => {
+        const waiting = steps.filter(st => plans[st.key] && plans[st.key].status === 'waiting' && plans[st.key].until && new Date(plans[st.key].until).getTime() <= Date.now());
+        if (!waiting.length || busy) return;
+        (async () => { for (const st of waiting) { const r = await planOne(st); setPlans(prev => ({ ...prev, [st.key]: r })); } })();
+      });
+      const applyAll = async () => {
+        setBusy('apply'); setError(null);
+        const out = {};
+        for (const st of steps) {
+          const pl = plans[st.key];
+          if (!pl || pl.status !== 'ok') { out[st.key] = { status: 'skipped', error: 'The dry run for this product did not pass.' }; setResults({ ...out }); continue; }
+          out[st.key] = { status: 'running' }; setResults({ ...out });
+          try {
+            if (st.product === 'zia') { const r = await api.call('POST', '/v2/zia/apply', { ...pl.payload, planId: pl.planId }); out[st.key] = { status: 'ok', counts: r.counts, rows: r.ledger, note: r.activated ? 'Activated' : '' }; }
+            else if (st.product === 'zpa') { const r = await api.call('POST', '/v2/zpa/apply', { ...pl.payload, planId: pl.planId }); out[st.key] = { status: 'ok', counts: r.counts, rows: r.ledger, key: r.provisioningKey ? true : false }; }
+            else if (st.product === 'zcc') { const r = await api.call('POST', `/zcc/app-profiles/${st.platform}`, { ...pl.payload, planId: pl.planId }); out[st.key] = { status: r.verified ? 'ok' : 'warn', rows: [{ product: 'ZCC', category: 'App Profile', name: r.name, action: r.action, note: r.verified ? 'Verified on read-back' : 'Some settings did not verify' }] }; }
+            else if (st.product === 'zdx') { const r = await api.call('POST', '/zdx/apply', pl.payload); out[st.key] = { status: r.success ? 'ok' : 'warn', rows: r.results.map(x => ({ product: 'ZDX', category: x.kind, name: x.name, action: x.ok ? 'CREATE' : 'FAILED' })) }; }
+          } catch (e) { out[st.key] = { status: 'error', error: e.message }; }
+          setResults({ ...out });
+        }
+        setBusy(null);
+      };
+      const planned = steps.length && steps.every(st => plans[st.key] && plans[st.key].status !== 'running');
+      const anyOk = steps.some(st => plans[st.key] && plans[st.key].status === 'ok');
+      const badge = (r) => !r ? null : r.status === 'running' ? <span className="spinner"></span> : r.status === 'ok' ? <span className="badge badge-create">Ready</span>
+        : r.status === 'waiting' ? <span className="badge badge-update">Rate limit · retries in {r.until ? fmtLeft(r.until) : 'a few minutes'}</span>
+        : r.status === 'warn' ? <span className="badge badge-update">Check</span> : r.status === 'skipped' ? <span className="badge badge-category">Skipped</span> : <span className="badge badge-risk">Failed</span>;
+      return (
+        <div className="card" data-combined>
+          <div className="card-header"><h2>3. Build the POV</h2><p>Pick the products in scope. One dry run covers all of them; one apply runs them in order (Client Connector → Internet Access → Private Access → Digital Experience). Each product can still be fine-tuned in its own module afterwards.</p></div>
+          {!prefix && <div className="alert alert-warning"><span>Set the global prefix first (top of the page, or Use it under Customer intake).</span></div>}
+          <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(220px, 1fr))', gap:'6px'}}>
+            {[['zcc', 'Client Connector — Windows'], ['zccMac', 'Client Connector — macOS'], ['zia', 'Internet Access'], ['zpa', 'Private Access'], ['zdx', 'Digital Experience']].map(([k, label]) => (
+              <div key={k} className="toggle-item" data-product={k}>
+                <label onClick={() => toggle(k)} style={{cursor:'pointer'}}>{label}</label>
+                <div className={`toggle-switch ${P[k] ? 'active' : ''}`} onClick={() => toggle(k)}><div className="toggle-knob"></div></div>
+              </div>
+            ))}
+          </div>
+          {(P.zcc || P.zccMac) && (
+            <div className="form-hint" style={{margin:'0.5rem 0'}}>Client Connector tamper-protection password for this POV: <code>{showPw ? pw : '•'.repeat(pw.length)}</code>
+              <button className="btn btn-ghost btn-sm" onClick={() => setShowPw(!showPw)}>{showPw ? 'Hide' : 'Show'}</button> (also in the summary report)</div>
+          )}
+          <div className="btn-group" style={{marginTop:'0.5rem'}}>
+            <button className="btn btn-primary" disabled={!prefix || !steps.length || !!busy || !meta} onClick={planAll} data-planall>{busy === 'plan' ? <><span className="spinner"></span> Dry run…</> : 'Run dry run for all'}</button>
+          </div>
+          {steps.map(st => {
+            const pl = plans[st.key], rs = results[st.key];
+            if (!pl && !rs) return null;
+            return (
+              <div key={st.key} style={{marginTop:'1rem'}} data-step-product={st.key}>
+                <h3 style={{fontSize:'14px', display:'flex', gap:'8px', alignItems:'center'}}>{st.label} {badge(rs || pl)} {(rs || pl).counts && <span className="form-hint" style={{margin:0}}>{countLine((rs || pl).counts)}</span>}</h3>
+                {(rs || pl).error && <div className="alert alert-danger"><span>{(rs || pl).error}</span></div>}
+                {((rs || pl).warnings || []).slice(0, 6).map((w, i) => <div key={i} className="form-hint" style={{color:'var(--accent-amber)'}}>⚠ {w}</div>)}
+                {(rs || pl).rows && <LedgerTable ledger={(rs || pl).rows} filterProduct />}
+              </div>
+            );
+          })}
+          {planned && anyOk && !Object.keys(results).length && (
+            <div className="toggle-item" style={{marginTop:'1rem'}}>
+              <label onClick={() => setConfirmed(!confirmed)} style={{cursor:'pointer'}}>I have reviewed the dry run. Apply the ready products (failed ones are skipped).</label>
+              <div className={`toggle-switch ${confirmed ? 'active' : ''}`} onClick={() => setConfirmed(!confirmed)} data-confirmall><div className="toggle-knob"></div></div>
+            </div>
+          )}
+          <LiveProgress active={busy === 'apply'} title="Applying" />
+          <div className="btn-group">
+            {planned && anyOk && !Object.keys(results).length && <button className="btn btn-success" disabled={!confirmed || !!busy} onClick={applyAll} data-applyall>{busy === 'apply' ? <><span className="spinner"></span> Applying…</> : '🚀 Apply all'}</button>}
+            {Object.keys(results).length > 0 && !busy && <button className="btn btn-primary" onClick={onReport}>Summary report →</button>}
+          </div>
+        </div>
+      );
+    }
+
+    function PovStart({ meta, prefix, setPrefix, licensing, setError, onReport }) {
+      const [intake, setIntake] = useState(() => { try { return { ...INTAKE_DEFAULT, ...JSON.parse(safeStore.get('zpw.intake') || '{}') }; } catch (e) { return INTAKE_DEFAULT; } });
+      useEffect(() => { safeStore.set('zpw.intake', JSON.stringify(intake)); const t = setTimeout(() => api.call('POST', '/v2/intake', intake).catch(() => {}), 800); return () => clearTimeout(t); }, [JSON.stringify(intake)]);
+      return (
+        <div data-step="start">
+          <ReadinessPanel setError={setError} />
+          {meta && <IntakePanel meta={meta} intake={intake} setIntake={setIntake} prefix={prefix} setPrefix={setPrefix} setError={setError} />}
+          {meta && <CombinedRun meta={meta} intake={intake} setIntake={setIntake} prefix={prefix} licensing={licensing} setError={setError} onReport={onReport} />}
+        </div>
+      );
+    }
+
+    // ---------- POV tests (7, 8, 9) ----------
+    function PovTests({ setError }) {
+      const [tests, setTests] = useState(null);
+      const [notes, setNotes] = useState({});
+      const [url, setUrl] = useState('');
+      const [proof, setProof] = useState(null);
+      const [busy, setBusy] = useState(false);
+      const [kit, setKit] = useState(null);
+      const load = () => api.call('GET', '/v2/tests').then(r => setTests(r.tests)).catch(e => setError(e.message));
+      useEffect(() => { load(); api.call('GET', '/v2/dlp-kit').then(r => setKit(r.files)).catch(() => {}); }, []);
+      const mark = async (t, status) => { await api.call('POST', `/v2/tests/${t.id}`, { status: t.result && t.result.status === status ? null : status, note: notes[t.id] !== undefined ? notes[t.id] : ((t.result && t.result.note) || '') }); load(); };
+      const prove = async (u) => { setBusy(true); setProof(null); try { setProof(await api.call('POST', '/v2/prove', { url: u || url })); } catch (e) { setError(e.message); } setBusy(false); };
+      const runbookMd = () => ['# POV test runbook', '', ...(tests || []).flatMap(t => [`## ${t.product}: ${t.title}`, '', ...t.steps.map((s, i) => `${i + 1}. ${s}`), '', `**Expected:** ${t.expect}`, '', `Result: ${t.result ? t.result.status : 'not run'}${t.result && t.result.note ? ` — ${t.result.note}` : ''}`, ''])].join('\n');
+      const done = (tests || []).filter(t => t.result).length;
+      return (
+        <div data-step="tests">
+          <div className="card">
+            <div className="card-header" style={{display:'flex', justifyContent:'space-between'}}>
+              <div><h2>POV test runbook</h2><p>One test for each policy the wizard created in this session: how to show it and what the customer should see. Mark each one as you go; results go into the summary report.</p></div>
+              {tests && tests.length > 0 && <button className="btn btn-ghost btn-sm" onClick={() => download('pov-test-runbook.md', runbookMd(), 'text/markdown')}>⬇ Runbook (.md)</button>}
+            </div>
+            {!tests && <div className="form-hint"><span className="spinner"></span> Loading…</div>}
+            {tests && !tests.length && <div className="alert alert-info"><span>Run a product first (POV Start or a module). Tests appear for the policies that were created.</span></div>}
+            {tests && tests.length > 0 && <div className="alert alert-info"><span>{done} of {tests.length} tests recorded · {tests.filter(t => t.result && t.result.status === 'pass').length} passed · {tests.filter(t => t.result && t.result.status === 'fail').length} failed</span></div>}
+            {(tests || []).map(t => (
+              <div key={t.id} className="ab-row" style={{display:'block', borderLeft: `3px solid ${t.result ? (t.result.status === 'pass' ? 'var(--accent-green)' : t.result.status === 'fail' ? 'var(--accent-red)' : 'var(--text-muted)') : 'transparent'}`}} data-test={t.id}>
+                <div style={{display:'flex', justifyContent:'space-between', gap:'12px', flexWrap:'wrap'}}>
+                  <div style={{flex:1, minWidth:'280px'}}>
+                    <div className="ab-row-name"><span className="badge badge-category">{t.product}</span> {t.title}</div>
+                    <ol style={{fontSize:'12px', margin:'4px 0 4px 18px'}}>{t.steps.map((s, i) => <li key={i}>{s}</li>)}</ol>
+                    <div className="ab-row-desc"><strong>Expected:</strong> {t.expect}</div>
+                    <div className="ab-row-desc">Objects: {t.objects.map(o => <code key={o} style={{marginRight:'4px'}}>{o}</code>)}</div>
+                  </div>
+                  <div style={{display:'flex', flexDirection:'column', gap:'4px', minWidth:'210px'}}>
+                    <div className="ab-seg">
+                      <button className={t.result && t.result.status === 'pass' ? 'on-allow' : ''} onClick={() => mark(t, 'pass')} data-pass>Pass</button>
+                      <button className={t.result && t.result.status === 'fail' ? 'on-block' : ''} onClick={() => mark(t, 'fail')} data-fail>Fail</button>
+                      <button className={t.result && t.result.status === 'skip' ? 'on-default' : ''} onClick={() => mark(t, 'skip')}>Skip</button>
+                    </div>
+                    <input type="text" placeholder="Note (optional)" value={notes[t.id] !== undefined ? notes[t.id] : ((t.result && t.result.note) || '')} onChange={e => setNotes({ ...notes, [t.id]: e.target.value })} onBlur={() => t.result && mark({ ...t, result: null }, t.result.status)} style={{fontSize:'12px'}} />
+                    {t.prove && <button className="btn btn-ghost btn-sm" onClick={() => { setUrl(t.prove); prove(t.prove); }}>🔎 Prove it</button>}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="card" data-prove>
+            <div className="card-header"><h2>Prove it</h2><p>What Internet Access does with a URL: its categories and the first URL Filtering rule that matches, plus the Z-Insights totals for the last hour. Zscaler does not give API clients the individual log lines, so open Web Insights › Logs in the ZIA portal to show the exact transaction.</p></div>
+            <div style={{display:'flex', gap:'6px'}}>
+              <input type="text" value={url} onChange={e => setUrl(e.target.value)} placeholder="https://www.example.com" data-proveurl />
+              <button className="btn btn-primary" onClick={() => prove()} disabled={busy || !url.trim()} data-provebtn>{busy ? <span className="spinner"></span> : 'Check'}</button>
+            </div>
+            {proof && (
+              <table className="diff-table" style={{marginTop:'0.75rem'}} data-proof><tbody>
+                <tr><td style={{width:'180px'}}>Host</td><td><code>{proof.host}</code></td></tr>
+                <tr><td>Categories</td><td>{proof.categories.join(', ') || '—'}{proof.securityAlert && <span className="badge badge-risk" style={{marginLeft:'6px'}}>Security alert</span>}</td></tr>
+                <tr><td>First matching rule</td><td>{proof.match ? <><code>{proof.match.name}</code> (order {proof.match.order}) → <ActionBadge action={proof.match.action} /></> : 'No URL Filtering rule matches; the default rule applies.'}{proof.note && <div className="form-hint">{proof.note}</div>}</td></tr>
+                <tr><td>Last hour (Z-Insights)</td><td style={{fontSize:'12px'}}>
+                  {proof.insights && (proof.insights.webThreats || proof.insights.firewallActions) ? <>
+                    {proof.insights.webThreats && <div>Web threats: {proof.insights.webThreats.length ? proof.insights.webThreats.map(x => `${x.name} ${x.total}`).join(', ') : 'none'}</div>}
+                    {proof.insights.firewallActions && <div>Firewall actions: {proof.insights.firewallActions.length ? proof.insights.firewallActions.map(x => `${x.name} ${x.total}`).join(', ') : 'none'}</div>}
+                  </> : 'Not available for this API client.'}
+                </td></tr>
+              </tbody></table>
+            )}
+          </div>
+          <div className="card" data-dlpkit>
+            <div className="card-header"><h2>DLP test kit</h2><p>Synthetic, clearly labelled test files that match the DLP rules (PHI with MRN / Medicare MBI / ICD-10, card-network test numbers, Social Security numbers). No real person's data. Upload one to a test site to trigger a block.</p></div>
+            {(kit || []).map(f => (
+              <div key={f.name} className="toggle-item">
+                <div><code>{f.name}</code><div className="form-hint">{f.description}</div></div>
+                <button className="btn btn-ghost btn-sm" onClick={() => download(f.name, f.content, f.type)} data-kitfile={f.name}>⬇ Download</button>
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+    }
+
+    // ---------- Client Connector devices, one-time passwords, install builder (10) ----------
+    function ZccDevicesInstall({ setError }) {
+      const [devices, setDevices] = useState(null);
+      const [devErr, setDevErr] = useState(null);
+      const [otp, setOtp] = useState({});
+      const [filter, setFilter] = useState('');
+      const [cat, setCat] = useState(null);
+      const [platform, setPlatform] = useState('windows');
+      const [type, setType] = useState('msi');
+      const [values, setValues] = useState({});
+      const [installer, setInstaller] = useState('');
+      const [tokens, setTokens] = useState(null);
+      const [build, setBuild] = useState(null);
+      const loadDevices = () => { setDevErr(null); api.call('GET', '/v2/zcc/devices').then(r => setDevices(r.devices)).catch(e => setDevErr(e.message)); };
+      useEffect(() => { loadDevices(); api.call('GET', '/v2/zcc/install/catalog').then(setCat).catch(() => {}); }, []);
+      useEffect(() => { setTokens(null); setBuild(null); api.call('GET', `/v2/zcc/install/tokens/${platform}`).then(setTokens).catch(() => setTokens([])); }, [platform]);
+      const params = cat ? cat[platform].filter(p => platform === 'macos' || (type === 'msi' ? p.msi : p.exe)) : [];
+      const cats = [...new Set(params.map(p => p.cat))];
+      const keyOf = (p) => p.key;
+      const getOtp = async (d) => { try { const r = await api.call('POST', '/v2/zcc/devices/otp', { udid: d.udid }); setOtp({ ...otp, [d.udid]: r.otp || Object.values(r.passwords || {})[0] || '(no OTP returned)' }); } catch (e) { setError(e.message); } };
+      const doBuild = async () => { try { setBuild(await api.call('POST', '/v2/zcc/install/build', { platform, installerType: type, values, installerName: installer || undefined })); } catch (e) { setError(e.message); } };
+      const shown = (devices || []).filter(d => !filter || `${d.user} ${d.hostname} ${d.os} ${d.policy}`.toLowerCase().includes(filter.toLowerCase()));
+      const field = (p) => {
+        const k = keyOf(p), v = values[k];
+        const set = (val) => { setBuild(null); setValues({ ...values, [k]: val }); };
+        if (p.type === 'toggle' || p.type === 'toggle_on') { const on = v === undefined ? p.type === 'toggle_on' : !!v; return <div className={`toggle-switch ${on ? 'active' : ''}`} onClick={() => set(!on)}><div className="toggle-knob"></div></div>; }
+        if (p.type === 'dropdown') return <select value={v === undefined ? p.options[0][1] : v} onChange={e => set(e.target.value)}>{p.options.map(([l, val]) => <option key={val} value={val}>{l}</option>)}</select>;
+        if (p.fromTenant === 'policyToken') return (
+          <div style={{display:'flex', gap:'6px'}}>
+            <select value={v || ''} onChange={e => set(e.target.value)} style={{flex:1}}>
+              <option value="">{tokens === null ? 'Loading app profiles…' : 'No policy token'}</option>
+              {(tokens || []).map(t => <option key={t.id} value={t.policyToken}>{t.name} ({t.policyToken})</option>)}
+            </select>
+          </div>);
+        if (p.type === 'dropdown' || !p.type) return null;
+        if (k === 'CLOUDNAME' || k === 'cloudName') return <select value={v || ''} onChange={e => set(e.target.value)}><option value="">Not set</option>{cat.cloudNames.map(c => <option key={c} value={c}>{c}</option>)}</select>;
+        return <input type={p.type === 'password' ? 'password' : 'text'} value={v || ''} placeholder={p.ph || ''} onChange={e => set(e.target.value)} autoComplete="off" />;
+      };
+      return (
+        <div data-step="zcc-devices">
+          <div className="card" data-devices>
+            <div className="card-header" style={{display:'flex', justifyContent:'space-between'}}>
+              <div><h2>Enrolled devices</h2><p>Devices registered to Client Connector. Issue a one-time password to let one user turn off a service or uninstall without sharing the profile password. One-time passwords are shown here only and never logged.</p></div>
+              <button className="btn btn-ghost btn-sm" onClick={loadDevices}>↻ Refresh</button>
+            </div>
+            {devErr && <div className="alert alert-warning"><span>{devErr}</span></div>}
+            {!devices && !devErr && <div className="form-hint"><span className="spinner"></span> Loading devices…</div>}
+            {devices && (<>
+              <input type="search" value={filter} onChange={e => setFilter(e.target.value)} placeholder="Filter by user, host, OS or profile" style={{marginBottom:'6px'}} />
+              <table className="diff-table"><thead><tr><th>User</th><th>Device</th><th>Platform</th><th>State</th><th>Version</th><th>App profile</th><th>One-time password</th></tr></thead>
+                <tbody>{shown.slice(0, 200).map(d => (
+                  <tr key={d.udid}>
+                    <td style={{fontSize:'12px'}}>{d.user}</td><td style={{fontSize:'12px'}}>{d.hostname}</td><td>{d.platform}</td><td>{d.state}</td><td style={{fontSize:'12px'}}>{d.agent}</td><td style={{fontSize:'12px'}}>{d.policy}</td>
+                    <td>{otp[d.udid] ? <code data-otp>{otp[d.udid]}</code> : <button className="btn btn-ghost btn-sm" onClick={() => getOtp(d)} data-getotp>Get OTP</button>}</td>
+                  </tr>))}
+                  {!shown.length && <tr><td colSpan={7} className="form-hint">No devices.</td></tr>}
+                </tbody></table>
+            </>)}
+          </div>
+          <div className="card" data-installer>
+            <div className="card-header"><h2>Install Client Connector</h2><p>Build the exact install command for a test machine, checked before you run it. Download a script to run next to the installer (Windows .bat runs as administrator; macOS .command asks for the admin password). Passwords are masked on screen but included in the script.</p></div>
+            <div style={{display:'flex', gap:'8px', flexWrap:'wrap', marginBottom:'0.75rem'}}>
+              <div className="ab-seg">
+                <button className={platform === 'windows' ? 'on-default' : ''} onClick={() => { setPlatform('windows'); setValues({}); }} data-plat="windows">🪟 Windows</button>
+                <button className={platform === 'macos' ? 'on-default' : ''} onClick={() => { setPlatform('macos'); setValues({}); }} data-plat="macos">🍎 macOS</button>
+              </div>
+              {platform === 'windows' && <div className="ab-seg">
+                <button className={type === 'msi' ? 'on-default' : ''} onClick={() => { setType('msi'); setValues({}); setBuild(null); }}>MSI</button>
+                <button className={type === 'exe' ? 'on-default' : ''} onClick={() => { setType('exe'); setValues({}); setBuild(null); }}>EXE</button>
+              </div>}
+              <input type="text" value={installer} onChange={e => { setInstaller(e.target.value); setBuild(null); }} placeholder={platform === 'macos' ? 'Installer name, e.g. Zscaler-osx-4.5.0-installer.app' : `Installer file name, e.g. Zscaler-windows-4.5.0-x64.${type}`} style={{flex:1, minWidth:'260px'}} data-installername />
+            </div>
+            {cats.map(c => (
+              <details key={c} open={c === 'Core Enrollment' || c === 'Enforcement & Security'} style={{marginBottom:'0.5rem'}}>
+                <summary style={{cursor:'pointer', fontSize:'13px', fontWeight:600}}>{c}</summary>
+                {params.filter(p => p.cat === c).map(p => (
+                  <div key={keyOf(p)} className="toggle-item" style={{alignItems:'center'}} data-param={keyOf(p)}>
+                    <div style={{flex:1}}><label><code>{platform === 'macos' ? p.mac : type === 'msi' ? p.msi : p.exe}</code></label><div className="form-hint" style={{margin:0}}>{p.desc}</div></div>
+                    <div style={{minWidth:'240px', maxWidth:'360px'}}>{field(p)}</div>
+                  </div>
+                ))}
+              </details>
+            ))}
+            <div className="btn-group"><button className="btn btn-primary" onClick={doBuild} data-buildinstall>Check and build</button></div>
+            {build && (<>
+              {build.issues.map((i, k) => <div key={k} className={`alert ${i[0] === 'ERROR' ? 'alert-danger' : 'alert-warning'}`}><span>{i[0] === 'ERROR' ? '✕' : '⚠'} {i[1]}</span></div>)}
+              <div className="form-label">Command {build.platform === 'macos' ? '(Terminal)' : '(administrator command prompt)'}</div>
+              <pre style={{whiteSpace:'pre-wrap', wordBreak:'break-all', fontSize:'12px', background:'var(--bg-input)', padding:'8px', borderRadius:'6px'}} data-installcmd>{build.command}</pre>
+              {build.script && <button className="btn btn-success btn-sm" onClick={() => download(build.script.name, build.script.content, 'text/plain')} data-downloadscript>⬇ {build.script.name}</button>}
+            </>)}
+          </div>
+        </div>
+      );
+    }
+
+    // ---------- Snapshots / restore (13) and drift (14) ----------
+    function RestoreDrift({ prefix, setError }) {
+      const [snaps, setSnaps] = useState(null);
+      const [plan, setPlan] = useState(null);
+      const [done, setDone] = useState(null);
+      const [busy, setBusy] = useState(false);
+      const [confirmed, setConfirmed] = useState(false);
+      const [drift, setDrift] = useState(null);
+      const load = () => api.call('GET', `/v2/snapshots${prefix ? `?prefix=${encodeURIComponent(prefix)}` : ''}`).then(setSnaps).catch(e => setError(e.message));
+      useEffect(() => { load(); }, [prefix]);
+      const preview = async (s) => { setBusy(true); setDone(null); setConfirmed(false); try { setPlan(await api.call('POST', `/v2/snapshots/${s.id}/restore`, { dryRun: true })); } catch (e) { setError(e.message); } setBusy(false); };
+      const restore = async () => { setBusy(true); try { setDone(await api.call('POST', `/v2/snapshots/${plan.id}/restore`, { dryRun: false, planId: plan.planId })); setPlan(null); load(); } catch (e) { setError(e.message); } setBusy(false); };
+      const checkDrift = async () => { setBusy(true); setDrift(null); try { setDrift(await api.call('POST', '/v2/drift', {})); } catch (e) { setError(e.message); } setBusy(false); };
+      return (
+        <div data-step="restore">
+          <div className="card" data-drift>
+            <div className="card-header"><h2>Drift check</h2><p>Compares the tenant with what the wizard applied in this session. Anything listed was changed or deleted since (by an admin, the customer or another tool).</p></div>
+            <button className="btn btn-primary" onClick={checkDrift} disabled={busy} data-checkdrift>{busy && !plan ? <span className="spinner"></span> : 'Check for drift'}</button>
+            {drift && drift.note && <div className="alert alert-info" style={{marginTop:'0.5rem'}}><span>{drift.note}</span></div>}
+            {drift && drift.products.map(p => (
+              <div key={p.product} style={{marginTop:'0.75rem'}}>
+                <h3 style={{fontSize:'14px'}}>{p.product}: {p.drift.length ? `${p.drift.length} change(s) since ${new Date(p.since).toLocaleString()}` : `no drift (${p.unchanged} objects match)`}</h3>
+                {p.drift.length > 0 && <LedgerTable ledger={p.drift} filterProduct />}
+                {p.drift.length > 0 && <div className="form-hint">Re-run that product (or POV Start) to put the wizard's settings back.</div>}
+              </div>
+            ))}
+          </div>
+          <div className="card" data-snapshots>
+            <div className="card-header" style={{display:'flex', justifyContent:'space-between'}}>
+              <div><h2>Restore</h2><p>Every Internet Access and Private Access apply saves a snapshot of what it changed. Restoring deletes what that run created and puts back what it updated, newest change first, then activates ZIA. Snapshots never contain secrets and stay on this computer.</p></div>
+              <button className="btn btn-ghost btn-sm" onClick={load}>↻</button>
+            </div>
+            {!snaps && <span className="spinner"></span>}
+            {snaps && !snaps.length && <div className="form-hint">No snapshots yet for {prefix ? <code>{prefix}</code> : 'this prefix'}.</div>}
+            {snaps && snaps.length > 0 && (
+              <table className="diff-table"><thead><tr><th>When</th><th>Product</th><th>Prefix</th><th>Changes</th><th></th></tr></thead>
+                <tbody>{snaps.map(s => (
+                  <tr key={s.id} data-snap={s.id}>
+                    <td style={{fontSize:'12px'}}>{new Date(s.at).toLocaleString()}</td><td>{s.product.toUpperCase()}</td><td><code>{s.prefix}</code></td><td>{s.steps}</td>
+                    <td>{s.restoredAt ? <span className="badge badge-category">Restored {new Date(s.restoredAt).toLocaleString()}</span> : <button className="btn btn-ghost btn-sm" onClick={() => preview(s)} disabled={busy} data-previewrestore>Preview restore</button>}</td>
+                  </tr>))}</tbody></table>
+            )}
+            {plan && (<>
+              <div className="alert alert-warning" style={{marginTop:'0.75rem'}}><span>Restore dry run for the {plan.product.toUpperCase()} run of {new Date(plan.at).toLocaleString()}: {plan.results.length} step(s), newest first. Nothing changed yet.</span></div>
+              <table className="diff-table"><tbody>{plan.results.map((r, i) => <tr key={i}><td>{r.action}</td><td style={{fontSize:'12px'}}>{r.label}</td></tr>)}</tbody></table>
+              <div className="toggle-item" style={{marginTop:'0.5rem'}}><label onClick={() => setConfirmed(!confirmed)} style={{cursor:'pointer'}}>I have reviewed this. Restore the tenant to before that run.</label>
+                <div className={`toggle-switch ${confirmed ? 'active' : ''}`} onClick={() => setConfirmed(!confirmed)} data-confirmrestore><div className="toggle-knob"></div></div></div>
+              <LiveProgress active={busy} title="Restoring" />
+              <div className="btn-group"><button className="btn btn-ghost" onClick={() => setPlan(null)}>Cancel</button>
+                <button className="btn btn-danger" disabled={!confirmed || busy} onClick={restore} data-dorestore>{busy ? <span className="spinner"></span> : 'Restore'}</button></div>
+            </>)}
+            {done && <div className="alert alert-success" style={{marginTop:'0.75rem', display:'block'}}>{done.results.map((r, i) => <div key={i}>{r.action === 'FAILED' ? '✕' : '✓'} {r.action} · {r.label}{r.error ? ` — ${r.error}` : ''}</div>)}{done.activated === true && <div>✓ ZIA activated</div>}</div>}
           </div>
         </div>
       );
