@@ -12,6 +12,7 @@ Implements the *Policy Wizard 2.0 Requirements Specification*.
 - Cloud App Control rules that cover a whole category accept only web-use actions. Upload, chat and post sub-actions need specific apps selected. Balanced now uses Social "Allow view + Block post" and AI/ML "Caution".
 - ZCC IP Inclusions and Exclusions take an IP address or CIDR only. A domain name there makes ZCC reject the whole app profile (HTTP 200, success:false), so the dry run now refuses it. This deviates from ZCC-08, which allows FQDNs.
 - ZCC re-runs compare bypass apps against the apps that were picked, not the template default, so they now show No change.
+- Cloud App Control Caution actions need the browsers named. ZIA answers "Caution Action can be applied only for specific user agents", so Caution rules now set the user agent types.
 
 - **Global:**
   - One global prefix (GLB-02).

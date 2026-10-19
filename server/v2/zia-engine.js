@@ -235,8 +235,14 @@ const dnsBody = (rule, order) => ({ name: rule.name, description: rule.descripti
 const fileTypeBody = (rule, order) => ({ name: rule.name, description: rule.description || '', order, state: rule.state || 'ENABLED', rank: 7,
   protocols: rule.protocols || ['ANY_RULE'], fileTypes: rule.fileTypes || [], filteringAction: rule.filteringAction || 'BLOCK',
   operation: rule.operation || 'UPLOAD_DOWNLOAD', ...(rule.passwordProtected !== undefined ? { passwordProtected: rule.passwordProtected } : {}) });
-const cacBody = (rule, order) => ({ name: rule.name, description: rule.description || '', order, state: rule.state || 'ENABLED', rank: 7,
-  type: rule.ruleType || rule.type || 'AI_ML', actions: rule.actions || [] });
+// ZIA: "Caution Action can be applied only for specific user agents" (live, ZTH) — a Caution rule must name the browsers.
+const CAC_BROWSERS = ['OPERA', 'FIREFOX', 'MSIE', 'MSEDGE', 'CHROME', 'SAFARI', 'MSCHREDGE'];
+const cacBody = (rule, order) => {
+  const b = { name: rule.name, description: rule.description || '', order, state: rule.state || 'ENABLED', rank: 7,
+    type: rule.ruleType || rule.type || 'AI_ML', actions: rule.actions || [] };
+  if (b.actions.some(a => /^CAUTION_/.test(a))) b.userAgentTypes = rule.userAgentTypes && rule.userAgentTypes.length ? rule.userAgentTypes : CAC_BROWSERS.slice();
+  return b;
+};
 
 // ---------- the run ----------
 /**

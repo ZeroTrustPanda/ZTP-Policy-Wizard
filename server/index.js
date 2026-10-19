@@ -1343,6 +1343,8 @@ app.post('/api/apply', requireAuth, async (req, res) => {
             type: ruleType,
             actions: rule.actions || []
           };
+          // ZIA only accepts a Caution action when the rule names the browsers it applies to
+          if (apiRule.actions.some(a => /^CAUTION_/.test(a))) apiRule.userAgentTypes = rule.userAgentTypes && rule.userAgentTypes.length ? rule.userAgentTypes : ['OPERA', 'FIREFOX', 'MSIE', 'MSEDGE', 'CHROME', 'SAFARI', 'MSCHREDGE'];
 
           const result = await client.createCloudAppControlRule(ruleType, apiRule);
           results.applied.push({ type: 'CREATE', category: 'Cloud App Control', name: rule.name, id: result?.id });
