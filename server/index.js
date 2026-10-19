@@ -20,6 +20,7 @@ const { resolveForTenant } = require('./tenant-resolve');
 const { buildFrameworkFile, readFrameworkFile, captureFromTenant } = require('./framework-io');
 const { generateZCCTemplate, buildAppProfileBody, readProfileLists, PROFILE_LISTS } = require('./zcc-templates');
 const { validateProfileLists } = require('./v2/validate');
+const { isSslCatchAll } = require('./v2/zia-engine');
 const { getTemplateCatalog, getTemplate, getPlatform, BYPASS_APPS } = require('./zcc-app-profile-templates');
 const { getFwdTemplateCatalog, getFwdTemplate, buildForwardingProfileBody } = require('./zcc-fwd-profile-templates');
 const { registerZdxRoutes, ZDXClient } = require('./zdx-routes');
@@ -27,7 +28,7 @@ const { registerV2Routes } = require('./v2/routes');
 const { AuditLogger } = require('./audit-logger');
 
 const app = express();
-const APP_VERSION = '2.0.0';
+const APP_VERSION = '2.1.0';
 const PORT = process.env.ZTP_PORT || 3000;
 const HOST = process.env.ZTP_HOST || '0.0.0.0';
 const SESSION_TTL_MS = 60 * 60 * 1000;   // 1 hour
@@ -1106,10 +1107,12 @@ app.post('/api/apply', requireAuth, async (req, res) => {
           const actionType = (rule.action === 'INSPECT' || rule.action === 'DECRYPT')
             ? 'DECRYPT' : 'DO_NOT_DECRYPT';
 
+          // The catch-all (inspect everything remaining) goes last, below "Zscaler Recommended Exemptions".
+          const catchAll = isSslCatchAll(rule);
           const apiRule = {
             name: rule.name,
             description: rule.description || '',
-            order: sslOrder,
+            order: catchAll ? sslLast : sslOrder,
             state: rule.state,
             rank: 7,
             roadWarriorForKerberos: false
@@ -1172,7 +1175,8 @@ app.post('/api/apply', requireAuth, async (req, res) => {
             result = await client.createSslInspectionRule(apiRule);
             results.warnings.push(`${rule.name}: placed at order ${apiRule.order} (the tenant did not allow it higher). Check that rules above it don't catch the same traffic.`);
           }
-          sslOrder = apiRule.order + 1; sslLast = Math.max(sslLast, apiRule.order) + 1;
+          if (!catchAll) sslOrder = apiRule.order + 1;
+          sslLast = Math.max(sslLast, apiRule.order) + 1;
           results.applied.push({ type: 'CREATE', category: 'SSL Inspection', name: rule.name, id: result?.id, order: apiRule.order });
           logger.logPolicyApply('SSL Inspection', rule.name, 'CREATE', { success: true, id: result?.id });
         } catch (e) {
@@ -2410,7 +2414,7 @@ app.delete('/api/zcc/forwarding-profiles/:id', requireAuth, async (req, res) => 
 async function planAppProfile(zccClient, platform, input, ownPrefix = null) {
   const plat = getPlatform(platform);
   const { name = '', description = '', forwardingProfileId = 0, active = false, templateId = 'BEST_PRACTICE', enabledSettings = null, newForwardingProfile = null,
-    bypassAppIds = null, lists = null } = input || {};
+    bypassAppIds = null, lists = null, tamperPassword = '' } = input || {};
   const checks = [];
   const warnings = [];
   const trimmed = String(name).trim();
@@ -2468,8 +2472,14 @@ async function planAppProfile(zccClient, platform, input, ownPrefix = null) {
   try {
     template = getTemplate(plat.id, templateId);
     const built = buildAppProfileBody({ platform: plat.id, name: trimmed || 'placeholder', description, ruleOrder, forwardingProfileId, active: !!active, templateId, enabledSettings,
-      bypassAppIds: Array.isArray(bypassAppIds) ? bypassAppIds : null, lists, id: dup ? dup.id : null });
+      bypassAppIds: Array.isArray(bypassAppIds) ? bypassAppIds : null, lists, id: dup ? dup.id : null, tamperPassword: tamperPassword || null });
     body = built.body; applied = built.applied;
+    if (applied.some(st => st.password)) {
+      const pw = String(tamperPassword || '');
+      const okPw = pw.length >= 8 && pw.length <= 64 && /^[A-Za-z0-9!@#%^*_+=.-]+$/.test(pw);
+      checks.push({ name: 'Tamper protection password', status: okPw ? 'pass' : 'fail',
+        detail: okPw ? `Set (${pw.length} characters); shown in the summary report` : 'Generate a password or enter 8 to 64 letters, numbers or !@#%^*_+=.- characters, or turn off Tamper protection passwords.' });
+    }
     checks.push({ name: 'Template', status: 'pass', detail: `${template.name}: ${applied.length} of ${template.settings.length} settings selected` });
   } catch (e) {
     checks.push({ name: 'Template', status: 'fail', detail: e.message });
@@ -2518,7 +2528,8 @@ async function planAppProfile(zccClient, platform, input, ownPrefix = null) {
       const stored = await zccClient.getApplicationProfile(dup.id);
       const ids = (x) => JSON.stringify((x || []).map(String).sort());
       // the bypass setting is compared against the apps the user picked (not the template default list)
-      const settingMatches = (st) => (st.key === 'appBypass' && Array.isArray(st.appIds)) ? ids(stored.appServiceIds) === ids(st.appIds) : st.verify(stored);
+      const settingMatches = (st) => (st.key === 'appBypass' && Array.isArray(st.appIds)) ? ids(stored.appServiceIds) === ids(st.appIds)
+        : st.password ? st.verify(stored, String(tamperPassword || '')) : st.verify(stored);
       for (const st of applied) if (!st.manual && !settingMatches(st)) changeReasons.push(st.label);
       const listsNow = readProfileLists(stored), listsWant = readProfileLists(body);
       for (const k of Object.keys(listsWant)) if (JSON.stringify(listsNow[k]) !== JSON.stringify(listsWant[k])) changeReasons.push(`${k}: ${listsNow[k].join(',') || 'none'} → ${listsWant[k].join(',') || 'none'}`);
@@ -2615,7 +2626,7 @@ app.post('/api/zcc/app-profiles/:platform', requireAuth, async (req, res) => {
         ? { key: s.key, label: s.label, expected: s.value, ok: true, manual: true }
         : s.key === 'appBypass'
           ? { key: s.key, label: s.label, expected: (s.appIds || []).join(', '), ok: JSON.stringify((stored.appServiceIds || []).map(String).sort()) === JSON.stringify((s.appIds || []).map(String).sort()) }
-          : { key: s.key, label: s.label, expected: s.value, ok: !!s.verify(stored) });
+          : { key: s.key, label: s.label, expected: s.value, ok: !!(s.password ? s.verify(stored, String(planInput.tamperPassword || '')) : s.verify(stored)) });
       const wantLists = readProfileLists(plan.body), gotLists = readProfileLists(stored);
       for (const k of Object.keys(wantLists)) verification.push({ key: `list:${k}`, label: k, expected: wantLists[k].join(', ') || 'None', ok: JSON.stringify(wantLists[k]) === JSON.stringify(gotLists[k]) });
       const storedFwd = stored?.onNetPolicy?.id ?? stored?.forwardingProfileId; // ZCC returns the linked forwarding profile as onNetPolicy
@@ -2635,7 +2646,8 @@ app.post('/api/zcc/app-profiles/:platform', requireAuth, async (req, res) => {
       ...(fwdResult.verified ? {} : { note: 'Some settings did not verify on read-back' }) });
     zccLedger.push({ product: 'ZCC', category: `${plan.platform.label} App Profile`, name: plan.body.name, action: plan.action, id: newId,
       ...(verified ? {} : { note: 'Some settings did not verify on read-back: ' + verification.filter(v => !v.ok).map(v => v.label).join(', ') }) });
-    app.locals.recordZccRun(req.session, { ledger: zccLedger, warnings: plan.warnings, manualSteps: plan._applied.filter(s => s.manual).map(s => ({ key: s.key, label: s.label })) });
+    const tamper = plan._applied.some(s => s.password) && planInput.tamperPassword ? { tamperPassword: String(planInput.tamperPassword), profile: `${plan.platform.label}: ${plan.body.name}` } : null;
+    app.locals.recordZccRun(req.session, { ledger: zccLedger, warnings: plan.warnings, manualSteps: plan._applied.filter(s => s.manual).map(s => ({ key: s.key, label: s.label })), ...(tamper ? { secrets: tamper } : {}) });
     res.json({
       success: true, action: plan.action, id: newId, name: plan.body.name, ruleOrder: plan.ruleOrder, active: plan.body.active === '1',
       forwardingProfile: fwdResult ? { ...fwdResult, created: true } : { id: plan.body.forwardingProfileId, name: plan.forwardingProfile.name, created: false },

@@ -19,10 +19,16 @@ function buildReport({ runs, prefix, tenant, licensing, endpointWarning, include
   const rows = collect(runs);
   const zia = (runs.zia || [])[runs.zia ? runs.zia.length - 1 : 0];
   const zpa = (runs.zpa || [])[runs.zpa ? runs.zpa.length - 1 : 0];
-  const key = includeSecrets && zpa && zpa.secrets && zpa.secrets.provisioningKey;
+  const pk = includeSecrets && zpa && zpa.secrets && zpa.secrets.provisioningKey;
+  // Tamper protection passwords set on ZCC app profiles in this session (latest per profile)
+  const pw = new Map();
+  if (includeSecrets) for (const r of runs.zcc || []) if (r.secrets && r.secrets.tamperPassword) pw.set(r.secrets.profile, r.secrets.tamperPassword);
+  const key = pk || pw.size > 0;
   const warnings = [...new Set([...(runs.zia || []), ...(runs.zcc || []), ...(runs.zpa || [])].flatMap(r => r.warnings || []).map(w => typeof w === 'string' ? w : w.text))];
   const followUps = [];
-  if (runs.zpa && runs.zpa.length) followUps.push(COPY.report.followUps.zpaLocation, COPY.report.followUps.zpaDeploy);
+  if (runs.zpa && runs.zpa.length) followUps.push(...(zpa.followUps || [COPY.report.followUps.zpaLocation, COPY.report.followUps.zpaDeploy]));
+  if (pw.size) followUps.push(COPY.report.followUps.otp);
+  if (zia && zia.template && ['urlFiltering', 'sandbox'].some(k => (zia.template.policies[k] || []).some(r => r.action === 'ISOLATE' || r.firstTimeOperation === 'QUARANTINE_ISOLATE'))) followUps.push(COPY.report.followUps.isolationProfile);
   if (zia && zia.template && zia.template.metadata.scope.endpointDlp && endpointWarning) followUps.push(COPY.report.followUps.endpointDlp);
   if ((runs.zcc || []).some(r => (r.manualSteps || []).some(m => m.key === 'modernUi'))) followUps.push(COPY.report.followUps.modernUi);
   if (zia && zia.template && (zia.template.generationNotes || []).length) warnings.push(...zia.template.generationNotes);
@@ -62,7 +68,8 @@ function buildReport({ runs, prefix, tenant, licensing, endpointWarning, include
     for (const d of decisions) md.push(`| ${d.type} | ${d.name} | ${d.action} |`);
     md.push('');
   }
-  if (key) md.push('## ZPA provisioning key', '', `**${COPY.report.sensitive}**`, '', '```', key, '```', '', COPY.zpa.keyNote, '');
+  if (pk) md.push('## ZPA provisioning key', '', `**${COPY.report.sensitive}**`, '', '```', pk, '```', '', COPY.zpa.keyNote, '');
+  if (pw.size) { md.push('## Client Connector tamper protection passwords', '', `**${COPY.report.sensitive}**`, ''); for (const [n, v] of pw) md.push(`- ${n}: \`${v}\``); md.push('', COPY.report.tamperNote, ''); }
   if (warnings.length) { md.push('## Warnings', ''); for (const w of warnings) md.push(`- ${w}`); md.push(''); }
   if (licensing && licensing.items) {
     const lic = Object.entries(licensing.items).filter(([, v]) => v.licensed !== true);
@@ -104,7 +111,8 @@ ${zia ? `<h2>Scope</h2><ul>${scopeOn.map(s => `<li>${esc(s)}</li>`).join('')}</u
 ${rows.map(r => `<tr><td>${esc(r.product)}</td><td>${esc(r.category)}</td><td>${esc(r.name)}</td><td>${badge(r.action)}</td><td>${esc(r.error || (r.changes ? 'Changed: ' + r.changes.join(', ') : '') || r.note || '')}</td></tr>`).join('')}
 </tbody></table>
 ${decisions.length ? `<h2>Rule decisions (ZIA)</h2><table><thead><tr><th>Area</th><th>Rule / setting</th><th>Action</th></tr></thead><tbody>${decisions.map(d => `<tr><td>${esc(d.type)}</td><td>${esc(d.name)}</td><td>${esc(d.action)}</td></tr>`).join('')}</tbody></table>` : ''}
-${key ? `<h2>ZPA provisioning key</h2><div class="secret">${esc(COPY.report.sensitive)}</div><code class="key">${esc(key)}</code><p>${esc(COPY.zpa.keyNote)}</p>` : ''}
+${pk ? `<h2>ZPA provisioning key</h2><div class="secret">${esc(COPY.report.sensitive)}</div><code class="key">${esc(pk)}</code><p>${esc(COPY.zpa.keyNote)}</p>` : ''}
+${pw.size ? `<h2>Client Connector tamper protection passwords</h2><div class="secret">${esc(COPY.report.sensitive)}</div>${[...pw].map(([n, v]) => `<p>${esc(n)}</p><code class="key">${esc(v)}</code>`).join('')}<p>${esc(COPY.report.tamperNote)}</p>` : ''}
 ${warnings.length ? `<h2>Warnings</h2><ul class="warn">${warnings.map(w => `<li>${esc(w)}</li>`).join('')}</ul>` : ''}
 <h2>Manual follow-ups</h2>${followUps.length ? `<ol>${followUps.map(f => `<li>${esc(f)}</li>`).join('')}</ol>` : '<p>None.</p>'}
 ${zia && zia.template.metadata.sources ? `<h2>Framework sources</h2><ul>${zia.template.metadata.sources.map(s => `<li><a href="${esc(s.url)}">${esc(s.title)}</a></li>`).join('')}</ul>` : ''}

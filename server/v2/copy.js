@@ -64,12 +64,15 @@ module.exports = {
     bulkTemplate: 'Application Name,Destinations,Ports\r\nEpic Hyperspace,epic.hospital.local; epicweb.hospital.local; 10.20.30.40,443; 8080-8090\r\nPACS Viewer,pacs.hospital.local; 10.50.0.0/24,104; 11112; 443\r\nInternal DNS,10.0.0.53,udp:53; tcp:53\r\nIntranet,*.intranet.hospital.local,80; 443\r\n'
   },
   report: {
-    sensitive: 'SENSITIVE — this report contains a ZPA provisioning key. Store it securely and share it only with people deploying App Connectors.',
+    sensitive: 'SENSITIVE — this report contains secrets (a ZPA provisioning key and/or Client Connector passwords). Store it securely and share it only with the people deploying Zscaler.',
+    tamperNote: 'Users need this password to log out of, exit or uninstall Client Connector, or to turn off ZIA, ZPA or ZDX on their device.',
     followUps: {
       zpaLocation: 'Change the ZPA App Connector Group location from San Jose, CA to where the connectors will run.',
       zpaDeploy: 'Deploy App Connectors and enroll them with the provisioning key in this report.',
       endpointDlp: 'Enable Endpoint DLP in the Zscaler Client Connector Portal (Mobile Admin), then confirm the endpoint rules reach devices.',
-      modernUi: 'Set "Modern UI" on the macOS app profile in the Mobile Admin portal (not available through the API).'
+      modernUi: 'Set "Modern UI" on the macOS app profile in the Mobile Admin portal (not available through the API).',
+      otp: 'To let one user turn off a service without sharing the password, issue a one-time password from Mobile Admin › Enrolled Devices › device › One-time password.',
+      isolationProfile: 'In the Cloud Browser Isolation profile used by the Isolate rules, set copy/paste, upload/download and watermark controls to what you want to show (ZIA › Cloud Browser Isolation › Isolation Profiles).'
     }
   },
   bulk: {
