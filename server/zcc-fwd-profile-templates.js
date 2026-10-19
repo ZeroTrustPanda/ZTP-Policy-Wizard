@@ -56,12 +56,21 @@ const WINDOWS_FWD_SETTINGS = [
   },
   {
     key: 'dropIpv6',
-    label: 'Drop IPv6 Traffic',
+    label: 'Drop IPv6 Traffic (dual-stack networks)',
     category: 'ZIA Forwarding',
-    description: 'Drops IPv6 traffic, including on IPv6-only networks, so it cannot bypass the tunnel. Can break IPv6-only destinations.',
-    value: 'On, including IPv6-only networks', portalDefault: 'Off', impact: 'caution',
-    apply: (b) => zia(b).forEach(a => { a.dropIpv6Traffic = 1; a.dropIpv6TrafficInIpv6Network = 1; }),
-    verify: (p) => all(zia(p), a => num(a.dropIpv6Traffic) === 1 && num(a.dropIpv6TrafficInIpv6Network) === 1)
+    description: 'On networks with both IPv4 and IPv6, IPv6 traffic is dropped so it goes over IPv4 through the tunnel instead of bypassing it.',
+    value: 'On', portalDefault: 'Off', impact: 'caution',
+    apply: (b) => zia(b).forEach(a => { a.dropIpv6Traffic = 1; }),
+    verify: (p) => all(zia(p), a => num(a.dropIpv6Traffic) === 1)
+  },
+  {
+    key: 'dropIpv6Only',
+    label: 'Drop IPv6 Traffic in IPv6-only networks',
+    category: 'ZIA Forwarding',
+    description: 'Also drops IPv6 traffic on networks that only have IPv6. Devices on such networks lose access to IPv6-only destinations.',
+    value: 'On', portalDefault: 'Off', impact: 'caution',
+    apply: (b) => zia(b).forEach(a => { a.dropIpv6TrafficInIpv6Network = 1; }),
+    verify: (p) => all(zia(p), a => num(a.dropIpv6TrafficInIpv6Network) === 1)
   },
   {
     key: 'latencyBasedZen',

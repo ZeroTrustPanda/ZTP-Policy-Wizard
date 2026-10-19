@@ -4,6 +4,24 @@
 
 Implements the *Policy Wizard 2.0 Requirements Specification*.
 
+**Feedback round (2026-10-19):**
+- **ZCC:**
+  - The forwarding profile has two separate IPv6 toggles: *Drop IPv6 Traffic (dual-stack networks)* and *Drop IPv6 Traffic in IPv6-only networks*.
+  - The predefined IP app bypass checklist now sits directly under the *Bypass IP-based Applications* toggle.
+- **ZIA:**
+  - The section is renamed to *Zscaler Internet Access* (was "ZIA POV Policy Wizard").
+  - New URL rule *Isolate-Misc-Unknown* opens Miscellaneous / Unknown sites in Cloud Browser Isolation, using the tenant's profile. Without an isolation profile it falls back to Caution with a warning.
+  - New app-specific Cloud App Control rules show granular controls:
+    - Google Drive, Dropbox and Box: view only.
+    - Facebook and X: view but no posting.
+    - LinkedIn: read only.
+    - ChatGPT, Gemini and Copilot: allowed, but no uploads.
+    - Slack: chat, but no file uploads.
+    App IDs and actions were read live from the tenant. If the tenant refuses the first action set, the rule falls back to a second one.
+  - UCaaS (Zoom, GoTo, RingCentral, Webex, Talkdesk) is its own settings group, enabled on every Zscaler Internet Access run and shown on the rule review page.
+  - Cloud Sandbox groups list only the file types the sandbox accepts, so the "left out" warnings are gone. Probed live: ZIA rejects JavaScript, IMG, LNK, GZIP, text, CSV and image types for sandbox rules, and DMG needs Sandbox macOS.
+- **ZPA:** *Bulk upload application segments from a CSV* (Application Name, Destinations, Ports; several values per cell separated by `;`, `udp:53` for UDP). It comes with a downloadable template, per-application settings overrides and row-numbered validation, including overlapping destinations. The shared ZPA objects are still created, and each application gets its own segment `<prefix>-<name>`.
+
 **Live-test findings (ZTH, 2026-10-16), fixed in this build:**
 - The ZIA API session can end before the OAuth token expires. ZIA then returns 403 "Resource Access Blocked". The client now signs in again once and retries.
 - A failed rule create gives back its rule order, so one failure no longer causes "Rule is not allowed at order N" for every later rule.

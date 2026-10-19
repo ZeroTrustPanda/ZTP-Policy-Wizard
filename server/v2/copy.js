@@ -58,7 +58,10 @@ module.exports = {
     connectorGroupDescription: 'Created by the Zscaler Policy Wizard for a proof of value.',
     appSegmentDescription: 'Basic wildcard application segment created by the Zscaler Policy Wizard.',
     fqdnHelp: '*.example.com, 10.0.0.0/24',
-    defaultsNote: 'These defaults apply to the ZPA application segment only. Closer to User is used because UDP ports are not supported with Closer to Application.'
+    defaultsNote: 'These defaults apply to the ZPA application segment only. Closer to User is used because UDP ports are not supported with Closer to Application.',
+    bulkLabel: 'Bulk upload application segments from a CSV (instead of the wildcard segment)',
+    bulkHelp: 'One row per application: Application Name, Destinations, Ports. Put several destinations or ports in one cell separated by semicolons (;). Ports are TCP unless written as udp:53. The App Connector Group, Provisioning Key, Segment Group and Server Group are still created; each application gets its own segment named <prefix>-<application name>.',
+    bulkTemplate: 'Application Name,Destinations,Ports\r\nEpic Hyperspace,epic.hospital.local; epicweb.hospital.local; 10.20.30.40,443; 8080-8090\r\nPACS Viewer,pacs.hospital.local; 10.50.0.0/24,104; 11112; 443\r\nInternal DNS,10.0.0.53,udp:53; tcp:53\r\nIntranet,*.intranet.hospital.local,80; 443\r\n'
   },
   report: {
     sensitive: 'SENSITIVE — this report contains a ZPA provisioning key. Store it securely and share it only with people deploying App Connectors.',

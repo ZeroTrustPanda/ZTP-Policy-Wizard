@@ -1351,7 +1351,8 @@ app.post('/api/apply', requireAuth, async (req, res) => {
             state: rule.state,
             rank: 7,
             type: ruleType,
-            actions: rule.actions || []
+            actions: rule.actions || [],
+            ...(rule.applications && rule.applications.length ? { applications: rule.applications } : {})
           };
           // ZIA only accepts a Caution action when the rule names the browsers it applies to
           if (apiRule.actions.some(a => /^CAUTION_/.test(a))) apiRule.userAgentTypes = rule.userAgentTypes && rule.userAgentTypes.length ? rule.userAgentTypes : ['OPERA', 'FIREFOX', 'MSIE', 'MSEDGE', 'CHROME', 'SAFARI', 'MSCHREDGE'];
@@ -2306,7 +2307,7 @@ async function planForwardingProfile(zccClient, input, prefix = '', ownPrefix = 
     try { if (applied.length && applied.every(st => st.verify(dup))) action = 'NO_CHANGE'; } catch (e) { /* update */ }
   }
   const warnings = [];
-  if (applied.some(s => s.key === 'dropIpv6')) warnings.push('Forwarding profile drops IPv6 traffic, including on IPv6-only networks. Devices on IPv6-only networks lose access to IPv6-only destinations.');
+  if (applied.some(s => s.key === 'dropIpv6Only')) warnings.push('Forwarding profile drops IPv6 traffic on IPv6-only networks. Devices on IPv6-only networks lose access to IPv6-only destinations.');
   const ok = !checks.some(c => c.status === 'fail');
   return {
     ok, checks, warnings, name: trimmed, action, existingId: dup ? dup.id : null,

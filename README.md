@@ -8,7 +8,7 @@ The sidebar runs in POV order: **Zscaler Client Connector → Zscaler Internet A
 
 **Every change goes through a dry run first.** The server refuses an apply that doesn't match a dry run of exactly the same choices. The dry run and the apply run the same code, so the preview lists each object as **Create**, **Update** or **No change**, and the apply does exactly that. After an apply, ZIA changes are activated automatically. One failed object never stops the rest: each failure is listed with its reason, and anything that depends on it is skipped.
 
-### ZIA: POV Policy Wizard
+### Zscaler Internet Access: Policy Wizard
 1. **Scope:** pick what the POV covers.
    - Inline DLP, either Monitor or Block.
    - Endpoint Data Protection.

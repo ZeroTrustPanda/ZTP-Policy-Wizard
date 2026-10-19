@@ -108,6 +108,12 @@ function parsePortRanges(v) {
 }
 
 function validateZpaInput(input) {
+  if (Array.isArray(input.apps) && input.apps.length) {
+    const b = validateBulkApps(input.apps);
+    if (!['ON_ACCESS', 'CONTINUOUS', 'NONE'].includes(input.settings?.healthReporting || 'ON_ACCESS')) b.errors.push('Health check must be On Access, Continuous or None.');
+    for (const a of input.apps) if (a.settings && a.settings.healthReporting && !['ON_ACCESS', 'CONTINUOUS', 'NONE'].includes(a.settings.healthReporting)) b.errors.push(`${a.name}: health check must be On Access, Continuous or None.`);
+    return { errors: b.errors, bulk: b.apps, entries: [], tcp: [], udp: [] };
+  }
   const errors = [];
   const entries = splitEntries(input.domains);
   if (!entries.length) errors.push('Enter at least one domain or IP for the application segment.');
@@ -117,6 +123,89 @@ function validateZpaInput(input) {
   if (!tcp.ranges.length && !udp.ranges.length) errors.push('Enter at least one TCP or UDP port range.');
   if (!['ON_ACCESS', 'CONTINUOUS', 'NONE'].includes(input.settings?.healthReporting || 'ON_ACCESS')) errors.push('Health check must be On Access, Continuous or None.');
   return { errors, entries, tcp: tcp.ranges, udp: udp.ranges };
+}
+
+// ---------- bulk application segments from a CSV (ZPA bulk upload) ----------
+// Columns: Application Name, Destinations, Ports. Inside a cell, separate multiple values with ";" (or new lines,
+// "|" or spaces; commas also work when the cell is in quotes). Ports: 443, 8000-8100, udp:53, tcp:22 (TCP when no prefix).
+function parseCsvRows(text) {
+  const rows = []; let row = [], cell = '', q = false;
+  const src = String(text || '').replace(/^﻿/, '');
+  for (let i = 0; i < src.length; i++) {
+    const ch = src[i];
+    if (q) {
+      if (ch === '"') { if (src[i + 1] === '"') { cell += '"'; i++; } else q = false; }
+      else cell += ch;
+    } else if (ch === '"') q = true;
+    else if (ch === ',') { row.push(cell); cell = ''; }
+    else if (ch === '\n' || ch === '\r') { if (ch === '\r' && src[i + 1] === '\n') i++; row.push(cell); rows.push(row); row = []; cell = ''; }
+    else cell += ch;
+  }
+  if (cell !== '' || row.length) { row.push(cell); rows.push(row); }
+  return rows.filter(r => r.some(c => String(c).trim()));
+}
+const splitCell = (v) => String(v || '').split(/[;|\n,\s]+/).map(x => x.trim()).filter(Boolean);
+function splitPorts(cell) {
+  const tcp = [], udp = [], bad = [];
+  for (const t of splitCell(cell)) {
+    const m = t.match(/^(tcp|udp|t|u)?\s*[:=]?\s*(\d{1,5}(?:-\d{1,5})?)$/i);
+    if (!m) { bad.push(t); continue; }
+    (m[1] && /^u/i.test(m[1]) ? udp : tcp).push(m[2]);
+  }
+  return { tcp: tcp.join(', '), udp: udp.join(', '), bad };
+}
+const COL = { name: /^(app(lication)?\s*name|name|application|app)$/i, dest: /^(destinations?|fqdn|fqdn\s*\/\s*ip|domains?|hosts?|ips?|addresses|fqdns?\s*\/\s*ips?)$/i, ports: /^ports?$/i, tcp: /^tcp(\s*ports?)?$/i, udp: /^udp(\s*ports?)?$/i };
+/** CSV text → { apps:[{name, destinations[], tcpPorts, udpPorts, row}], errors[] } */
+function parseBulkCsv(text) {
+  const rows = parseCsvRows(text);
+  const errors = [];
+  if (!rows.length) return { apps: [], errors: ['The file is empty.'] };
+  const head = rows[0].map(c => String(c).trim());
+  let idx = { name: head.findIndex(h => COL.name.test(h)), dest: head.findIndex(h => COL.dest.test(h)), ports: head.findIndex(h => COL.ports.test(h)), tcp: head.findIndex(h => COL.tcp.test(h)), udp: head.findIndex(h => COL.udp.test(h)) };
+  let body = rows.slice(1);
+  if (idx.name < 0 || idx.dest < 0) { idx = { name: 0, dest: 1, ports: 2, tcp: -1, udp: -1 }; body = rows; }   // no header row
+  const apps = [];
+  body.forEach((r, i) => {
+    const rowNo = i + (body === rows ? 1 : 2);
+    const name = String(r[idx.name] || '').trim();
+    const destinations = splitCell(r[idx.dest]);
+    let tcp = [], udp = [], bad = [];
+    if (idx.ports >= 0) { const p = splitPorts(r[idx.ports]); tcp.push(p.tcp); udp.push(p.udp); bad.push(...p.bad); }
+    if (idx.tcp >= 0) tcp.push(splitCell(r[idx.tcp]).join(', '));
+    if (idx.udp >= 0) udp.push(splitCell(r[idx.udp]).join(', '));
+    if (bad.length) errors.push(`Row ${rowNo} (${name || 'no name'}): ports ${bad.map(b => `"${b}"`).join(', ')} not understood (use 443, 8000-8100 or udp:53).`);
+    apps.push({ name, destinations, tcpPorts: tcp.filter(Boolean).join(', '), udpPorts: udp.filter(Boolean).join(', '), row: rowNo });
+  });
+  return { apps, errors };
+}
+const APP_NAME_RE = /^[A-Za-z0-9][A-Za-z0-9 _.()&-]{0,99}$/;
+const segmentName = (prefix, appName) => `${prefix}-${String(appName).trim().replace(/\s+/g, '-')}`;
+const overlaps = (a, b) => a.some(([a1, a2]) => b.some(([b1, b2]) => a1 <= b2 && b1 <= a2));
+/** Validate the uploaded apps (names, destinations, ports, and clashes ZPA would reject). */
+function validateBulkApps(apps) {
+  const errors = [], out = [];
+  const seen = new Map();
+  for (const a of apps || []) {
+    const label = `${a.row ? `Row ${a.row}: ` : ''}${a.name || '(no name)'}`;
+    if (!a.name || !APP_NAME_RE.test(String(a.name).trim())) errors.push(`${label}: the application name must start with a letter or digit and use letters, digits, spaces and _ . ( ) & - (up to 100 characters).`);
+    const key = String(a.name || '').trim().toLowerCase();
+    if (key && seen.has(key)) errors.push(`${label}: the name is used twice (also row ${seen.get(key)}).`); else seen.set(key, a.row || '?');
+    const dests = Array.isArray(a.destinations) ? a.destinations : splitCell(a.destinations);
+    if (!dests.length) errors.push(`${label}: no destinations (FQDN, *.domain, IP or CIDR).`);
+    for (const d of dests) { const c = classifyEntry(d); if (!c.ok) errors.push(`${label}: "${d}" ${c.why}.`); }
+    const tcp = parsePortRanges(a.tcpPorts), udp = parsePortRanges(a.udpPorts);
+    errors.push(...tcp.errors.map(e => `${label}: TCP ${e}`), ...udp.errors.map(e => `${label}: UDP ${e}`));
+    if (!tcp.ranges.length && !udp.ranges.length) errors.push(`${label}: no ports.`);
+    out.push({ ...a, name: String(a.name || '').trim(), entries: dests, tcp: tcp.ranges, udp: udp.ranges });
+  }
+  // ZPA refuses the same destination in two application segments when their ports overlap
+  for (let i = 0; i < out.length; i++) for (let j = i + 1; j < out.length; j++) {
+    const shared = out[i].entries.filter(d => out[j].entries.some(e => e.toLowerCase() === d.toLowerCase()));
+    if (shared.length && (overlaps(out[i].tcp, out[j].tcp) || overlaps(out[i].udp, out[j].udp)))
+      errors.push(`${out[i].name} and ${out[j].name} both include ${shared.join(', ')} on overlapping ports; ZPA does not allow that. Merge them into one row or split the ports.`);
+  }
+  if (!out.length) errors.push('Upload at least one application.');
+  return { errors, apps: out };
 }
 
 // ---------- plan / apply (GLB-03/05, VAL-02) ----------
@@ -223,15 +312,20 @@ async function runZpa(zpa, input, { dryRun, logger }) {
   else svg = await upsert('serverGroup', 'Server Group', names.serverGroup, {
     name: names.serverGroup, enabled: true, dynamicDiscovery: true, appConnectorGroups: [{ id: String(cgId) }]
   });
-  // 5. App segment (ZPA-07, §5.2)
-  const s = { ...APP_SEGMENT_DEFAULTS, ...(input.settings || {}) };
+  // 5. App segment(s) (ZPA-07, §5.2): one wildcard segment, or one segment per uploaded application
+  const segments = v.bulk
+    ? v.bulk.map(a => ({ name: segmentName(p, a.name), entries: a.entries, tcp: a.tcp, udp: a.udp, settings: a.settings || {}, description: a.description || `${a.name}: application segment created by the Zscaler Policy Wizard (bulk upload).` }))
+    : [{ name: names.appSegment, entries: v.entries, tcp: v.tcp, udp: v.udp, settings: {}, description: input.descriptions?.appSegment || COPY.zpa.appSegmentDescription }];
+  if (v.bulk) names.appSegments = segments.map(x => x.name);
+  for (const seg of segments) {
+  const s = { ...APP_SEGMENT_DEFAULTS, ...(input.settings || {}), ...seg.settings };
   let as;
-  if (dead(sg) || dead(svg)) as = skip('Application Segment', names.appSegment, dead(sg) ? names.segmentGroup : names.serverGroup);
+  if (dead(sg) || dead(svg)) as = skip('Application Segment', seg.name, dead(sg) ? names.segmentGroup : names.serverGroup);
   else {
     const body = {
-      name: names.appSegment, description: input.descriptions?.appSegment || COPY.zpa.appSegmentDescription, enabled: true,
-      domainNames: v.entries, segmentGroupId: String(sg.id), serverGroups: [{ id: String(svg.id) }],
-      tcpPortRanges: flat(v.tcp), udpPortRanges: flat(v.udp),
+      name: seg.name, description: seg.description, enabled: true,
+      domainNames: seg.entries, segmentGroupId: String(sg.id), serverGroups: [{ id: String(svg.id) }],
+      tcpPortRanges: flat(seg.tcp), udpPortRanges: flat(seg.udp),
       bypassType: s.bypassType, healthReporting: s.healthReporting, healthCheckType: s.healthReporting === 'NONE' ? 'NONE' : 'DEFAULT',
       selectConnectorCloseToApp: !!s.selectConnectorCloseToApp, icmpAccessType: s.icmpAccessType === 'PING' || s.icmpAccessType === true ? 'PING' : 'NONE',
       isCnameEnabled: !!s.isCnameEnabled, ipAnchored: !!s.ipAnchored, doubleEncrypt: !!s.doubleEncrypt, bypassOnReauth: !!s.bypassOnReauth,
@@ -239,8 +333,10 @@ async function runZpa(zpa, input, { dryRun, logger }) {
       useInDrMode: !!s.useInDrMode, passiveHealthEnabled: true
     };
     if (String(body.segmentGroupId).startsWith('new:')) body.segmentGroupId = '(new)';
-    as = await upsert('appSegment', 'Application Segment', names.appSegment, body, { fetchFull: true });
-    if (s.clientlessAccess) warnings.push('Clientless (browser) access needs a web server certificate and per-application settings; enable it in the ZPA portal.');
+    if (s.selectConnectorCloseToApp && seg.udp.length) warnings.push(`${seg.name}: UDP ports are not supported with Closer to Application; ZPA may reject this segment.`);
+    as = await upsert('appSegment', 'Application Segment', seg.name, body, { fetchFull: true });
+    if (s.clientlessAccess) warnings.push(`${seg.name}: Clientless (browser) access needs a web server certificate and per-application settings; enable it in the ZPA portal.`);
+  }
   }
   return { ledger, warnings, errors: [], secrets, names, followUps: [COPY.report.followUps.zpaLocation, COPY.report.followUps.zpaDeploy] };
 }
@@ -283,5 +379,6 @@ async function deleteZpaObjects(zpa, items, { dryRun, logger }) {
   return results;
 }
 
-module.exports = { ZPAClient, runZpa, validateZpaInput, classifyEntry, splitEntries, parsePortRanges, APP_SEGMENT_DEFAULTS, SAN_JOSE,
+module.exports = {
+  parseBulkCsv, validateBulkApps, segmentName, ZPAClient, runZpa, validateZpaInput, classifyEntry, splitEntries, parsePortRanges, APP_SEGMENT_DEFAULTS, SAN_JOSE,
   listZpaObjects, deleteZpaObjects, DELETE_ORDER, KIND_LABEL };

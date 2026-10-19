@@ -19,20 +19,21 @@ const SANDBOX_CATEGORIES = ['ADWARE_BLOCK', 'BOTMAL_BLOCK', 'ANONYP2P_BLOCK', 'R
 
 // Draft risk tiers (OQ-7: user to confirm). Types the sandbox does not support are dropped and listed (SCP-43).
 const SANDBOX_ADVANCED_GROUPS = [
-  { key: 'Executables', label: 'Executables and installers (exe, dll, msi, scr, apk)', tier: 'high',
+  // Only types Cloud Sandbox accepts (probed live on ZTH, 2026-10-19). ZIA rejects JavaScript, IMG, LNK, GZIP, text, CSV and
+  // image types for sandbox rules; DMG needs the separate Sandbox macOS subscription.
+  { key: 'Executables', label: 'Executables and installers (exe, dll, msi, apk)', tier: 'high',
     types: ['FTCATEGORY_WINDOWS_EXECUTABLES', 'FTCATEGORY_WINDOWS_LIBRARY', 'FTCATEGORY_MICROSOFT_INSTALLER', 'FTCATEGORY_APK'] },
-  { key: 'Scripts', label: 'Scripts (ps1, bat/cmd, vbs, wsf, hta, py, standalone js)', tier: 'high',
-    types: ['FTCATEGORY_POWERSHELL', 'FTCATEGORY_BAT', 'FTCATEGORY_VISUAL_BASIC_SCRIPT', 'FTCATEGORY_WINDOWS_SCRIPT_FILES', 'FTCATEGORY_HTA', 'FTCATEGORY_PYTHON', 'FTCATEGORY_JAVASCRIPT'] },
+  { key: 'Scripts', label: 'Scripts (ps1, bat/cmd, vbs, wsf, hta, py)', tier: 'high',
+    types: ['FTCATEGORY_POWERSHELL', 'FTCATEGORY_BAT', 'FTCATEGORY_VISUAL_BASIC_SCRIPT', 'FTCATEGORY_WINDOWS_SCRIPT_FILES', 'FTCATEGORY_HTA', 'FTCATEGORY_PYTHON'] },
   { key: 'Java-Flash', label: 'Java and Flash (jar, swf)', tier: 'high', types: ['FTCATEGORY_JAVA_APPLET', 'FTCATEGORY_FLASH'] },
-  { key: 'DiskImg-Lnk', label: 'Disk images and shortcuts (iso, img, dmg, lnk)', tier: 'high', types: ['FTCATEGORY_ISO', 'FTCATEGORY_DMG', 'FTCATEGORY_IMG', 'FTCATEGORY_LNK'] },
-  { key: 'Archives', label: 'Archives (zip, rar, 7z, tar, gz, bz2)', tier: 'high',
-    types: ['FTCATEGORY_ZIP', 'FTCATEGORY_RAR', 'FTCATEGORY_P7Z', 'FTCATEGORY_TAR', 'FTCATEGORY_GZIP', 'FTCATEGORY_BZIP2', 'FTCATEGORY_SCZIP'] },
+  { key: 'DiskImages', label: 'Disk images (iso)', tier: 'high', types: ['FTCATEGORY_ISO'] },
+  { key: 'Archives', label: 'Archives (zip, rar, 7z, tar, bz2, sczip)', tier: 'high',
+    types: ['FTCATEGORY_ZIP', 'FTCATEGORY_RAR', 'FTCATEGORY_P7Z', 'FTCATEGORY_TAR', 'FTCATEGORY_BZIP2', 'FTCATEGORY_SCZIP'] },
   { key: 'Office', label: 'Office documents (Word, Excel, PowerPoint — the categories include macro-capable docm/xlsm/pptm and legacy doc/xls/ppt)', tier: 'high',
     types: ['FTCATEGORY_MS_WORD', 'FTCATEGORY_MS_EXCEL', 'FTCATEGORY_MS_POWERPOINT'],
     note: 'Zscaler file-type categories do not separate macro-enabled from macro-free Office files, so all Word / Excel / PowerPoint files follow the high-risk action.' },
   { key: 'PDF', label: 'PDF', tier: 'high', types: ['FTCATEGORY_PDF_DOCUMENT'] },
-  { key: 'LowRisk', label: 'Lower-risk documents (rtf, txt, csv, images)', tier: 'low',
-    types: ['FTCATEGORY_MS_RTF', 'FTCATEGORY_TEXT', 'FTCATEGORY_CSV', 'FTCATEGORY_BITMAP', 'FTCATEGORY_JPEG', 'FTCATEGORY_PNG', 'FTCATEGORY_GIF'] }
+  { key: 'LowRisk', label: 'Lower-risk documents (rtf)', tier: 'low', types: ['FTCATEGORY_MS_RTF'] }
 ];
 
 function sandboxRules(prefix, mode) {
@@ -104,7 +105,12 @@ const AI_PROMPT_APPS = [
   { key: 'enableMistralAIPrompt', label: 'Mistral', group: 'genai' },
   { key: 'enableGrammarlyPrompt', label: 'Grammarly', group: 'genai' },
   { key: 'enableQuillbotAIPrompt', label: 'QuillBot', group: 'genai' },
-  { key: 'enableGoogleAIPrompt', label: 'Google AI', group: 'genai' },
+  { key: 'enableGoogleAIPrompt', label: 'Google AI', group: 'genai' }
+];
+
+// ---------- UCaaS (Advanced Settings → Unified communications as a service) ----------
+// On for every ZIA run, whatever the scope: these apps are recognised and inspected properly by ZIA.
+const UCAAS_APPS = [
   { key: 'enableUcaasZoom', label: 'Zoom', group: 'ucaas' },
   { key: 'enableUcaasLogMeIn', label: 'GoTo', group: 'ucaas' },
   { key: 'enableUcaasRingCentral', label: 'RingCentral', group: 'ucaas' },
@@ -165,7 +171,7 @@ function endpointDlpRules(prefix, framework) {
 }
 
 module.exports = {
-  SANDBOX_SUPPORTED, SANDBOX_PROTOCOLS, SANDBOX_ADVANCED_GROUPS, sandboxRules,
+  SANDBOX_SUPPORTED, SANDBOX_PROTOCOLS, SANDBOX_ADVANCED_GROUPS, sandboxRules, UCAAS_APPS,
   MALWARE_TO_ATP, ATP_LABELS, atpSettings, AI_PROMPT_APPS,
   dlpMonitorRules, dlpBlockObjects, endpointDlpRules, ENDPOINT_CHANNELS
 };
