@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ZeroTrustPanda ZS Policy Wizard v2.1.0 - Zscaler Template Policy Configuration</title>
+  <title>ZeroTrustPanda ZS Policy Wizard v2.2.0 - Zscaler Template Policy Configuration</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
   <style>
@@ -506,7 +506,7 @@
     // ========================
     // App Version
     // ========================
-    const APP_VERSION = '2.1.0';
+    const APP_VERSION = '2.2.0';
     const BUILD_DATE = '2026-03-30';
 
     // ========================
@@ -852,6 +852,7 @@
                     <p>HIPAA, HITRUST CSF, NIST 800-53, NIST 800-171, PCI-DSS, CJIS, SOX, FERPA, GDPR</p>
                     <h3 style={{fontSize:'15px', color:'var(--accent-cyan)', margin:'1.5rem 0 0.5rem'}}>Version History</h3>
                     <div style={{paddingLeft:'1rem', fontSize:'12px'}}>
+                      <div><strong>v2.2.0</strong> — POV Start (tenant readiness, customer intake with a Healthcare preset, one dry run and one apply across the products you toggle on, live progress); POV Tests (runbook with Pass / Fail, prove it, DLP test kit); Client Connector devices, one-time passwords and the install builder from the Deployment Toolkit; ZPA access policy, Browser Access and POV isolation profile; restore from snapshots and drift check; field-level differences; rate-limit countdowns; rule search and shortcuts; update check.</div>
                       <div><strong>v2.1.0</strong> — More policies built into the templates, so each one can be shown during a POV: SSL inspect-remaining always last (below Zscaler Recommended Exemptions) with TLS 1.2 minimum; DNS over HTTPS inspected; DNS sent to the Zscaler Trusted Resolver; SSH / RDP / FTP dropped to and from high-risk countries; ZPA timeout, AppProtection inspection and isolation policies; Privileged Remote Access RDP / SSH consoles; Client Connector tamper protection passwords; Teams, Zoom and Webex in the ZDX template.</div>
                       <div><strong>v2.0.0</strong> — POV release: global prefix; mandatory dry run with Create / Update / No change and re-runs that update instead of duplicating; ZIA scope screen, Baseline Framework page (compliance frameworks or Strict / Balanced / Permissive), DLP Monitor / Block with custom dictionaries, Endpoint DLP, Sandbox Standard / Advanced, AI Prompt Capture, UCaaS, granular app-specific Cloud App Control, Isolate for Miscellaneous / Unknown, ATP defaults; ZCC bypass app checklist, VPN / IP / DNS lists, ZPA reauthentication on, separate IPv6 switches; new ZPA wizard with CSV bulk upload of application segments; ZPA and ZDX bulk managers; summary report. Sidebar order ZCC → ZIA → ZPA → ZDX.</div>
                       <div><strong>v1.9.0</strong> — Rules step: an on/off switch for every rule in every policy type, and URL rules can be set to Isolate. Isolation profile picker (Default Isolation Profile, ↻ Refresh for new ones) used by Isolate rules and Sandbox Quarantine & Isolate. SSL interception certificate picker for the Inspect rules this creates, plus a new SSL Certificate Manager page to move existing rules between certificates in bulk. Frameworks: save your choices to a file, load it in another tenant, or capture a tenant's current policies (with custom categories). Live-tenant fixes: rule names kept to 31 characters, URL categories / deprecated firewall apps the tenant doesn't have are left out, SSL rules placed after Zscaler's predefined rules, Sandbox file types named instead of ANY, isolation profile endpoint fixed.</div>
