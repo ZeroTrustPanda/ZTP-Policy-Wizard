@@ -14,6 +14,7 @@
  */
 
 const redactBody = (s) => String(s).replace(/("[^"]*(?:password|secret|provisioningKey|token|apiKey)[^"]*"\s*:\s*)"[^"]*"/gi, '$1"<redacted>"');
+const { gate } = require('./rate-limit');
 class ZCCClient {
   constructor(ziaClient) {
     this.ziaClient = ziaClient;
@@ -41,6 +42,8 @@ class ZCCClient {
     }
 
     const host = this.ziaClient.baseUrl;
+    const rl = gate(this.ziaClient, 'Client Connector');
+    rl.before();
 
     // Rate limiting
     const now = Date.now();
@@ -80,10 +83,7 @@ class ZCCClient {
       if (response.headers?.['retry-after']) retryAfter = parseInt(response.headers['retry-after']) || 2;
       // v2.0: never sleep for minutes inside a request. Short waits are retried (3 times); long ones are reported.
       const next = attempt + 1;
-      if (retryAfter > 30 || next > 3) {
-        const mins = Math.max(1, Math.ceil(retryAfter / 60));
-        throw new Error(`ZCC API rate limit reached (HTTP 429). The Client Connector API allows about 100 calls per hour; Zscaler asks to wait about ${mins} minute${mins === 1 ? '' : 's'}. Nothing else was changed; run the dry run again later.`);
-      }
+      if (retryAfter > 30 || next > 3) throw rl.limited(retryAfter > 30 ? retryAfter : 60);
       console.log(`[ZCC-API] Rate limited. Retrying in ${retryAfter}s (attempt ${next})`);
       await this.ziaClient._sleep(retryAfter * 1000);
       return this._apiCall(method, path, body, next);

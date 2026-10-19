@@ -331,7 +331,9 @@ function registerZdxRoutes(app, requireAuth) {
         // Apps need their collection: if tenant setup failed, don't try them (nothing half-built is left behind)
         const setupFailed = results.some(r => r.kind === 'setup' && !r.ok);
         if (setupFailed) { results.push({ name: entry.name, kind: entry.kind, ok: false, steps: [{ label: 'Not started — ZDX tenant setup failed', ok: false, error: 'Skipped' }], created: {} }); continue; }
-        results.push(await runApp(zdx, entry, plan._ctx));
+        const r = await runApp(zdx, entry, plan._ctx);
+        results.push(r);
+        logger.log('PROGRESS', { product: 'ZDX', message: `${r.name}: ${r.ok ? 'done' : 'failed'}` }, r.ok ? 'success' : 'error');
       }
       let verification = [];
       try { verification = await verifyZdx(zdx, plan, results); }
@@ -339,6 +341,7 @@ function registerZdxRoutes(app, requireAuth) {
       const ok = results.every(r => r.ok);
       const verified = ok && verification.every(v => v.ok);
       logger.log('ZDX_APPLY', { ok, verified, results: results.map(r => ({ app: r.name, kind: r.kind, ok: r.ok, created: r.created, rolledBack: r.rolledBack || null })) }, ok ? 'info' : 'error');
+      if (app.locals.recordZdxRun) app.locals.recordZdxRun(req.session, { apps: results.map(r => ({ name: r.name, kind: r.kind, ok: r.ok })) });
       res.json({ success: ok, verified, results, verification });
     } catch (e) {
       logger.log('ZDX_APPLY', { error: e.message }, 'error');

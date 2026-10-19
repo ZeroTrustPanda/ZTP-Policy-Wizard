@@ -28,6 +28,7 @@
  */
 
 const redactBody = (s) => String(s).replace(/("[^"]*(?:password|secret|provisioningKey|token|apiKey)[^"]*"\s*:\s*)"[^"]*"/gi, '$1"<redacted>"');
+const { gate } = require('./rate-limit');
 class ZDXClient {
   constructor(ziaClient) {
     this.ziaClient = ziaClient;
@@ -41,6 +42,8 @@ class ZDXClient {
       throw new Error('The ZDX API requires OneAPI (OAuth2) authentication.');
     }
     const host = this.ziaClient.baseUrl;
+    const rl = gate(this.ziaClient, 'ZDX');
+    rl.before();
 
     const now = Date.now();
     if (this.ziaClient._lastRequestTime && (now - this.ziaClient._lastRequestTime) < 1100) {
@@ -66,7 +69,7 @@ class ZDXClient {
       let retryAfter = 2;
       if (response.headers?.['retry-after']) retryAfter = parseInt(response.headers['retry-after']) || 2;
       const attempt = (arguments[3] || 0) + 1;
-      if (retryAfter > 30 || attempt > 3) throw new Error(`ZDX API rate limit reached (HTTP 429). Wait about ${Math.max(1, Math.ceil(retryAfter / 60))} minute(s) and try again.`);
+      if (retryAfter > 30 || attempt > 3) throw rl.limited(retryAfter > 30 ? retryAfter : 60);
       await this.ziaClient._sleep(retryAfter * 1000);
       return this.apiCall(method, path, body, attempt);
     }
