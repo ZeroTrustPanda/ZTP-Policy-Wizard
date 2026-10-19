@@ -6,9 +6,9 @@ Proof-of-value automation for Zscaler SEs: Zscaler Internet Access (ZIA), Zscale
 
 | Computer | Download (click to download) |
 |---|---|
-| **Mac with Apple silicon (M1–M4)** | [**ZTP-Wizard-2.0.0-macos-arm64.zip**](https://github.com/ZeroTrustPanda/ZTP-Policy-Wizard/releases/download/v2.0.0/ZTP-Wizard-2.0.0-macos-arm64.zip) |
-| Windows 10/11 (64-bit) | [ZTP-Wizard-2.0.0-windows-x64.zip](https://github.com/ZeroTrustPanda/ZTP-Policy-Wizard/releases/download/v2.0.0/ZTP-Wizard-2.0.0-windows-x64.zip) |
-| Intel Mac | [ZTP-Wizard-2.0.0-macos-x64.zip](https://github.com/ZeroTrustPanda/ZTP-Policy-Wizard/releases/download/v2.0.0/ZTP-Wizard-2.0.0-macos-x64.zip) |
+| **Mac with Apple silicon (M1–M4)** | [**ZTP-Wizard-2.0.0-macos-arm64.zip**](https://github.com/ZeroTrustPanda/ZTP-Policy-Wizard/raw/standalone/standalone/release/ZTP-Wizard-2.0.0-macos-arm64.zip) |
+| Windows 10/11 (64-bit) | [ZTP-Wizard-2.0.0-windows-x64.zip](https://github.com/ZeroTrustPanda/ZTP-Policy-Wizard/raw/standalone/standalone/release/ZTP-Wizard-2.0.0-windows-x64.zip) |
+| Intel Mac | [ZTP-Wizard-2.0.0-macos-x64.zip](https://github.com/ZeroTrustPanda/ZTP-Policy-Wizard/raw/standalone/standalone/release/ZTP-Wizard-2.0.0-macos-x64.zip) |
 
 Unzip and double-click `ZTP-Wizard`. Your browser opens the wizard at `http://127.0.0.1:3000`, and your API credentials stay on your computer. The builds aren't code-signed yet. On a Mac, right-click → *Open* → *Open* the first time. On Windows, SmartScreen → *More info* → *Run anyway*.
 
