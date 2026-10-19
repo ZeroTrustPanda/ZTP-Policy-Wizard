@@ -1,0 +1,35 @@
+{
+ "id": "2026-10-19T20-49-55-351Z-zia-ZPOVTEST",
+ "at": "2026-10-19T20:49:55.351Z",
+ "product": "zia",
+ "prefix": "ZPOVTEST",
+ "tenant": "acme",
+ "steps": [
+  {
+   "op": "PUT",
+   "path": "/api/v1/advancedUrlFilterAndCloudAppSettings",
+   "body": {
+    "enableChatGptPrompt": true,
+    "enableClaudePrompt": true,
+    "enableGeminiPrompt": false,
+    "enableUcaasTalkdesk": true,
+    "enableMicrosoftCoPilotPrompt": true,
+    "enablePerPlexityPrompt": true,
+    "enablePOEPrompt": true,
+    "enableMetaPrompt": true,
+    "enableWriterPrompt": true,
+    "enableDeepSeekPrompt": true,
+    "enableGrokPrompt": false,
+    "enableMistralAIPrompt": true,
+    "enableGrammarlyPrompt": true,
+    "enableQuillbotAIPrompt": true,
+    "enableGoogleAIPrompt": true,
+    "enableUcaasZoom": true,
+    "enableUcaasLogMeIn": true,
+    "enableUcaasRingCentral": true,
+    "enableUcaasWebex": true
+   },
+   "label": "AI Prompt Capture: ZPOVTEST-AI-Prompt-Capture"
+  }
+ ]
+}

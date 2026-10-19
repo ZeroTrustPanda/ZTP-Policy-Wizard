@@ -43,6 +43,14 @@ function diff(desired, existing, path = '') {
   return out;
 }
 
+/** v2.2: before → after values for the changed fields (short, for the dry-run view). */
+const short = (v) => { const t = typeof v === 'string' ? v : JSON.stringify(v === undefined ? null : v); return t.length > 140 ? t.slice(0, 137) + '…' : t; };
+function details(changes, want, existing) {
+  const get = (o, p) => p.split('.').reduce((x, k) => (x == null ? undefined : x[k]), o);
+  return changes.filter(c => !/^order \(/.test(c)).map(f => ({ field: f, from: short(get(existing, f)), to: short(get(want, f)) }));
+}
+const strip = (o) => { const c = JSON.parse(JSON.stringify(o || {})); for (const k of ['lastModifiedTime', 'lastModifiedBy', 'accessControl', 'creationTime', 'modifiedTime', 'modifiedBy']) delete c[k]; return c; };
+
 // ZIA rejects descriptions over 255 bytes on several object types (e.g. DLP dictionaries).
 function clampDescription(b) {
   if (!b || typeof b.description !== 'string' || Buffer.byteLength(b.description) <= 255) return b;
@@ -61,6 +69,7 @@ class ZiaEngine {
     this.cache = {};
     this.wrote = false;
     this.seq = 0;
+    this.undo = [];   // v2.2 snapshot: how to put every change back (create → delete, update → previous body)
   }
 
   record(entry) {
@@ -127,15 +136,17 @@ class ZiaEngine {
         if (existing.order !== undefined && existing.order < max) { moveTo = max; changes.push(`order (${existing.order} → bottom, ${max})`); }
       }
       if (!changes.length) return this.record({ category, name, action: 'NO_CHANGE', id: existing.id });
-      if (this.dryRun) return this.record({ category, name, action: 'UPDATE', id: existing.id, changes });
+      const det = details(changes, want, existing);
+      if (this.dryRun) return this.record({ category, name, action: 'UPDATE', id: existing.id, changes, details: det });
       const merged = clampDescription({ ...existing, ...want, id: existing.id });
       if (existing.order !== undefined) merged.order = moveTo || existing.order;   // re-runs only move a catch-all back to the bottom
       for (const k of READ_ONLY) delete merged[k];
       try {
         await this.client.apiCall('PUT', spec.updatePath(existing.id), merged);
         this.wrote = true;
+        this.undo.push({ op: 'PUT', path: spec.updatePath(existing.id), body: strip(existing), label: `${category}: ${name}` });
         this.cache[spec.listPath] = null;
-        return this.record({ category, name, action: 'UPDATE', id: existing.id, changes });
+        return this.record({ category, name, action: 'UPDATE', id: existing.id, changes, details: det });
       } catch (e) {
         return this.record({ category, name, action: 'FAILED', id: existing.id, error: e.message, changes });
       }
@@ -159,6 +170,7 @@ class ZiaEngine {
         created = await this.client.apiCall('POST', spec.createPath, retry.body);
       }
       this.wrote = true;
+      if (created && created.id !== undefined) this.undo.push({ op: 'DELETE', path: spec.updatePath(created.id), label: `${category}: ${name}` });
       this.cache[spec.listPath] = null;
       return this.record({ category, name, action: 'CREATE', id: created && (created.id !== undefined ? created.id : created.configuredName) });
     } catch (e) {
@@ -174,13 +186,15 @@ class ZiaEngine {
     catch (e) { return this.record({ category, name, action: 'FAILED', error: `Could not read current settings: ${e.message}` }); }
     const changes = Object.keys(values).filter(k => (current || {})[k] !== values[k] && !(emptyish(values[k]) && emptyish((current || {})[k])));
     if (!changes.length) return this.record({ category, name, action: 'NO_CHANGE' });
-    if (this.dryRun) return this.record({ category, name, action: 'UPDATE', changes });
+    const det = changes.map(k => ({ field: k, from: short((current || {})[k]), to: short(values[k]) }));
+    if (this.dryRun) return this.record({ category, name, action: 'UPDATE', changes, details: det });
     try {
       const merged = { ...current, ...values };
       if (putFilter) { const r = await putFilter(merged); if (r && r.notes) this.warnings.push(...r.notes); }
       else await this.client.apiCall('PUT', path, merged);
       this.wrote = true;
-      return this.record({ category, name, action: 'UPDATE', changes });
+      this.undo.push({ op: 'PUT', path, body: strip(current), label: `${category}: ${name}` });
+      return this.record({ category, name, action: 'UPDATE', changes, details: det });
     } catch (e) {
       if (e.skipped) return this.record({ category, name, action: 'SKIPPED', error: e.message, changes });
       return this.record({ category, name, action: 'FAILED', error: e.message, changes });
@@ -291,7 +305,7 @@ async function runZia(client, template, { dryRun, logger }) {
       if (dryRun) { eng.record({ category: 'URL Category', name: nm, action: 'CREATE' }); continue; }
       try {
         const c = await client.apiCall('POST', '/api/v1/urlCategories', { configuredName: nm, superCategory: 'USER_DEFINED', urls: ['placeholder.example.com'], customCategory: true, description: 'Custom category created by the Zscaler Policy Wizard' });
-        catIds[nm] = c.id; eng.wrote = true; eng.record({ category: 'URL Category', name: nm, action: 'CREATE', id: c.id });
+        catIds[nm] = c.id; eng.wrote = true; eng.undo.push({ op: 'DELETE', path: `/api/v1/urlCategories/${c.id}`, label: `URL Category: ${nm}` }); eng.record({ category: 'URL Category', name: nm, action: 'CREATE', id: c.id });
       } catch (e) { eng.record({ category: 'URL Category', name: nm, action: 'FAILED', error: e.message }); }
     }
   }
@@ -397,7 +411,7 @@ async function runZia(client, template, { dryRun, logger }) {
   }
 
   const activated = await eng.activate();
-  return { ledger: eng.ledger, warnings: eng.warnings, activated };
+  return { ledger: eng.ledger, warnings: eng.warnings, activated, undo: eng.undo };
 }
 
 /** PUT ATP; if a feature flag blocks some fields, drop them and retry once; still refused → skipped (not failed). */

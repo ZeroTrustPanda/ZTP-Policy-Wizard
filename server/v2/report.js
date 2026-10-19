@@ -15,7 +15,7 @@ function collect(runs) {
 }
 
 /** runs: { zia:[{at, template, ledger, warnings, activated}], zcc:[{at, ledger, warnings}], zpa:[{at, ledger, warnings, secrets, names}] } */
-function buildReport({ runs, prefix, tenant, licensing, endpointWarning, includeSecrets = true }) {
+function buildReport({ runs, prefix, tenant, licensing, endpointWarning, includeSecrets = true, tests = [] }) {
   const rows = collect(runs);
   const zia = (runs.zia || [])[runs.zia ? runs.zia.length - 1 : 0];
   const zpa = (runs.zpa || [])[runs.zpa ? runs.zpa.length - 1 : 0];
@@ -70,6 +70,12 @@ function buildReport({ runs, prefix, tenant, licensing, endpointWarning, include
   }
   if (pk) md.push('## ZPA provisioning key', '', `**${COPY.report.sensitive}**`, '', '```', pk, '```', '', COPY.zpa.keyNote, '');
   if (pw.size) { md.push('## Client Connector tamper protection passwords', '', `**${COPY.report.sensitive}**`, ''); for (const [n, v] of pw) md.push(`- ${n}: \`${v}\``); md.push('', COPY.report.tamperNote, ''); }
+  const RES = { pass: 'Pass', fail: 'Fail', skip: 'Skipped' };
+  if (tests.length) {
+    md.push('## POV tests', '', '| Product | Test | Result | Note |', '|---|---|---|---|');
+    for (const t of tests) md.push(`| ${t.product} | ${t.title} | ${t.result ? RES[t.result.status] : 'Not run'} | ${((t.result && t.result.note) || '').replace(/\|/g, '\\|')} |`);
+    md.push('');
+  }
   if (warnings.length) { md.push('## Warnings', ''); for (const w of warnings) md.push(`- ${w}`); md.push(''); }
   if (licensing && licensing.items) {
     const lic = Object.entries(licensing.items).filter(([, v]) => v.licensed !== true);
@@ -113,6 +119,7 @@ ${rows.map(r => `<tr><td>${esc(r.product)}</td><td>${esc(r.category)}</td><td>${
 ${decisions.length ? `<h2>Rule decisions (ZIA)</h2><table><thead><tr><th>Area</th><th>Rule / setting</th><th>Action</th></tr></thead><tbody>${decisions.map(d => `<tr><td>${esc(d.type)}</td><td>${esc(d.name)}</td><td>${esc(d.action)}</td></tr>`).join('')}</tbody></table>` : ''}
 ${pk ? `<h2>ZPA provisioning key</h2><div class="secret">${esc(COPY.report.sensitive)}</div><code class="key">${esc(pk)}</code><p>${esc(COPY.zpa.keyNote)}</p>` : ''}
 ${pw.size ? `<h2>Client Connector tamper protection passwords</h2><div class="secret">${esc(COPY.report.sensitive)}</div>${[...pw].map(([n, v]) => `<p>${esc(n)}</p><code class="key">${esc(v)}</code>`).join('')}<p>${esc(COPY.report.tamperNote)}</p>` : ''}
+${tests.length ? `<h2>POV tests</h2><table><thead><tr><th>Product</th><th>Test</th><th>Result</th><th>Note</th></tr></thead><tbody>${tests.map(t => `<tr><td>${esc(t.product)}</td><td>${esc(t.title)}</td><td>${t.result ? badge(t.result.status === 'pass' ? 'CREATE' : t.result.status === 'fail' ? 'FAILED' : 'SKIPPED').replace(/>[^<]*</, `>${RES[t.result.status]}<`) : 'Not run'}</td><td>${esc((t.result && t.result.note) || '')}</td></tr>`).join('')}</tbody></table>` : ''}
 ${warnings.length ? `<h2>Warnings</h2><ul class="warn">${warnings.map(w => `<li>${esc(w)}</li>`).join('')}</ul>` : ''}
 <h2>Manual follow-ups</h2>${followUps.length ? `<ol>${followUps.map(f => `<li>${esc(f)}</li>`).join('')}</ol>` : '<p>None.</p>'}
 ${zia && zia.template.metadata.sources ? `<h2>Framework sources</h2><ul>${zia.template.metadata.sources.map(s => `<li><a href="${esc(s.url)}">${esc(s.title)}</a></li>`).join('')}</ul>` : ''}

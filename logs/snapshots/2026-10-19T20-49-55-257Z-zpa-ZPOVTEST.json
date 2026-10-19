@@ -1,0 +1,138 @@
+{
+ "id": "2026-10-19T20-49-55-257Z-zpa-ZPOVTEST",
+ "at": "2026-10-19T20:49:55.257Z",
+ "product": "zpa",
+ "prefix": "ZPOVTEST",
+ "tenant": "acme",
+ "steps": [
+  {
+   "op": "DELETE",
+   "path": "/zpa/mgmtconfig/v1/admin/customers/72000001/application/5070?forceDelete=true",
+   "label": "Application Segment: ZPOVTEST-Epic-Hyperspace"
+  },
+  {
+   "op": "DELETE",
+   "path": "/zpa/mgmtconfig/v1/admin/customers/72000001/application/5071?forceDelete=true",
+   "label": "Application Segment: ZPOVTEST-PACS-Viewer"
+  },
+  {
+   "op": "DELETE",
+   "path": "/zpa/mgmtconfig/v1/admin/customers/72000001/application/5072?forceDelete=true",
+   "label": "Application Segment: ZPOVTEST-Internal-DNS"
+  },
+  {
+   "op": "DELETE",
+   "path": "/zpa/mgmtconfig/v1/admin/customers/72000001/application/5073?forceDelete=true",
+   "label": "Application Segment: ZPOVTEST-Intranet"
+  },
+  {
+   "op": "PUT",
+   "path": "/zpa/mgmtconfig/v2/admin/customers/72000001/policySet/159/rule/5057",
+   "body": {
+    "name": "ZPOVTEST-timeout-policy",
+    "description": "Users re-authenticate to these applications every 8 hours, or after 1 hour idle. Created by the Zscaler Policy Wizard.",
+    "action": "RE_AUTH",
+    "reauthTimeout": "28800",
+    "reauthIdleTimeout": "3600",
+    "conditions": [
+     {
+      "operator": "OR",
+      "operands": [
+       {
+        "objectType": "APP",
+        "values": [
+         "5056"
+        ]
+       }
+      ]
+     }
+    ]
+   },
+   "label": "Policy Rule: ZPOVTEST-timeout-policy"
+  },
+  {
+   "op": "PUT",
+   "path": "/zpa/mgmtconfig/v2/admin/customers/72000001/policySet/163/rule/5059",
+   "body": {
+    "name": "ZPOVTEST-inspection-policy",
+    "description": "Inspect traffic to these applications with AppProtection (OWASP rules). Created by the Zscaler Policy Wizard.",
+    "action": "INSPECT",
+    "zpnInspectionProfileId": "5058",
+    "conditions": [
+     {
+      "operator": "OR",
+      "operands": [
+       {
+        "objectType": "APP",
+        "values": [
+         "5056"
+        ]
+       }
+      ]
+     }
+    ]
+   },
+   "label": "Policy Rule: ZPOVTEST-inspection-policy"
+  },
+  {
+   "op": "PUT",
+   "path": "/zpa/mgmtconfig/v2/admin/customers/72000001/policySet/422/rule/5062",
+   "body": {
+    "name": "ZPOVTEST-isolation-policy",
+    "description": "Users who reach these applications from a browser (Browser Access) get an isolated session (ZPOVTEST-isolation-profile). Created by the Zscaler Policy Wizard.",
+    "action": "ISOLATE",
+    "zpnIsolationProfileId": "5061",
+    "conditions": [
+     {
+      "operator": "OR",
+      "operands": [
+       {
+        "objectType": "CLIENT_TYPE",
+        "values": [
+         "zpn_client_type_exporter"
+        ]
+       }
+      ]
+     },
+     {
+      "operator": "OR",
+      "operands": [
+       {
+        "objectType": "APP",
+        "values": [
+         "5056"
+        ]
+       }
+      ]
+     }
+    ]
+   },
+   "label": "Policy Rule: ZPOVTEST-isolation-policy"
+  },
+  {
+   "op": "PUT",
+   "path": "/zpa/mgmtconfig/v2/admin/customers/72000001/policySet/157/rule/5069",
+   "body": {
+    "name": "ZPOVTEST-access-policy",
+    "description": "Any user signed in to ZPA can reach these applications. Narrow it to groups in the ZPA portal when the POV moves to production. Created by the Zscaler Policy Wizard.",
+    "action": "ALLOW",
+    "conditions": [
+     {
+      "operator": "OR",
+      "operands": [
+       {
+        "objectType": "APP",
+        "values": [
+         "5056",
+         "5063",
+         "5066"
+        ]
+       }
+      ]
+     }
+    ]
+   },
+   "label": "Policy Rule: ZPOVTEST-access-policy"
+  }
+ ]
+}
