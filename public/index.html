@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ZeroTrustPanda ZS Policy Wizard v2.2.0 - Zscaler Template Policy Configuration</title>
+  <title>ZeroTrustPanda ZS Policy Wizard v2.3.0 - Zscaler Template Policy Configuration</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
   <style>
@@ -434,6 +434,11 @@
       font-size: 11px; padding: 2px 8px; border-radius: 4px;
       background: var(--bg-secondary); color: var(--text-secondary); border: 1px solid var(--border);
     }
+      .guide-stepper { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:1rem; position:sticky; top:0; z-index:5; background:var(--bg-primary); padding:6px 0; }
+    .guide-pill { display:flex; align-items:center; gap:6px; padding:6px 12px; border-radius:999px; font-size:12px; border:1px solid var(--border); background:var(--bg-input); color:var(--text-muted); }
+    .guide-pill.cur { background:var(--accent-blue); color:#fff; border-color:var(--accent-blue); }
+    .guide-pill.seen { background:var(--accent-green-dim); color:var(--accent-green); }
+    .guide-num { display:inline-flex; width:18px; height:18px; border-radius:50%; align-items:center; justify-content:center; font-size:10px; background:rgba(255,255,255,0.15); }
   </style>
 </head>
 <body>
@@ -506,7 +511,7 @@
     // ========================
     // App Version
     // ========================
-    const APP_VERSION = '2.2.0';
+    const APP_VERSION = '2.3.0';
     const BUILD_DATE = '2026-03-30';
 
     // ========================
@@ -623,8 +628,11 @@
         setStep(s);
       };
 
+      const [bulkTab, setBulkTab] = useState('zia');
       const switchModule = (mod) => {
         setError(null);
+        // v2.3: the per-product bulk managers are one page now
+        if (['zia-bulk', 'zpa-bulk', 'zdx-bulk'].includes(mod)) { setBulkTab(mod.split('-')[0]); mod = 'bulk'; }
         setActiveModule(mod);
         if (mod === 'zia-wizard') {
           // Reset wizard state so user can run a fresh deployment
@@ -634,9 +642,9 @@
           setApplyResult(null);
           setCompletedSteps(new Set());
         }
-        else if (mod === 'zia-bulk') setStep('bulk-delete');
+        else if (mod === 'bulk') setStep('bulk');
         else if (mod === 'zia-pov') setStep('pov');
-        else if (['zpa', 'zpa-bulk', 'zdx-bulk', 'report'].includes(mod)) setStep(mod);
+        else if (['zpa', 'report'].includes(mod)) setStep(mod);
         else if (mod === 'zia-ssl') setStep('ssl');
         else if (mod === 'zcc') setStep('zcc');
         else if (['start', 'tests', 'zcc-devices', 'restore'].includes(mod)) setStep(mod);
@@ -647,15 +655,14 @@
 
       const showConnect = !auth.connected && activeModule !== 'catalog' && activeModule !== 'about';
       const showZiaWizard = auth.connected && activeModule === 'zia-wizard';
-      const showZiaBulk = auth.connected && activeModule === 'zia-bulk';
       const showZcc = auth.connected && activeModule === 'zcc';
       const showZdx = auth.connected && activeModule === 'zdx';
       const showAbout = activeModule === 'about';
       const showCatalog = activeModule === 'catalog';
       const showZiaSsl = auth.connected && activeModule === 'zia-ssl';
-      const ziaExpanded = ['zia-pov', 'zia-wizard', 'zia-bulk', 'zia-ssl'].includes(activeModule);
-      const zpaExpanded = activeModule === 'zpa' || activeModule === 'zpa-bulk';
-      const zdxExpanded = activeModule === 'zdx' || activeModule === 'zdx-bulk';
+      const ziaExpanded = ['zia-pov', 'zia-wizard', 'zia-ssl'].includes(activeModule);
+      const zpaExpanded = activeModule === 'zpa';
+      const zdxExpanded = activeModule === 'zdx';
       const needsPrefix = auth.connected && !globalPrefix && ['zia-pov', 'zpa', 'zcc'].includes(activeModule);
       const zccExpanded = activeModule === 'zcc' || activeModule === 'zcc-devices';
       const sub = (mod, icon, label, extra = {}) => (
@@ -730,18 +737,15 @@
                       </div>
                     ))}
                     {sub('zia-ssl', '🔐', 'SSL Certificate Manager')}
-                    {sub('zia-bulk', '🗑️', 'Bulk Rule Manager')}
                   </>)}
                   <div className={`sidebar-item ${zpaExpanded ? 'active' : ''}`} data-nav="zpa-top"
                     onClick={() => switchModule('zpa')} style={{cursor:'pointer', fontWeight: zpaExpanded ? 600 : 400}}>
                     <span className="step-num">🔒</span> Zscaler Private Access
                   </div>
-                  {zpaExpanded && (<>{sub('zpa', '🧭', 'ZPA Wizard')}{sub('zpa-bulk', '🗑️', 'Bulk Manager')}</>)}
                   <div className={`sidebar-item ${zdxExpanded ? 'active' : ''}`} data-nav="zdx-top"
                     onClick={() => switchModule('zdx')} style={{cursor:'pointer', fontWeight: zdxExpanded ? 600 : 400}}>
                     <span className="step-num">📈</span> Zscaler Digital Experience
                   </div>
-                  {zdxExpanded && (<>{sub('zdx', '🧭', 'Probes & Apps')}{sub('zdx-bulk', '🗑️', 'Bulk Manager')}</>)}
                   <div className={`sidebar-item ${activeModule === 'tests' ? 'active' : ''}`} data-nav="tests"
                     onClick={() => switchModule('tests')} style={{cursor:'pointer', marginTop:'0.5rem'}}>
                     <span className="step-num">🧪</span> POV Tests
@@ -757,6 +761,12 @@
                 </div>
               )}
               <div className="sidebar-section" style={{marginTop:'auto'}}>
+                {auth.connected && (
+                  <div className={`sidebar-item ${activeModule === 'bulk' ? 'active' : ''}`} data-nav="bulk"
+                    onClick={() => switchModule('bulk')} style={{cursor:'pointer', fontSize:'12px'}}>
+                    <span className="step-num" style={{fontSize:'10px'}}>🗑️</span> Bulk Rule Manager
+                  </div>
+                )}
                 <div className={`sidebar-item ${activeModule === 'catalog' ? 'active' : ''}`}
                   onClick={() => switchModule('catalog')} style={{cursor:'pointer', fontSize:'12px'}}>
                   <span className="step-num" style={{fontSize:'10px'}}>📖</span> Policy Catalog
@@ -769,8 +779,8 @@
             </nav>
             <div className={`content ${step === 'review' ? 'content-wide' : ''}`}>
               {error && <div className="alert alert-danger">⚠ {error}</div>}
-              {auth.connected && activeModule && !['about', 'catalog'].includes(activeModule) && <PrefixBar prefix={globalPrefix} setPrefix={setGlobalPrefix} setError={setError} />}
-              {needsPrefix && <div className="alert alert-info"><span>Set the global prefix above first. It is used for every object created in ZIA, ZPA and ZCC.</span></div>}
+              {needsPrefix && <div className="alert alert-info" data-needsprefix><span>Start with the customer intake on <a href="#" onClick={e => { e.preventDefault(); switchModule('start'); }}>POV Start</a>: it sets the prefix used for every object created in ZIA, ZPA and ZCC.</span></div>}
+              {auth.connected && globalPrefix && ['zia-pov', 'zpa', 'zcc'].includes(activeModule) && <div className="form-hint" style={{marginBottom:'0.75rem'}} data-prefixinfo>Prefix <code>{globalPrefix}</code> (from the customer intake on POV Start)</div>}
               {auth.connected && activeModule === 'zia-pov' && globalPrefix && meta && (<>
                 {povStep === 'scope' && <ScopeStep meta={meta} pov={pov} setPov={setPov} licensing={licensing} onNext={() => goPov('baseline')} />}
                 {povStep === 'baseline' && <BaselineStep meta={meta} pov={pov} setPov={setPov} setError={setError} onNext={() => goPov('rules')} onBack={() => goPov('scope')} />}
@@ -779,11 +789,10 @@
                 {povStep === 'done' && <PovDoneStep result={povResult} onReport={() => switchModule('report')} onRestart={() => { setPovResult(null); setPovReached(0); goPov('scope'); }} />}
               </>)}
               {auth.connected && activeModule === 'zpa' && globalPrefix && meta && <ZpaWizard meta={meta} prefix={globalPrefix} setError={setError} onReport={() => switchModule('report')} />}
-              {auth.connected && activeModule === 'zpa-bulk' && meta && <BulkManagerV2 key="zpa" product="zpa" prefix={globalPrefix} meta={meta} setError={setError} />}
-              {auth.connected && activeModule === 'zdx-bulk' && meta && <BulkManagerV2 key="zdx" product="zdx" prefix={globalPrefix} meta={meta} setError={setError} />}
+              {auth.connected && activeModule === 'bulk' && <BulkHub key={bulkTab} initialTab={bulkTab} meta={meta} prefix={globalPrefix} setError={setError} loading={loading} setLoading={setLoading} />}
               {auth.connected && activeModule === 'report' && <ReportStep setError={setError} />}
               {auth.connected && <RateLimitBar />}
-              {auth.connected && activeModule === 'start' && <PovStart meta={meta} prefix={globalPrefix} setPrefix={setGlobalPrefix} licensing={licensing} setError={setError} onReport={() => switchModule('report')} />}
+              {auth.connected && meta && <div style={{display: activeModule === 'start' ? 'block' : 'none'}}><PovGuide meta={meta} auth={auth} prefix={globalPrefix} setPrefix={setGlobalPrefix} licensing={licensing} pov={pov} setPov={setPov} setError={setError} onReport={() => switchModule('report')} /></div>}
               {auth.connected && activeModule === 'tests' && <PovTests setError={setError} />}
               {auth.connected && activeModule === 'zcc-devices' && <ZccDevicesInstall setError={setError} />}
               {auth.connected && activeModule === 'restore' && <RestoreDrift prefix={globalPrefix} setError={setError} />}
@@ -852,6 +861,7 @@
                     <p>HIPAA, HITRUST CSF, NIST 800-53, NIST 800-171, PCI-DSS, CJIS, SOX, FERPA, GDPR</p>
                     <h3 style={{fontSize:'15px', color:'var(--accent-cyan)', margin:'1.5rem 0 0.5rem'}}>Version History</h3>
                     <div style={{paddingLeft:'1rem', fontSize:'12px'}}>
+                      <div><strong>v2.3.0</strong> — Guided POV on POV Start: readiness → Build the POV (ZIA / ZPA / ZDX) → customer intake (name, generated prefix, internal domain, preset, baseline) → Client Connector → Internet Access → Private Access → Digital Experience → one dry run and apply. Presets fill ZPA with a *.domain wildcard and common apps, and ZDX with apps for the market; Education preset. Readiness flags missing core licences. The prefix comes from the intake (no global prefix bar). One Bulk Rule Manager for ZIA, ZPA and ZDX.</div>
                       <div><strong>v2.2.0</strong> — POV Start (tenant readiness, customer intake with a Healthcare preset, one dry run and one apply across the products you toggle on, live progress); POV Tests (runbook with Pass / Fail, prove it, DLP test kit); Client Connector devices, one-time passwords and the install builder from the Deployment Toolkit; ZPA access policy, Browser Access and POV isolation profile; restore from snapshots and drift check; field-level differences; rate-limit countdowns; rule search and shortcuts; update check.</div>
                       <div><strong>v2.1.0</strong> — More policies built into the templates, so each one can be shown during a POV: SSL inspect-remaining always last (below Zscaler Recommended Exemptions) with TLS 1.2 minimum; DNS over HTTPS inspected; DNS sent to the Zscaler Trusted Resolver; SSH / RDP / FTP dropped to and from high-risk countries; ZPA timeout, AppProtection inspection and isolation policies; Privileged Remote Access RDP / SSH consoles; Client Connector tamper protection passwords; Teams, Zoom and Webex in the ZDX template.</div>
                       <div><strong>v2.0.0</strong> — POV release: global prefix; mandatory dry run with Create / Update / No change and re-runs that update instead of duplicating; ZIA scope screen, Baseline Framework page (compliance frameworks or Strict / Balanced / Permissive), DLP Monitor / Block with custom dictionaries, Endpoint DLP, Sandbox Standard / Advanced, AI Prompt Capture, UCaaS, granular app-specific Cloud App Control, Isolate for Miscellaneous / Unknown, ATP defaults; ZCC bypass app checklist, VPN / IP / DNS lists, ZPA reauthentication on, separate IPv6 switches; new ZPA wizard with CSV bulk upload of application segments; ZPA and ZDX bulk managers; summary report. Sidebar order ZCC → ZIA → ZPA → ZDX.</div>
@@ -893,7 +903,6 @@
                 setError={setError} loading={loading} setLoading={setLoading}
                 onNext={() => { markComplete('apply'); goTo('audit'); }} />)}
               {showZiaWizard && step === 'audit' && (<AuditStep auditLogs={auditLogs} setAuditLogs={setAuditLogs} setError={setError} />)}
-              {showZiaBulk && (<BulkDeleteStep setError={setError} loading={loading} setLoading={setLoading} />)}
               {showZiaSsl && (<SslCertStep setError={setError} />)}
               {showZcc && globalPrefix && (<MobileAdminStep setError={setError} loading={loading} setLoading={setLoading} config={{ ...config, globalPrefix }} />)}
               {showZdx && (<ZdxStep setError={setError} />)}
@@ -939,31 +948,8 @@
       return meta;
     }
 
-    // GLB-02: one prefix for every object the wizard creates in ZIA, ZPA and ZCC
-    function PrefixBar({ prefix, setPrefix, setError }) {
-      const [draft, setDraft] = useState(prefix || '');
-      const [saved, setSaved] = useState(!!prefix);
-      const valid = /^[A-Za-z0-9_-]{1,20}$/.test(draft);
-      useEffect(() => { setDraft(prefix || ''); setSaved(!!prefix); }, [prefix]);
-      const save = async () => {
-        try { await api.call('POST', '/v2/prefix', { prefix: draft }); setPrefix(draft); setSaved(true); safeStore.set('zpw.prefix', draft); }
-        catch (e) { setError(e.message); }
-      };
-      return (
-        <div className="card" style={{padding:'0.75rem 1rem', marginBottom:'1rem', display:'flex', gap:'12px', alignItems:'center', flexWrap:'wrap'}} data-prefixbar>
-          <strong style={{fontSize:'13px'}}>Global prefix</strong>
-          <input type="text" value={draft} maxLength={20} onChange={e => { setDraft(e.target.value.trim()); setSaved(false); }} placeholder="e.g. ACMEPOV"
-            style={{width:'180px', borderColor: draft && !valid ? 'var(--accent-red)' : undefined}} data-prefixinput />
-          <button className="btn btn-primary btn-sm" disabled={!valid || (saved && draft === prefix)} onClick={save} data-prefixsave>{saved && draft === prefix ? '✓ Saved' : 'Use this prefix'}</button>
-          <span className="form-hint" style={{margin:0}}>
-            {draft && !valid ? 'Letters, numbers, - and _ only (max 20).' : <>Every object the wizard creates in ZIA, ZPA and ZCC starts with <code>{(prefix || draft || 'PREFIX')}-</code>. Re-running with the same prefix updates those objects instead of duplicating them.</>}
-          </span>
-        </div>
-      );
-    }
-
     // ---------- §1 Scope ----------
-    function ScopeStep({ meta, pov, setPov, licensing, onNext }) {
+    function ScopeStep({ meta, pov, setPov, licensing, onNext, onBack }) {
       const scope = pov.scope || Object.fromEntries(meta.scopeItems.map(i => [i.key, i.default]));
       const groupOf = (key) => Object.entries(meta.exclusiveGroups).find(([, keys]) => keys.includes(key));
       const lic = (key) => (licensing && licensing.items && licensing.items[key]) || null;
@@ -1016,6 +1002,7 @@
           <h3 style={{fontSize:'13px', margin:'1rem 0 0.5rem'}}>Core internet security</h3>
           {rows(['urlFiltering', 'cloudAppControl', 'fileTypeControl', 'advancedThreatProtection', 'firewallFiltering', 'dnsSecurity', 'sslInspection'])}
           <div className="btn-group">
+            {onBack && <button className="btn btn-ghost" onClick={onBack}>← Back</button>}
             <button className="btn btn-primary" onClick={onNext} disabled={!Object.values(scope).some(Boolean)} data-next>Next: Baseline Framework →</button>
           </div>
         </div>
@@ -1078,7 +1065,7 @@
     }
 
     // ---------- §2.1 Rule review ----------
-    function PovRulesStep({ meta, pov, setPov, prefix, auth, setError, onNext, onBack }) {
+    function PovRulesStep({ meta, pov, setPov, prefix, auth, setError, onNext, onBack, nextLabel }) {
       const [tpl, setTpl] = useState(null);
       const [open, setOpen] = useState({});
       const [q, setQ] = useState('');
@@ -1220,7 +1207,7 @@
           })}
           <div className="btn-group">
             <button className="btn btn-ghost" onClick={onBack}>← Baseline</button>
-            <button className="btn btn-primary" onClick={onNext} data-next>Run Dry Run →</button>
+            <button className="btn btn-primary" onClick={onNext} data-next>{nextLabel || 'Run Dry Run →'}</button>
           </div>
         </div>
       );
@@ -1368,17 +1355,18 @@
       </>);
     }
 
-    function ZpaWizard({ meta, prefix, setError, onReport }) {
+    function ZpaWizard({ meta, prefix, setError, onReport, guided }) {
       const [ctx, setCtx] = useState(null);
-      const [form, setForm] = useState({ domains: '', tcpPorts: '1-52, 54-65535', udpPorts: '1-52, 54-65535', connectorGroupId: '',
+      const init = (guided && guided.initial) || {};
+      const [form, setForm] = useState({ domains: init.domains || '', tcpPorts: '1-52, 54-65535', udpPorts: '1-52, 54-65535', connectorGroupId: '',
         descriptions: { connectorGroup: meta.copy.zpa.connectorGroupDescription, appSegment: meta.copy.zpa.appSegmentDescription } });
       const [settings, setSettings] = useState({ ...meta.zpaDefaults });
       const [policies, setPolicies] = useState({ access: true, timeout: true, inspection: true, isolation: true });
       const [pra, setPra] = useState({ rdpHost: '', sshHost: '' });
       const [iso, setIso] = useState({ enabled: true, copyPaste: 'none', uploadDownload: 'none', allowPrinting: false, watermark: true, watermarkMessage: 'Zscaler POV' });
       const [ba, setBa] = useState({ domain: '', port: '443', certificateId: '' });
-      const [bulk, setBulk] = useState(false);
-      const [apps, setApps] = useState([]);            // [{ name, destinations[], tcpPorts, udpPorts, row, settings }]
+      const [bulk, setBulk] = useState(!!(init.apps && init.apps.length));
+      const [apps, setApps] = useState(() => (init.apps || []).map(a => ({ ...a, settings: {} })));            // [{ name, destinations[], tcpPorts, udpPorts, row, settings }]
       const [csvErrors, setCsvErrors] = useState([]);
       const [csvName, setCsvName] = useState('');
       const [openApp, setOpenApp] = useState(null);
@@ -1600,11 +1588,18 @@
             )}
             <div className="alert alert-warning" style={{marginTop:'1rem'}}><span>📍 Follow-ups: {result.followUps.join(' ')}</span></div>
           </>)}
+          {guided ? (
+          <div className="btn-group">
+            <button className="btn btn-ghost" onClick={guided.onBack}>← Back</button>
+            <button className="btn btn-primary" onClick={() => guided.onNext(body())} disabled={errors.length > 0 || (bulk ? (!apps.length || csvErrors.length > 0) : !form.domains.trim())} data-zpanext>{guided.nextLabel || 'Next →'}</button>
+          </div>
+          ) : (
           <div className="btn-group">
             {!result && <button className="btn btn-primary" onClick={dry} disabled={busy || errors.length > 0 || (bulk ? (!apps.length || csvErrors.length > 0) : !form.domains.trim())} data-zpadry>{busy && !plan ? <><span className="spinner"></span> Checking…</> : 'Run Dry Run'}</button>}
             {plan && !result && <button className="btn btn-success" onClick={apply} disabled={busy || !confirmed} data-zpaapply>{busy ? <><span className="spinner"></span> Applying…</> : '🚀 Apply'}</button>}
             {result && <button className="btn btn-primary" onClick={onReport}>Summary report →</button>}
           </div>
+          )}
         </div>
       );
     }
@@ -1685,7 +1680,7 @@
       return (
         <div className="card" data-readiness>
           <div className="card-header" style={{display:'flex', justifyContent:'space-between', alignItems:'flex-start'}}>
-            <div><h2>1. Tenant readiness</h2><p>Read-only checks of what the POV needs, so blockers show up before the customer sees them.</p></div>
+            <div><h2>Tenant readiness</h2><p>Read-only checks of what the POV needs, including every licence a standard POV uses, so blockers show up before the customer sees them.</p></div>
             <button className="btn btn-ghost btn-sm" onClick={run} disabled={busy}>{busy ? <span className="spinner"></span> : '↻ Check again'}</button>
           </div>
           {busy && !r && <div className="form-hint"><span className="spinner"></span> Checking ZIA, ZPA, Client Connector and ZDX…</div>}
@@ -1706,152 +1701,268 @@
       );
     }
 
-    const PRODUCT_LABEL = { zcc: 'Client Connector', zia: 'Internet Access', zpa: 'Private Access', zdx: 'Digital Experience' };
-    const INTAKE_DEFAULT = { customerName: '', domain: '', presetId: 'HEALTHCARE', vpnGateways: '', apps: [], zdxUrls: [], products: { zcc: true, zccMac: true, zia: true, zpa: true, zdx: true }, baseline: 'HIPAA' };
     const splitItems = (v) => String(v || '').split(/[,;\n]+/).map(x => x.trim()).filter(Boolean);
+    const DOMAIN_OK = (d) => /^(?=.{1,253}$)(?!-)[A-Za-z0-9-]{1,63}(?<!-)(\.(?!-)[A-Za-z0-9-]{1,63}(?<!-))+$/.test(String(d || '').trim());
+    const PREFIX_OK = (p) => /^[A-Za-z0-9_-]{1,20}$/.test(String(p || ''));
+    const suggestPrefix = (name) => {
+      const s = String(name || '').replace(/[^A-Za-z0-9 ]/g, ' ').trim();
+      if (!s) return '';
+      const words = s.split(/\s+/);
+      const initials = words.length > 1 ? words.map(w => w[0]).join('') : words[0];
+      return (initials.length >= 3 ? initials : words.join('')).toUpperCase().slice(0, 12);
+    };
 
-    function IntakePanel({ meta, intake, setIntake, prefix, setPrefix, setError }) {
-      const [presets, setPresets] = useState([]);
-      const [suggested, setSuggested] = useState('');
-      const [notes, setNotes] = useState([]);
-      useEffect(() => { api.call('GET', '/v2/intake/presets').then(setPresets).catch(() => {}); }, []);
-      const set = (patch) => setIntake(prev => ({ ...prev, ...patch }));
-      const fill = async (id) => {
-        try {
-          const r = await api.call('POST', '/v2/intake/preset', { id, domain: intake.domain, customerName: intake.customerName });
-          set({ presetId: id, baseline: r.preset.baseline, apps: r.preset.apps.map(a => ({ name: a.name, destinations: a.destinations.join('; '), ports: a.ports })), zdxUrls: r.preset.apps.filter(a => a.zdx).map(a => ({ name: a.name, url: a.zdx })) });
-          setSuggested(r.suggestedPrefix); setNotes(r.preset.notes);
-        } catch (e) { setError(e.message); }
-      };
-      const usePrefix = async () => { try { await api.call('POST', '/v2/prefix', { prefix: suggested }); setPrefix(suggested); safeStore.set('zpw.prefix', suggested); } catch (e) { setError(e.message); } };
-      const setApp = (i, patch) => set({ apps: intake.apps.map((a, j) => j === i ? { ...a, ...patch } : a) });
-      const baselines = meta ? [...meta.baselines.compliance, ...meta.baselines.nonMapped] : [];
+    // v2.3 guided POV: Readiness → Build the POV (scope) → Customer intake → Client Connector → Internet Access → Private Access → Digital Experience → Dry run & apply
+    const GUIDE_DEFAULT = { customerName: '', prefix: '', prefixEdited: false, domain: '', presetId: 'HEALTHCARE', baseline: 'HIPAA', scope: { zia: true, zpa: true, zdx: true } };
+    const GUIDE_PRODUCTS = [
+      { id: 'zia', icon: '🌐', name: 'Zscaler Internet Access', desc: 'URL filtering, cloud app control, SSL inspection, threat protection, DLP, firewall and DNS policies from a baseline framework.' },
+      { id: 'zpa', icon: '🔒', name: 'Zscaler Private Access', desc: 'App Connector group and provisioning key, application segments for the internal domain and common apps, access / timeout / inspection / isolation policies.' },
+      { id: 'zdx', icon: '📈', name: 'Zscaler Digital Experience', desc: 'Web and CloudPath probes for Microsoft 365, UCaaS and the SaaS apps common to the customer\'s market.' }
+    ];
+
+    function GuideStepper({ stages, stage, visited, go }) {
       return (
-        <div className="card" data-intake>
-          <div className="card-header"><h2>2. Customer intake</h2><p>Fill this once at the start of the call. It pre-fills the prefix, baseline, Client Connector lists, ZPA applications and ZDX apps. Everything stays editable in each module.</p></div>
-          <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:'12px'}}>
-            <div className="form-group"><label className="form-label">Customer name</label><input type="text" value={intake.customerName} onChange={e => set({ customerName: e.target.value })} placeholder="Maine Medical Center" data-intakename /></div>
-            <div className="form-group"><label className="form-label">Internal domain</label><input type="text" value={intake.domain} onChange={e => set({ domain: e.target.value.trim() })} placeholder="hospital.org" data-intakedomain /></div>
-          </div>
-          <div className="form-label">Preset</div>
-          <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(200px, 1fr))', gap:'8px', marginBottom:'0.75rem'}}>
-            {presets.map(p => (
-              <div key={p.id} className={`tier-card ${intake.presetId === p.id ? 'selected' : ''}`} onClick={() => fill(p.id)} style={{cursor:'pointer', padding:'0.75rem'}} data-preset={p.id}>
-                <div className="tier-name" style={{fontSize:'13px'}}>{p.icon} {p.name}</div><div className="tier-desc" style={{fontSize:'11px'}}>{p.description}</div>
+        <div className="guide-stepper" data-guidestepper>
+          {stages.map((s, i) => {
+            const cur = s.id === stage, seen = visited.has(s.id) && !cur;
+            return (
+              <div key={s.id} onClick={() => visited.has(s.id) && go(s.id)} data-guidestage={s.id}
+                className={`guide-pill ${cur ? 'cur' : seen ? 'seen' : ''}`} style={{cursor: visited.has(s.id) ? 'pointer' : 'default'}}>
+                <span className="guide-num">{seen ? '✓' : i + 1}</span>{s.label}
               </div>
-            ))}
-          </div>
-          {suggested && (
-            <div className="alert alert-info"><span>Suggested prefix: <code>{suggested}</code> {prefix === suggested ? '✓ in use' : <button className="btn btn-primary btn-sm" style={{marginLeft:'8px'}} onClick={usePrefix} data-usesuggested>Use it</button>}</span></div>
-          )}
-          {notes.map((n, i) => <div key={i} className="form-hint">• {n}</div>)}
-          <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:'12px', marginTop:'0.5rem'}}>
-            <div className="form-group"><label className="form-label">Baseline (Internet Access)</label>
-              <select value={intake.baseline} onChange={e => set({ baseline: e.target.value })} data-intakebaseline>{baselines.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}</select></div>
-            <div className="form-group"><label className="form-label">VPN gateways to bypass (Client Connector)</label><input type="text" value={intake.vpnGateways} onChange={e => set({ vpnGateways: e.target.value })} placeholder="vpn.hospital.org, 203.0.113.10" /></div>
-          </div>
-          <div className="form-label">Private applications (one ZPA segment each)</div>
-          <table className="diff-table" data-intakeapps>
-            <thead><tr><th>Name</th><th>Destinations (; between)</th><th>Ports (TCP, or udp:53)</th><th></th></tr></thead>
-            <tbody>
-              {intake.apps.map((a, i) => (
-                <tr key={i}>
-                  <td><input type="text" value={a.name} onChange={e => setApp(i, { name: e.target.value })} /></td>
-                  <td><input type="text" value={a.destinations} onChange={e => setApp(i, { destinations: e.target.value })} /></td>
-                  <td><input type="text" value={a.ports} onChange={e => setApp(i, { ports: e.target.value })} style={{width:'140px'}} /></td>
-                  <td><button className="btn btn-ghost btn-sm" onClick={() => set({ apps: intake.apps.filter((_, j) => j !== i) })}>✕</button></td>
-                </tr>
-              ))}
-              {!intake.apps.length && <tr><td colSpan={4} className="form-hint">None: ZPA uses one wildcard segment for *.{intake.domain || 'domain'}.</td></tr>}
-            </tbody>
-          </table>
-          <button className="btn btn-ghost btn-sm" onClick={() => set({ apps: [...intake.apps, { name: '', destinations: '', ports: '443' }] })}>+ Add application</button>
-          <div className="form-label" style={{marginTop:'0.75rem'}}>ZDX web apps to monitor</div>
-          {intake.zdxUrls.map((z, i) => (
-            <div key={i} style={{display:'flex', gap:'6px', marginBottom:'4px'}}>
-              <input type="text" value={z.name} style={{width:'180px'}} onChange={e => set({ zdxUrls: intake.zdxUrls.map((x, j) => j === i ? { ...x, name: e.target.value } : x) })} />
-              <input type="text" value={z.url} onChange={e => set({ zdxUrls: intake.zdxUrls.map((x, j) => j === i ? { ...x, url: e.target.value } : x) })} />
-              <button className="btn btn-ghost btn-sm" onClick={() => set({ zdxUrls: intake.zdxUrls.filter((_, j) => j !== i) })}>✕</button>
-            </div>
-          ))}
-          <button className="btn btn-ghost btn-sm" onClick={() => set({ zdxUrls: [...intake.zdxUrls, { name: '', url: 'https://' }] })}>+ Add web app</button>
+            );
+          })}
         </div>
       );
     }
 
-    // 3: one dry run and one apply across the products in scope (toggles), in order ZCC → ZIA → ZPA → ZDX
-    function CombinedRun({ meta, intake, setIntake, prefix, licensing, setError, onReport }) {
+    function ScopePanel({ g, setG, onNext, onBack }) {
+      const toggle = (id) => setG(prev => ({ ...prev, scope: { ...prev.scope, [id]: !prev.scope[id] } }));
+      const any = Object.values(g.scope).some(Boolean);
+      return (
+        <div className="card" data-guide="scope">
+          <div className="card-header"><h2>Build the POV</h2><p>What is in scope for this POV? The wizard walks you through each product you turn on, then runs one dry run and one apply for all of them.</p></div>
+          <div className="tier-grid" style={{gridTemplateColumns:'repeat(auto-fill, minmax(230px, 1fr))'}}>
+            {GUIDE_PRODUCTS.map(p => (
+              <div key={p.id} className={`tier-card ${g.scope[p.id] ? 'selected' : ''}`} onClick={() => toggle(p.id)} data-scopeproduct={p.id} style={{textAlign:'left', position:'relative'}}>
+                <div style={{position:'absolute', top:'12px', right:'12px'}}><div className={`toggle-switch ${g.scope[p.id] ? 'active' : ''}`}><div className="toggle-knob"></div></div></div>
+                <div className="tier-icon">{p.icon}</div>
+                <div className="tier-name">{p.name}</div>
+                <div className="tier-desc">{p.desc}</div>
+              </div>
+            ))}
+          </div>
+          <div className="form-hint" style={{marginTop:'0.75rem'}}>📱 {g.scope.zia || g.scope.zpa ? 'Zscaler Client Connector is set up first, because Internet Access and Private Access traffic reaches Zscaler through it.' : 'Client Connector is skipped: neither Internet Access nor Private Access is in scope.'}</div>
+          <div className="btn-group">
+            <button className="btn btn-ghost" onClick={onBack}>← Back</button>
+            <button className="btn btn-primary" onClick={onNext} disabled={!any} data-next>Next: Customer intake →</button>
+          </div>
+        </div>
+      );
+    }
+
+    function IntakePanel({ meta, g, setG, presets, onNext, onBack, busy }) {
+      const set = (patch) => setG(prev => ({ ...prev, ...patch }));
+      const setName = (name) => setG(prev => ({ ...prev, customerName: name, prefix: prev.prefixEdited ? prev.prefix : suggestPrefix(name) }));
+      const baselines = meta ? [...meta.baselines.compliance, ...meta.baselines.nonMapped] : [];
+      const pickPreset = (p) => set({ presetId: p.id, baseline: p.baseline });
+      const domainBad = g.domain && !DOMAIN_OK(g.domain);
+      const prefixBad = g.prefix && !PREFIX_OK(g.prefix);
+      const needDomain = g.scope.zpa;
+      const ok = g.customerName.trim() && PREFIX_OK(g.prefix) && (!needDomain || DOMAIN_OK(g.domain)) && !domainBad;
+      const preset = presets.find(p => p.id === g.presetId);
+      return (
+        <div className="card" data-guide="intake">
+          <div className="card-header"><h2>Customer intake</h2><p>Who the POV is for. The prefix names every object the wizard creates; the preset pre-fills the private applications and ZDX apps for the customer's market.</p></div>
+          <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(220px, 1fr))', gap:'12px'}}>
+            <div className="form-group"><label className="form-label">Customer name</label>
+              <input type="text" value={g.customerName} onChange={e => setName(e.target.value)} placeholder="Maine Medical Center" data-intakename /></div>
+            <div className="form-group"><label className="form-label">Prefix</label>
+              <input type="text" value={g.prefix} maxLength={20} onChange={e => set({ prefix: e.target.value.trim(), prefixEdited: true })} placeholder="MMC" data-intakeprefix
+                style={{borderColor: prefixBad ? 'var(--accent-red)' : undefined, fontFamily:'IBM Plex Mono, monospace'}} />
+              <div className="form-hint">{prefixBad ? 'Letters, numbers, - and _ only (max 20).' : <>Generated from the name. Objects are named <code>{g.prefix || 'PREFIX'}-…</code>; re-running with it updates them instead of duplicating.</>}
+                {g.prefixEdited && <> <a href="#" style={{color:'var(--accent-cyan)'}} onClick={e => { e.preventDefault(); set({ prefix: suggestPrefix(g.customerName), prefixEdited: false }); }}>Use generated</a></>}</div></div>
+            <div className="form-group"><label className="form-label">Internal domain{needDomain ? '' : ' (optional)'}</label>
+              <input type="text" value={g.domain} onChange={e => set({ domain: e.target.value.trim().toLowerCase() })} placeholder="hospital.org" data-intakedomain
+                style={{borderColor: domainBad ? 'var(--accent-red)' : undefined}} />
+              <div className="form-hint">{domainBad ? 'Not a valid domain (for example hospital.org).' : 'Saved for Private Access: a wildcard segment *.' + (g.domain || 'domain') + ' plus the preset apps.'}</div></div>
+          </div>
+          <div className="form-label">Preset</div>
+          <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(180px, 1fr))', gap:'8px', marginBottom:'0.75rem'}}>
+            {presets.map(p => (
+              <div key={p.id} className={`tier-card ${g.presetId === p.id ? 'selected' : ''}`} onClick={() => pickPreset(p)} style={{cursor:'pointer', padding:'0.75rem', textAlign:'left'}} data-preset={p.id}>
+                <div className="tier-name" style={{fontSize:'13px'}}>{p.icon} {p.name}</div>
+                <div className="tier-desc" style={{fontSize:'11px'}}>{p.description}</div>
+                <div className="form-hint" style={{marginTop:'4px'}}>{p.appCount} private apps · {p.zdxCount} ZDX apps</div>
+              </div>
+            ))}
+          </div>
+          {g.scope.zia && (
+            <div className="form-group" style={{maxWidth:'420px'}}><label className="form-label">Baseline policies (Internet Access)</label>
+              <select value={g.baseline} onChange={e => set({ baseline: e.target.value })} data-intakebaseline>{baselines.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}</select>
+              <div className="form-hint">{preset ? `The ${preset.name} preset suggests ${preset.baseline}.` : ''} You can still change it on the Internet Access step.</div></div>
+          )}
+          <div className="btn-group">
+            <button className="btn btn-ghost" onClick={onBack}>← Back</button>
+            <button className="btn btn-primary" onClick={onNext} disabled={!ok || busy} data-next>{busy ? <><span className="spinner"></span> Preparing…</> : 'Next →'}</button>
+          </div>
+        </div>
+      );
+    }
+
+    function PovGuide({ meta, auth, prefix, setPrefix, licensing, pov, setPov, setError, onReport }) {
+      const [g, setG] = useState(() => { try { const j = JSON.parse(safeStore.get('zpw.guide') || '{}'); return { ...GUIDE_DEFAULT, ...j, scope: { ...GUIDE_DEFAULT.scope, ...(j.scope || {}) } }; } catch (e) { return GUIDE_DEFAULT; } });
+      const [stage, setStage] = useState('readiness');
+      const [visited, setVisited] = useState(() => new Set(['readiness']));
+      const [presets, setPresets] = useState([]);
+      const [preset, setPreset] = useState(null);
+      const [zpaInitial, setZpaInitial] = useState(null);
+      const [wizardKey, setWizardKey] = useState('');
+      const [payloads, setPayloads] = useState({ zcc: {}, ziaReady: false, zpa: null, zdx: null });
+      const [ziaSub, setZiaSub] = useState('scope');
+      const [fwdProfiles, setFwdProfiles] = useState(null);
+      const [busy, setBusy] = useState(false);
+      useEffect(() => { api.call('GET', '/v2/intake/presets').then(setPresets).catch(() => {}); }, []);
+      useEffect(() => {
+        safeStore.set('zpw.guide', JSON.stringify(g));
+        const t = setTimeout(() => api.call('POST', '/v2/intake', { customerName: g.customerName, domain: DOMAIN_OK(g.domain) ? g.domain : '', presetId: g.presetId, baseline: g.baseline, products: g.scope }).catch(() => {}), 800);
+        return () => clearTimeout(t);
+      }, [JSON.stringify(g)]);
+
+      const needZcc = g.scope.zia || g.scope.zpa;
+      const stages = [
+        { id: 'readiness', label: 'Tenant readiness' }, { id: 'scope', label: 'Build the POV' }, { id: 'intake', label: 'Customer intake' },
+        needZcc && { id: 'zcc', label: 'Client Connector' }, g.scope.zia && { id: 'zia', label: 'Internet Access' },
+        g.scope.zpa && { id: 'zpa', label: 'Private Access' }, g.scope.zdx && { id: 'zdx', label: 'Digital Experience' },
+        { id: 'run', label: 'Dry run & apply' }
+      ].filter(Boolean);
+      const idx = Math.max(0, stages.findIndex(s => s.id === stage));
+      const go = (id) => { setError(null); setStage(id); setVisited(v => new Set([...v, id])); try { window.scrollTo(0, 0); } catch (e) {} };
+      const next = () => go(stages[Math.min(idx + 1, stages.length - 1)].id);
+      const back = () => go(stages[Math.max(idx - 1, 0)].id);
+      const nextLabel = stages[idx + 1] ? `Next: ${stages[idx + 1].label} →` : 'Next →';
+
+      // Intake → save the prefix, fill the preset for the domain and prepare each product's wizard
+      const finishIntake = async () => {
+        setBusy(true); setError(null);
+        try {
+          await api.call('POST', '/v2/prefix', { prefix: g.prefix });
+          setPrefix(g.prefix); safeStore.set('zpw.prefix', g.prefix);
+          const r = await api.call('POST', '/v2/intake/preset', { id: g.presetId, domain: g.domain, customerName: g.customerName });
+          setPreset(r.preset);
+          let apps = [];
+          if (g.scope.zpa && r.preset.apps.length) {
+            const csv = 'Application Name,Destinations,Ports\r\n' + r.preset.apps.map(a => [a.name, a.destinations.join('; '), a.ports].map(x => `"${String(x).replace(/"/g, '""')}"`).join(',')).join('\r\n');
+            const parsed = await api.call('POST', '/v2/zpa/parse-csv', { text: csv });
+            apps = parsed.apps;
+          }
+          setZpaInitial(apps.length ? { apps } : { domains: g.domain ? `*.${g.domain}` : '' });
+          const key = [g.prefix, g.domain, g.presetId].join('|');
+          if (key !== wizardKey) {
+            setWizardKey(key);
+            setPayloads({ zcc: {}, ziaReady: false, zpa: null, zdx: null });
+            setVisited(new Set(['readiness', 'scope', 'intake']));
+            setZiaSub('scope');
+          }
+          if (g.scope.zia && pov.baseline !== g.baseline) {
+            setPov(prev => ({ ...prev, baseline: g.baseline, disabledRules: { 'firewallFiltering:Default-Block-All': true }, actionSettings: { policy: {}, rules: {} }, settingOverrides: {} }));
+          }
+          if (needZcc && !fwdProfiles) api.call('GET', '/zcc/profiles').then(d => setFwdProfiles(d.forwardingProfiles || [])).catch(() => setFwdProfiles([]));
+          next();
+        } catch (e) { setError(e.message); }
+        setBusy(false);
+      };
+
+      const show = (id) => ({ display: stage === id ? 'block' : 'none' });
+      const savedZcc = Object.keys(payloads.zcc);
+      return (
+        <div data-step="start">
+          <GuideStepper stages={stages} stage={stage} visited={visited} go={go} />
+          {stage === 'readiness' && (<>
+            <ReadinessPanel setError={setError} />
+            <div className="btn-group" style={{marginTop:0}}><button className="btn btn-primary" onClick={next} data-next>Next: Build the POV →</button></div>
+          </>)}
+          {stage === 'scope' && <ScopePanel g={g} setG={setG} onNext={next} onBack={back} />}
+          {stage === 'intake' && <IntakePanel meta={meta} g={g} setG={setG} presets={presets} onNext={finishIntake} onBack={back} busy={busy} />}
+
+          {wizardKey && needZcc && visited.has('zcc') && (
+            <div style={show('zcc')} data-guide="zcc">
+              {savedZcc.length > 0 && <div className="alert alert-success"><span>✓ Saved for the dry run: {savedZcc.map(k => k === 'macos' ? 'macOS' : 'Windows').join(' and ')} profile{savedZcc.length > 1 ? 's' : ''}
+                <button className="btn btn-ghost btn-sm" style={{marginLeft:'8px'}} onClick={() => setPayloads(p => ({ ...p, zcc: {} }))}>Clear</button></span></div>}
+              {fwdProfiles ? (
+                <ZccCreateWizard key={wizardKey} setError={setError} config={{ globalPrefix: prefix }} forwardingProfiles={fwdProfiles}
+                  guided={{ saved: payloads.zcc, onSave: (plat, p) => setPayloads(prev => ({ ...prev, zcc: { ...prev.zcc, [plat]: p } })), onNext: next, onBack: back, onSkip: () => { setPayloads(prev => ({ ...prev, zcc: {} })); next(); } }} />
+              ) : <div className="card"><span className="spinner"></span> Reading Client Connector profiles…</div>}
+            </div>
+          )}
+          {wizardKey && g.scope.zia && visited.has('zia') && meta && (
+            <div style={show('zia')} data-guide="zia">
+              {ziaSub === 'scope' && <ScopeStep meta={meta} pov={pov} setPov={setPov} licensing={licensing} onBack={back} onNext={() => setZiaSub('baseline')} />}
+              {ziaSub === 'baseline' && <BaselineStep meta={meta} pov={pov} setPov={setPov} setError={setError} onBack={() => setZiaSub('scope')} onNext={() => setZiaSub('rules')} />}
+              {ziaSub === 'rules' && <PovRulesStep meta={meta} pov={pov} setPov={setPov} prefix={prefix} auth={auth} setError={setError} onBack={() => setZiaSub('baseline')}
+                nextLabel={nextLabel} onNext={() => { setPayloads(p => ({ ...p, ziaReady: true })); next(); }} />}
+            </div>
+          )}
+          {wizardKey && g.scope.zpa && visited.has('zpa') && meta && zpaInitial && (
+            <div style={show('zpa')} data-guide="zpa">
+              <ZpaWizard key={wizardKey} meta={meta} prefix={prefix} setError={setError} onReport={onReport}
+                guided={{ initial: zpaInitial, onBack: back, nextLabel, onNext: (body) => { setPayloads(p => ({ ...p, zpa: body })); next(); } }} />
+            </div>
+          )}
+          {wizardKey && g.scope.zdx && visited.has('zdx') && preset && (
+            <div style={show('zdx')} data-guide="zdx">
+              <ZdxWizard key={wizardKey} setError={setError}
+                guided={{ custom: preset.zdxApps || [], predefined: preset.zdxPredefined || [], onBack: back, nextLabel, onNext: (pl) => { setPayloads(p => ({ ...p, zdx: pl })); next(); } }} />
+            </div>
+          )}
+          {stage === 'run' && (
+            <GuidedRun g={g} prefix={prefix} pov={pov} payloads={payloads} stages={stages} go={go} setError={setError} onReport={onReport} onBack={back} />
+          )}
+        </div>
+      );
+    }
+
+    // One dry run and one apply across what the guided steps collected, in order ZCC → ZIA → ZPA → ZDX
+    function GuidedRun({ g, prefix, pov, payloads, stages, go, setError, onReport, onBack }) {
       const [plans, setPlans] = useState({});        // key → { status, rows, error, payload, planId, until }
       const [results, setResults] = useState({});
       const [busy, setBusy] = useState(null);         // 'plan' | 'apply' | null
       const [confirmed, setConfirmed] = useState(false);
-      const [pw] = useState(() => genPassword());
-      const [showPw, setShowPw] = useState(false);
       const [, tick] = useState(0);
       useEffect(() => { const t = setInterval(() => tick(x => x + 1), 1000); return () => clearInterval(t); }, []);
-      const P = intake.products;
-      const toggle = (k) => { setIntake(prev => ({ ...prev, products: { ...prev.products, [k]: !prev.products[k] } })); setPlans({}); setResults({}); setConfirmed(false); };
+      const ziaPayload = () => ({ baseline: pov.baseline, scope: pov.scope, prefix, disabledRules: pov.disabledRules, actionSettings: pov.actionSettings, settingOverrides: pov.settingOverrides, cbiProfile: pov.cbiProfile, sslCertificate: pov.sslCertificate });
       const steps = [
-        P.zcc && { key: 'zccWin', product: 'zcc', label: 'Client Connector (Windows)', platform: 'windows' },
-        P.zccMac && { key: 'zccMac', product: 'zcc', label: 'Client Connector (macOS)', platform: 'macos' },
-        P.zia && { key: 'zia', product: 'zia', label: 'Internet Access' },
-        P.zpa && { key: 'zpa', product: 'zpa', label: 'Private Access' },
-        P.zdx && { key: 'zdx', product: 'zdx', label: 'Digital Experience' }
+        payloads.zcc.windows && { key: 'zccWin', product: 'zcc', stage: 'zcc', label: 'Client Connector (Windows)', platform: 'windows', payload: payloads.zcc.windows },
+        payloads.zcc.macos && { key: 'zccMac', product: 'zcc', stage: 'zcc', label: 'Client Connector (macOS)', platform: 'macos', payload: payloads.zcc.macos },
+        g.scope.zia && payloads.ziaReady && pov.baseline && { key: 'zia', product: 'zia', stage: 'zia', label: 'Internet Access', payload: ziaPayload() },
+        g.scope.zpa && payloads.zpa && { key: 'zpa', product: 'zpa', stage: 'zpa', label: 'Private Access', payload: payloads.zpa },
+        g.scope.zdx && payloads.zdx && { key: 'zdx', product: 'zdx', stage: 'zdx', label: 'Digital Experience', payload: payloads.zdx }
       ].filter(Boolean);
-
-      // only the VPN gateways come from the intake; the DNS / IP lists keep the template values (the template includes all DNS so ZPA resolves internal names)
-      const lists = () => { const v = splitItems(intake.vpnGateways); return v.length ? { vpnGateways: v } : null; };
-      const ziaScope = () => { const sc = Object.fromEntries(meta.scopeItems.map(i => [i.key, i.default])); for (const [k, v] of Object.entries((licensing && licensing.items) || {})) if (v.licensed === false) sc[k] = false; return sc; };
-      const zpaPayload = async () => {
-        const base = { prefix, policies: { access: true, timeout: true, inspection: true, isolation: true }, pra: {}, settings: {} };
-        const apps = intake.apps.filter(a => a.name.trim() && a.destinations.trim());
-        if (!apps.length) return { ...base, domains: intake.domain ? `*.${intake.domain}` : '', tcpPorts: '1-52, 54-65535', udpPorts: '1-52, 54-65535' };
-        const csv = 'Application Name,Destinations,Ports\r\n' + apps.map(a => [a.name, a.destinations, a.ports].map(x => `"${String(x).replace(/"/g, '""')}"`).join(',')).join('\r\n');
-        const r = await api.call('POST', '/v2/zpa/parse-csv', { text: csv });
-        if (r.errors.length) throw new Error('Private applications: ' + r.errors.join(' '));
-        return { ...base, apps: r.apps.map(a => ({ ...a, settings: {} })) };
-      };
-      const zdxPayload = async () => {
-        const cat = await api.call('GET', '/zdx/catalog');
-        const t = cat.templates.find(x => x.id === 'POV_BEST_PRACTICE');
-        const predefined = t.predefined.filter(x => cat.predefined.some(a => a.provider === x.provider)).map(x => ({ provider: x.provider, prefix: (cat.predefined.find(a => a.provider === x.provider) || {}).prefix || '', web: true, cloudpath: !!x.cloudpath }));
-        const custom = [...t.custom, ...intake.zdxUrls.filter(z => z.name.trim() && /^https?:\/\/\S+\.\S+/.test(z.url))].map(c => ({ name: c.name.trim(), url: c.url.trim(), cloudpath: c.cloudpath !== false, frequency: c.frequency || 300, protocol: c.protocol || 'ADAPTIVE' }));
-        return { templateId: t.id, predefined, custom };
-      };
-      const zccPayload = (platform) => {
-        const tag = platform === 'macos' ? 'macOS' : 'Windows';
-        return { name: `${prefix}-${tag}-BestPractice`, description: `${intake.customerName || 'POV'} — created by the ZTP Policy Wizard`, forwardingProfileId: 0, active: false,
-          templateId: 'BEST_PRACTICE', enabledSettings: null, newForwardingProfile: { name: `${prefix}-FWD-${tag}`, templateId: 'BEST_PRACTICE', enabledSettings: null },
-          bypassAppIds: null, lists: lists(), tamperPassword: pw };
-      };
+      const missing = [
+        g.scope.zia && !(payloads.ziaReady && pov.baseline) && { stage: 'zia', label: 'Internet Access' },
+        g.scope.zpa && !payloads.zpa && { stage: 'zpa', label: 'Private Access' },
+        g.scope.zdx && !payloads.zdx && { stage: 'zdx', label: 'Digital Experience' }
+      ].filter(Boolean);
 
       const planOne = async (st) => {
         try {
-          if (st.product === 'zia') {
-            const payload = { baseline: intake.baseline, scope: ziaScope(), prefix, disabledRules: { 'firewallFiltering:Default-Block-All': true }, actionSettings: { policy: {}, rules: {} }, settingOverrides: {}, cbiProfile: null, sslCertificate: null };
-            const p = await api.call('POST', '/v2/zia/plan', payload);
-            return { status: 'ok', payload, planId: p.planId, counts: p.counts, rows: p.ledger, warnings: p.warnings };
-          }
-          if (st.product === 'zpa') {
-            const payload = await zpaPayload();
-            const p = await api.call('POST', '/v2/zpa/plan', payload);
-            return { status: 'ok', payload, planId: p.planId, counts: p.counts, rows: p.ledger, warnings: p.warnings };
+          if (st.product === 'zia' || st.product === 'zpa') {
+            const p = await api.call('POST', `/v2/${st.product}/plan`, st.payload);
+            return { status: (p.errors && p.errors.length) ? 'error' : 'ok', error: (p.errors || []).join(' '), payload: st.payload, planId: p.planId, counts: p.counts, rows: p.ledger, warnings: p.warnings };
           }
           if (st.product === 'zcc') {
-            const payload = zccPayload(st.platform);
-            const p = await api.call('POST', `/zcc/app-profiles/${st.platform}/dryrun`, payload);
+            const p = await api.call('POST', `/zcc/app-profiles/${st.platform}/dryrun`, st.payload);
             const rows = [];
             if (p.forwardingProfile && p.forwardingProfile.isNew) rows.push({ product: 'ZCC', category: 'Forwarding Profile', name: p.forwardingProfile.name, action: p.forwardingAction || 'CREATE' });
-            rows.push({ product: 'ZCC', category: 'App Profile', name: payload.name, action: p.action, changes: p.changeReasons });
+            rows.push({ product: 'ZCC', category: 'App Profile', name: st.payload.name, action: p.action, changes: p.changeReasons });
             const fails = (p.checks || []).filter(c => c.status === 'fail');
-            return { status: p.ok ? 'ok' : 'error', error: fails.map(c => `${c.name}: ${c.detail}`).join(' '), payload, planId: p.planId, rows, warnings: p.warnings || [] };
+            return { status: p.ok ? 'ok' : 'error', error: fails.map(c => `${c.name}: ${c.detail}`).join(' '), payload: st.payload, planId: p.planId, rows, warnings: p.warnings || [] };
           }
           if (st.product === 'zdx') {
-            const payload = await zdxPayload();
-            const p = await api.call('POST', '/zdx/dryrun', payload);
+            const p = await api.call('POST', '/zdx/dryrun', st.payload);
             const rows = (p.apps || []).flatMap(a => (a.steps || []).filter(s => s.op !== 'none').map(s => ({ product: 'ZDX', category: a.kind === 'setup' ? 'Setup' : 'App', name: a.name, action: /create/i.test(s.op) ? 'CREATE' : 'UPDATE', note: s.label })));
             const fails = (p.checks || []).filter(c => c.status === 'fail');
-            return { status: p.ok ? 'ok' : 'error', error: fails.map(c => `${c.name}: ${c.detail}`).join(' '), payload, rows, warnings: p.warnings || [] };
+            return { status: p.ok ? 'ok' : 'error', error: fails.map(c => `${c.name}: ${c.detail}`).join(' '), payload: st.payload, rows, warnings: p.warnings || [] };
           }
         } catch (e) {
           if (e.status === 429 || /rate limit/i.test(e.message)) {
@@ -1868,6 +1979,7 @@
         for (const st of steps) { out[st.key] = { status: 'running' }; setPlans({ ...out }); out[st.key] = await planOne(st); setPlans({ ...out }); }
         setBusy(null);
       };
+      useEffect(() => { if (steps.length) planAll(); }, []);
       // a step paused by a rate limit is re-run on its own when the wait is over
       useEffect(() => {
         const waiting = steps.filter(st => plans[st.key] && plans[st.key].status === 'waiting' && plans[st.key].until && new Date(plans[st.key].until).getTime() <= Date.now());
@@ -1883,7 +1995,7 @@
           out[st.key] = { status: 'running' }; setResults({ ...out });
           try {
             if (st.product === 'zia') { const r = await api.call('POST', '/v2/zia/apply', { ...pl.payload, planId: pl.planId }); out[st.key] = { status: 'ok', counts: r.counts, rows: r.ledger, note: r.activated ? 'Activated' : '' }; }
-            else if (st.product === 'zpa') { const r = await api.call('POST', '/v2/zpa/apply', { ...pl.payload, planId: pl.planId }); out[st.key] = { status: 'ok', counts: r.counts, rows: r.ledger, key: r.provisioningKey ? true : false }; }
+            else if (st.product === 'zpa') { const r = await api.call('POST', '/v2/zpa/apply', { ...pl.payload, planId: pl.planId }); out[st.key] = { status: 'ok', counts: r.counts, rows: r.ledger, key: !!r.provisioningKey }; }
             else if (st.product === 'zcc') { const r = await api.call('POST', `/zcc/app-profiles/${st.platform}`, { ...pl.payload, planId: pl.planId }); out[st.key] = { status: r.verified ? 'ok' : 'warn', rows: [{ product: 'ZCC', category: 'App Profile', name: r.name, action: r.action, note: r.verified ? 'Verified on read-back' : 'Some settings did not verify' }] }; }
             else if (st.product === 'zdx') { const r = await api.call('POST', '/zdx/apply', pl.payload); out[st.key] = { status: r.success ? 'ok' : 'warn', rows: r.results.map(x => ({ product: 'ZDX', category: x.kind, name: x.name, action: x.ok ? 'CREATE' : 'FAILED' })) }; }
           } catch (e) { out[st.key] = { status: 'error', error: e.message }; }
@@ -1893,41 +2005,30 @@
       };
       const planned = steps.length && steps.every(st => plans[st.key] && plans[st.key].status !== 'running');
       const anyOk = steps.some(st => plans[st.key] && plans[st.key].status === 'ok');
-      const badge = (r) => !r ? null : r.status === 'running' ? <span className="spinner"></span> : r.status === 'ok' ? <span className="badge badge-create">Ready</span>
+      const applied = Object.keys(results).length > 0;
+      const badge = (r) => !r ? null : r.status === 'running' ? <span className="spinner"></span> : r.status === 'ok' ? <span className="badge badge-create">{applied ? 'Done' : 'Ready'}</span>
         : r.status === 'waiting' ? <span className="badge badge-update">Rate limit · retries in {r.until ? fmtLeft(r.until) : 'a few minutes'}</span>
         : r.status === 'warn' ? <span className="badge badge-update">Check</span> : r.status === 'skipped' ? <span className="badge badge-category">Skipped</span> : <span className="badge badge-risk">Failed</span>;
       return (
         <div className="card" data-combined>
-          <div className="card-header"><h2>3. Build the POV</h2><p>Pick the products in scope. One dry run covers all of them; one apply runs them in order (Client Connector → Internet Access → Private Access → Digital Experience). Each product can still be fine-tuned in its own module afterwards.</p></div>
-          {!prefix && <div className="alert alert-warning"><span>Set the global prefix first (top of the page, or Use it under Customer intake).</span></div>}
-          <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(220px, 1fr))', gap:'6px'}}>
-            {[['zcc', 'Client Connector — Windows'], ['zccMac', 'Client Connector — macOS'], ['zia', 'Internet Access'], ['zpa', 'Private Access'], ['zdx', 'Digital Experience']].map(([k, label]) => (
-              <div key={k} className="toggle-item" data-product={k}>
-                <label onClick={() => toggle(k)} style={{cursor:'pointer'}}>{label}</label>
-                <div className={`toggle-switch ${P[k] ? 'active' : ''}`} onClick={() => toggle(k)}><div className="toggle-knob"></div></div>
-              </div>
-            ))}
-          </div>
-          {(P.zcc || P.zccMac) && (
-            <div className="form-hint" style={{margin:'0.5rem 0'}}>Client Connector tamper-protection password for this POV: <code>{showPw ? pw : '•'.repeat(pw.length)}</code>
-              <button className="btn btn-ghost btn-sm" onClick={() => setShowPw(!showPw)}>{showPw ? 'Hide' : 'Show'}</button> (also in the summary report)</div>
-          )}
-          <div className="btn-group" style={{marginTop:'0.5rem'}}>
-            <button className="btn btn-primary" disabled={!prefix || !steps.length || !!busy || !meta} onClick={planAll} data-planall>{busy === 'plan' ? <><span className="spinner"></span> Dry run…</> : 'Run dry run for all'}</button>
-          </div>
+          <div className="card-header"><h2>Dry run & apply</h2><p>One dry run covers everything you set up for <strong>{g.customerName || 'this customer'}</strong> (prefix <code>{prefix}</code>). Nothing changes until you apply; Apply runs Client Connector → Internet Access → Private Access → Digital Experience and shows each object as it is created.</p></div>
+          {missing.map(m => <div key={m.stage} className="alert alert-warning"><span>{m.label} is in scope but its step was not finished. <button className="btn btn-ghost btn-sm" onClick={() => go(m.stage)}>Go to {m.label}</button></span></div>)}
+          {!steps.length && <div className="alert alert-info"><span>Nothing to run yet. Finish at least one product step.</span></div>}
           {steps.map(st => {
-            const pl = plans[st.key], rs = results[st.key];
-            if (!pl && !rs) return null;
+            const pl = plans[st.key], rs = results[st.key], cur = rs || pl;
             return (
-              <div key={st.key} style={{marginTop:'1rem'}} data-step-product={st.key}>
-                <h3 style={{fontSize:'14px', display:'flex', gap:'8px', alignItems:'center'}}>{st.label} {badge(rs || pl)} {(rs || pl).counts && <span className="form-hint" style={{margin:0}}>{countLine((rs || pl).counts)}</span>}</h3>
-                {(rs || pl).error && <div className="alert alert-danger"><span>{(rs || pl).error}</span></div>}
-                {((rs || pl).warnings || []).slice(0, 6).map((w, i) => <div key={i} className="form-hint" style={{color:'var(--accent-amber)'}}>⚠ {w}</div>)}
-                {(rs || pl).rows && <LedgerTable ledger={(rs || pl).rows} filterProduct />}
+              <div key={st.key} style={{marginTop:'0.75rem', borderTop:'1px solid var(--border)', paddingTop:'0.75rem'}} data-step-product={st.key}>
+                <h3 style={{fontSize:'14px', display:'flex', gap:'8px', alignItems:'center', flexWrap:'wrap'}}>{st.label} {badge(cur)} {cur && cur.counts && <span className="form-hint" style={{margin:0}}>{countLine(cur.counts)}</span>}
+                  {!applied && <button className="btn btn-ghost btn-sm" style={{marginLeft:'auto'}} onClick={() => go(st.stage)} disabled={!!busy}>Edit</button>}</h3>
+                {cur && cur.error && <div className="alert alert-danger"><span>{cur.error}</span></div>}
+                {cur && (cur.warnings || []).slice(0, 6).map((w, i) => <div key={i} className="form-hint" style={{color:'var(--accent-amber)'}}>⚠ {w}</div>)}
+                {cur && cur.rows && (
+                  <details open={cur.rows.length <= 12}><summary style={{cursor:'pointer', fontSize:'12px'}}>{cur.rows.length} object{cur.rows.length === 1 ? '' : 's'}</summary><LedgerTable ledger={cur.rows} filterProduct /></details>
+                )}
               </div>
             );
           })}
-          {planned && anyOk && !Object.keys(results).length && (
+          {planned && anyOk && !applied && (
             <div className="toggle-item" style={{marginTop:'1rem'}}>
               <label onClick={() => setConfirmed(!confirmed)} style={{cursor:'pointer'}}>I have reviewed the dry run. Apply the ready products (failed ones are skipped).</label>
               <div className={`toggle-switch ${confirmed ? 'active' : ''}`} onClick={() => setConfirmed(!confirmed)} data-confirmall><div className="toggle-knob"></div></div>
@@ -1935,21 +2036,31 @@
           )}
           <LiveProgress active={busy === 'apply'} title="Applying" />
           <div className="btn-group">
-            {planned && anyOk && !Object.keys(results).length && <button className="btn btn-success" disabled={!confirmed || !!busy} onClick={applyAll} data-applyall>{busy === 'apply' ? <><span className="spinner"></span> Applying…</> : '🚀 Apply all'}</button>}
-            {Object.keys(results).length > 0 && !busy && <button className="btn btn-primary" onClick={onReport}>Summary report →</button>}
+            {!applied && <button className="btn btn-ghost" onClick={onBack} disabled={!!busy}>← Back</button>}
+            {!applied && <button className="btn btn-ghost" onClick={planAll} disabled={!!busy || !steps.length} data-planall>{busy === 'plan' ? <><span className="spinner"></span> Dry run…</> : '↻ Re-run dry run'}</button>}
+            {planned && anyOk && !applied && <button className="btn btn-success" disabled={!confirmed || !!busy} onClick={applyAll} data-applyall>{busy === 'apply' ? <><span className="spinner"></span> Applying…</> : '🚀 Apply all'}</button>}
+            {applied && !busy && <button className="btn btn-primary" onClick={onReport}>Summary report →</button>}
           </div>
         </div>
       );
     }
 
-    function PovStart({ meta, prefix, setPrefix, licensing, setError, onReport }) {
-      const [intake, setIntake] = useState(() => { try { return { ...INTAKE_DEFAULT, ...JSON.parse(safeStore.get('zpw.intake') || '{}') }; } catch (e) { return INTAKE_DEFAULT; } });
-      useEffect(() => { safeStore.set('zpw.intake', JSON.stringify(intake)); const t = setTimeout(() => api.call('POST', '/v2/intake', intake).catch(() => {}), 800); return () => clearTimeout(t); }, [JSON.stringify(intake)]);
+    // v2.3: one Bulk Rule Manager for ZIA, ZPA and ZDX
+    function BulkHub({ meta, prefix, setError, loading, setLoading, initialTab }) {
+      const [tab, setTab] = useState(initialTab || 'zia');
       return (
-        <div data-step="start">
-          <ReadinessPanel setError={setError} />
-          {meta && <IntakePanel meta={meta} intake={intake} setIntake={setIntake} prefix={prefix} setPrefix={setPrefix} setError={setError} />}
-          {meta && <CombinedRun meta={meta} intake={intake} setIntake={setIntake} prefix={prefix} licensing={licensing} setError={setError} onReport={onReport} />}
+        <div data-bulkhub>
+          <div className="card" style={{padding:'0.75rem 1rem', marginBottom:'1rem'}}>
+            <h2 style={{fontSize:'16px', margin:'0 0 0.5rem'}}>🗑️ Bulk Rule Manager</h2>
+            <div style={{display:'flex', gap:'6px', flexWrap:'wrap'}}>
+              {[['zia', '🌐 Internet Access'], ['zpa', '🔒 Private Access'], ['zdx', '📈 Digital Experience']].map(([k, l]) => (
+                <button key={k} className={`btn btn-sm ${tab === k ? 'btn-primary' : 'btn-ghost'}`} onClick={() => setTab(k)} data-bulktab={k}>{l}</button>
+              ))}
+            </div>
+          </div>
+          {tab === 'zia' && <BulkDeleteStep setError={setError} loading={loading} setLoading={setLoading} />}
+          {tab === 'zpa' && meta && <BulkManagerV2 key="zpa" product="zpa" prefix={prefix} meta={meta} setError={setError} />}
+          {tab === 'zdx' && meta && <BulkManagerV2 key="zdx" product="zdx" prefix={prefix} meta={meta} setError={setError} />}
         </div>
       );
     }
@@ -3880,15 +3991,16 @@
     // Windows v1.6.0, macOS v1.6.1, forwarding profile first v1.7.0
     // Platform -> Forwarding Profile -> App Profile -> Customize -> Review -> Dry Run -> Apply
     // ========================
-    function ZccCreateWizard({ setError, config, forwardingProfiles, onExit, onCreated }) {
+    function ZccCreateWizard({ setError, config, forwardingProfiles, onExit, onCreated, guided, initialPlatform }) {
       const prefix = (config && (config.globalPrefix || config.prefix)) || 'ZTP';
       const [step, setStep] = useState('platform');
-      const [platform, setPlatform] = useState('windows');
+      const [platform, setPlatform] = useState(initialPlatform || 'windows');
+      const initTag = initialPlatform === 'macos' ? 'macOS' : 'Windows';
       const [catalog, setCatalog] = useState(null);
       const [templateId, setTemplateId] = useState('BEST_PRACTICE');
       const [enabled, setEnabled] = useState(null); // Set of app profile setting keys
       const [form, setForm] = useState({
-        name: `${prefix}-Windows-BestPractice`,
+        name: `${prefix}-${initTag}-BestPractice`,
         description: 'Created by ZTP Policy Wizard from the Best Practice template',
         forwardingProfileId: 0,
         active: false
@@ -3898,7 +4010,7 @@
       const [fwdMode, setFwdMode] = useState('new'); // 'new' | 'existing'
       const [fwdTemplateId, setFwdTemplateId] = useState('BEST_PRACTICE');
       const [fwdEnabled, setFwdEnabled] = useState(null);
-      const [fwdName, setFwdName] = useState(`${prefix}-FWD-Windows-BestPractice`);
+      const [fwdName, setFwdName] = useState(`${prefix}-FWD-${initTag}-BestPractice`);
       const [plan, setPlan] = useState(null);
       const [busy, setBusy] = useState(false);
       const [confirmed, setConfirmed] = useState(false);
@@ -4045,7 +4157,7 @@
 
       const Stepper = () => (
         <div style={{display:'flex', gap:'6px', marginBottom:'1.25rem', flexWrap:'wrap'}}>
-          {ZCC_STEPS.map((s, i) => {
+          {(guided ? ZCC_STEPS.slice(0, 5) : ZCC_STEPS).map((s, i) => {
             const done = i < reached, cur = s.id === step;
             const canGo = done && !result;
             return (
@@ -4119,7 +4231,8 @@
                 ))}
               </div>
               <div className="btn-group">
-                <button className="btn btn-ghost" onClick={onExit}>← Mobile Admin</button>
+                {guided ? <button className="btn btn-ghost" onClick={guided.onBack}>← Back</button> : <button className="btn btn-ghost" onClick={onExit}>← Mobile Admin</button>}
+                {guided && guided.onSkip && <button className="btn btn-ghost" onClick={guided.onSkip} data-zccskip>Skip Client Connector</button>}
                 <button className="btn btn-primary" onClick={() => setStep('forwarding')}>Forwarding Profile →</button>
               </div>
             </div>
@@ -4315,7 +4428,14 @@
               )}
               <div className="btn-group">
                 <button className="btn btn-ghost" onClick={() => setStep('customize')}>← Back</button>
-                <button className="btn btn-primary" onClick={runDryRun} disabled={busy}>{busy ? <><span className="spinner"></span> Running...</> : 'Run Dry Run →'}</button>
+                {guided ? (() => {
+                  const other = ZCC_PLATFORMS.find(p => p.id !== platform);
+                  const save = () => guided.onSave(platform, payload());
+                  return (<>
+                    {!guided.saved[other.id] && <button className="btn btn-ghost" data-zccalso={other.id} onClick={() => { save(); pickPlatform(other.id); setStep('forwarding'); }}>Save and also set up {other.label}</button>}
+                    <button className="btn btn-primary" onClick={() => { save(); guided.onNext(); }} data-zccsave>Save {plat.label} and continue →</button>
+                  </>);
+                })() : <button className="btn btn-primary" onClick={runDryRun} disabled={busy}>{busy ? <><span className="spinner"></span> Running...</> : 'Run Dry Run →'}</button>}
               </div>
             </div>
           )}
@@ -4431,7 +4551,7 @@
       return p.active ? <span className="badge badge-create">ON</span> : <span className="badge badge-risk">OFF</span>;
     }
 
-    function ZdxWizard({ setError, onExit }) {
+    function ZdxWizard({ setError, onExit, guided }) {
       const [step, setStep] = useState('template');
       const [catalog, setCatalog] = useState(null);
       const [templateId, setTemplateId] = useState('POV_BEST_PRACTICE');
@@ -4447,8 +4567,11 @@
         const p = {};
         cat.predefined.forEach(a => { p[a.provider] = { on: false, prefix: a.prefix || '', web: true, cloudpath: true }; });
         t.predefined.forEach(x => { p[x.provider] = { ...(p[x.provider] || {}), on: true, web: x.web !== false, cloudpath: !!x.cloudpath }; });
+        // v2.3 guided: the customer intake preset adds its segment's apps on top of the template
+        if (guided) (guided.predefined || []).forEach(prov => { if (p[prov]) p[prov] = { ...p[prov], on: true }; });
         setPredef(p);
-        setCustom(t.custom.map(c => ({ name: c.name, url: c.url, cloudpath: c.cloudpath !== false, frequency: c.frequency || 300, protocol: c.protocol || 'ADAPTIVE' })));
+        const extra = guided ? (guided.custom || []).filter(c => !t.custom.some(x => x.url === c.url)) : [];
+        setCustom([...t.custom, ...extra].map(c => ({ name: c.name, url: c.url, cloudpath: c.cloudpath !== false, frequency: c.frequency || 300, protocol: c.protocol || 'ADAPTIVE' })));
         setPlan(null);
       };
 
@@ -4486,7 +4609,7 @@
 
       const Stepper = () => (
         <div style={{display:'flex', gap:'6px', marginBottom:'1.25rem', flexWrap:'wrap'}}>
-          {ZDX_STEPS.map((s, i) => {
+          {(guided ? ZDX_STEPS.slice(0, 3) : ZDX_STEPS).map((s, i) => {
             const done = i < reached, cur = s.id === step, canGo = done && !result;
             return (
               <div key={s.id} onClick={() => canGo && setStep(s.id)}
@@ -4530,7 +4653,7 @@
                 ))}
               </div>
               <div className="btn-group">
-                <button className="btn btn-ghost" onClick={onExit}>← Digital Experience</button>
+                {guided ? <button className="btn btn-ghost" onClick={guided.onBack}>← Back</button> : <button className="btn btn-ghost" onClick={onExit}>← Digital Experience</button>}
                 <button className="btn btn-primary" onClick={() => setStep('apps')}>Applications & Probes →</button>
               </div>
             </div>
@@ -4631,7 +4754,8 @@
               <div className="form-hint" style={{marginTop:'0.5rem'}}>All probes run for all users. Web probes accept HTTP 200–299 and 304, follow up to 5 redirects and time out after 60 seconds.</div>
               <div className="btn-group">
                 <button className="btn btn-ghost" onClick={() => setStep('apps')}>← Back</button>
-                <button className="btn btn-primary" onClick={runDryRun} disabled={busy}>{busy ? <><span className="spinner"></span> Running...</> : 'Run Dry Run →'}</button>
+                {guided ? <button className="btn btn-primary" onClick={() => guided.onNext(payload())} data-zdxnext>{guided.nextLabel || 'Next →'}</button>
+                  : <button className="btn btn-primary" onClick={runDryRun} disabled={busy}>{busy ? <><span className="spinner"></span> Running...</> : 'Run Dry Run →'}</button>}
               </div>
             </div>
           )}

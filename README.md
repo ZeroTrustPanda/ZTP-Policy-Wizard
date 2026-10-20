@@ -1,4 +1,4 @@
-# 🐼 ZeroTrustPanda — ZTP Policy Wizard v2.2.0
+# 🐼 ZeroTrustPanda — ZTP Policy Wizard v2.3.0
 
 Proof-of-value automation for Zscaler SEs: Zscaler Internet Access (ZIA), Zscaler Client Connector (ZCC), Zscaler Private Access (ZPA) and Zscaler Digital Experience (ZDX), all with one set of OneAPI (ZIdentity) client credentials.
 
@@ -8,9 +8,9 @@ No Node.js, no npm, nothing to install. Click your download, unzip it, and doubl
 
 | Computer | Download (click to download) |
 |---|---|
-| **Mac with Apple silicon (M1–M4)** | [**ZTP-Wizard-2.2.0-macos-arm64.zip**](https://github.com/ZeroTrustPanda/ZTP-Policy-Wizard/raw/standalone/standalone/release/ZTP-Wizard-2.2.0-macos-arm64.zip) |
-| Windows 10/11 (64-bit) | [ZTP-Wizard-2.2.0-windows-x64.zip](https://github.com/ZeroTrustPanda/ZTP-Policy-Wizard/raw/standalone/standalone/release/ZTP-Wizard-2.2.0-windows-x64.zip) |
-| Intel Mac | [ZTP-Wizard-2.2.0-macos-x64.zip](https://github.com/ZeroTrustPanda/ZTP-Policy-Wizard/raw/standalone/standalone/release/ZTP-Wizard-2.2.0-macos-x64.zip) |
+| **Mac with Apple silicon (M1–M4)** | [**ZTP-Wizard-2.3.0-macos-arm64.zip**](https://github.com/ZeroTrustPanda/ZTP-Policy-Wizard/raw/standalone/standalone/release/ZTP-Wizard-2.3.0-macos-arm64.zip) |
+| Windows 10/11 (64-bit) | [ZTP-Wizard-2.3.0-windows-x64.zip](https://github.com/ZeroTrustPanda/ZTP-Policy-Wizard/raw/standalone/standalone/release/ZTP-Wizard-2.3.0-windows-x64.zip) |
+| Intel Mac | [ZTP-Wizard-2.3.0-macos-x64.zip](https://github.com/ZeroTrustPanda/ZTP-Policy-Wizard/raw/standalone/standalone/release/ZTP-Wizard-2.3.0-macos-x64.zip) |
 
 The wizard starts on `http://127.0.0.1:3000` (or the next free port), opens your browser, and keeps your API credentials on your computer. Logs go to `ZTP-Wizard/logs` in your home folder.
 
@@ -18,9 +18,16 @@ The wizard starts on `http://127.0.0.1:3000` (or the next free port), opens your
 - **Mac:** right-click `ZTP-Wizard` → *Open* → *Open*. If macOS still refuses, run `xattr -d com.apple.quarantine ZTP-Wizard` in the unzipped folder. If it then reports "killed", also run `codesign --force --sign - ZTP-Wizard`.
 - **Windows:** SmartScreen → *More info* → *Run anyway*.
 
-These are the same features as the v2.2.0 server version on `main`. The UI is compiled ahead of time, with React and fonts built in, so it works without reaching any CDN; only the Zscaler API calls need the network.
+These are the same features as the v2.3.0 server version on `main`. The UI is compiled ahead of time, with React and fonts built in, so it works without reaching any CDN; only the Zscaler API calls need the network.
 
-Release notes: [v2.2.0](docs/release-notes/v2.2.0.md) · [v2.1.0](docs/release-notes/v2.1.0.md) · [v2.0.0](https://github.com/ZeroTrustPanda/ZTP-Policy-Wizard/releases/tag/v2.0.0) · Full history: [CHANGELOG.md](CHANGELOG.md)
+Release notes: [v2.3.0](docs/release-notes/v2.3.0.md) · [v2.2.0](docs/release-notes/v2.2.0.md) · [v2.1.0](docs/release-notes/v2.1.0.md) · [v2.0.0](https://github.com/ZeroTrustPanda/ZTP-Policy-Wizard/releases/tag/v2.0.0) · Full history: [CHANGELOG.md](CHANGELOG.md)
+
+## What's new in 2.3
+
+- **Guided POV:** Tenant readiness → Build the POV (ZIA / ZPA / ZDX) → Customer intake (name, generated prefix, internal domain, preset, baseline) → Client Connector → Internet Access → Private Access → Digital Experience → one dry run and apply. One step on screen at a time.
+- **Presets fill ZPA and ZDX:** a `*.domain` wildcard plus common apps (Active Directory, file shares, intranet, jump host) and each vertical's own apps; ZDX apps for the market segment (Healthcare, Financial services, General enterprise, Education).
+- **Licensing in readiness:** missing core licences (URL Filtering, Cloud App Control, SSL Inspection, ATP, Sandbox, DLP, Firewall, DNS, Client Connector, isolation…) are flagged as cautions; trials ending soon too.
+- **No global prefix bar** (it comes from the intake) and **one Bulk Rule Manager** for ZIA, ZPA and ZDX, above Policy Catalog.
 
 ## What's new in 2.2
 
@@ -315,6 +322,7 @@ The DLP module uses a **dictionary-first** approach:
 
 | Version | Changes |
 |---------|---------|
+| **2.3.0** | Guided POV (readiness → scope → intake → Client Connector → ZIA → ZPA → ZDX → one dry run and apply), presets fill ZPA (wildcard + common apps) and ZDX (market apps), Education preset, licensing cautions in readiness, prefix from the intake (no global prefix bar), one Bulk Rule Manager for ZIA / ZPA / ZDX. |
 | **2.2.0** | POV Start (readiness, intake presets, combined dry run / apply with live progress), POV Tests (runbook, prove it, DLP kit), Client Connector devices / one-time passwords / install builder, ZPA access policy, Browser Access and POV isolation profile, snapshot restore, drift check, field-level diffs, rate-limit countdowns, rule search, update check. |
 | **2.1.0** | Policies built into the templates for POV test cases: SSL catch-all last (below Zscaler exemptions) with TLS 1.2, DoH inspection, Zscaler Trusted Resolver, high-risk country firewall block, ZPA timeout / inspection / isolation policies and PRA consoles, ZCC tamper protection passwords, Teams / Zoom / Webex in ZDX. |
 | **2.0.0** | POV release built on the 2.0 requirements spec. Global prefix and a server-enforced dry run (Create / Update / No change), with re-runs that update instead of duplicating. Licensing detection, summary report. **ZIA:** scope screen, baseline frameworks, DLP Monitor / Block with custom dictionaries, Endpoint DLP, Sandbox Standard / Advanced, AI Prompt Capture, UCaaS, granular app-specific Cloud App Control, Isolate for Misc / Unknown. **ZCC:** live bypass list, VPN / IP / DNS lists, ZPA reauthentication, separate IPv6 switches. **ZPA:** new wizard with CSV bulk upload of application segments. **ZPA and ZDX** bulk managers. Live-tested end to end on a Zscaler tenant. |
