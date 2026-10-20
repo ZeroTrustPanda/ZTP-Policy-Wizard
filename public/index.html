@@ -89,7 +89,7 @@
     .auth-badge.connected .dot { background: var(--accent-green); }
     .auth-badge.disconnected .dot { background: var(--accent-red); }
 
-    .main { flex: 1; display: flex; }
+    .main { flex: 1; display: flex; min-width: 0; }
     .sidebar {
       width: 260px;
       background: var(--bg-secondary);
@@ -129,17 +129,21 @@
       background: var(--accent-green); border-color: var(--accent-green); color: white;
     }
 
-    .content { flex: 1; padding: 2rem 3rem; max-width: 960px; }
-    .content-wide { max-width: 1200px; }
+    /* v2.3.1: the content column fills the window (up to a readable maximum) and never pushes past it */
+    .content { flex: 1 1 auto; min-width: 0; padding: 2rem clamp(1rem, 3vw, 3rem); max-width: min(1280px, 100%); }
+    .content-wide { max-width: min(1440px, 100%); }
 
     /* Cards */
     .card {
       background: var(--bg-card);
       border: 1px solid var(--border);
       border-radius: var(--radius-lg);
-      padding: 1.5rem;
+      padding: clamp(1rem, 2vw, 1.5rem);
       margin-bottom: 1.5rem;
+      min-width: 0; max-width: 100%;
+      overflow-x: auto;
     }
+    .card .card { overflow-x: visible; }
     .card-header { margin-bottom: 1rem; }
     .card-header h2 { font-size: 20px; font-weight: 600; margin-bottom: 4px; }
     .card-header h3 { font-size: 16px; font-weight: 500; margin-bottom: 4px; }
@@ -282,8 +286,11 @@
     }
     .diff-table td {
       padding: 10px 12px; border-bottom: 1px solid var(--border);
-      vertical-align: top;
+      vertical-align: top; overflow-wrap: anywhere;
     }
+    .diff-table td input[type="text"], .diff-table td select { min-width: 0; padding: 6px 8px; }
+    .zpa-apps td { padding: 6px 6px; }
+    .zpa-apps th { padding: 8px 6px; }
     .diff-table tr:hover { background: var(--bg-card-hover); }
     .badge {
       display: inline-block; padding: 2px 8px; border-radius: 4px;
@@ -372,6 +379,19 @@
     .placeholder-banner h3 { color: var(--text-secondary); margin-bottom: 8px; }
 
     /* Responsive */
+    .header { flex-wrap: wrap; gap: 8px; }
+    .header-right { flex-wrap: wrap; }
+    img, svg, pre, code { max-width: 100%; }
+    pre { overflow-x: auto; }
+    .btn-group { flex-wrap: wrap; }
+    @media (max-width: 1200px) {
+      .sidebar { width: 220px; }
+      .diff-table th, .diff-table td { padding: 8px; }
+    }
+    @media (max-width: 760px) {
+      [style*="grid-template-columns"] { grid-template-columns: 1fr !important; }
+      .guide-pill { font-size: 11px; padding: 4px 8px; }
+    }
     @media (max-width: 900px) {
       .sidebar { display: none; }
       .content { padding: 1rem; }
@@ -1453,17 +1473,17 @@
               </div>
               {csvErrors.length > 0 && <div className="alert alert-danger" style={{display:'block'}} data-zpacsverrors>{csvErrors.map((e, i) => <div key={i}>✕ {e}</div>)}</div>}
               {apps.length > 0 && (
-                <table className="diff-table" data-zpaapps>
-                  <thead><tr><th>Application name</th><th>Destinations (FQDN, *.domain, IP, CIDR)</th><th>TCP ports</th><th>UDP ports</th><th>Settings</th><th></th></tr></thead>
+                <table className="diff-table zpa-apps" data-zpaapps>
+                  <thead><tr><th style={{width:'22%'}}>Application name</th><th style={{width:'32%'}}>Destinations (FQDN, *.domain, IP, CIDR)</th><th style={{width:'15%'}}>TCP ports</th><th style={{width:'12%'}}>UDP ports</th><th>Settings</th><th></th></tr></thead>
                   <tbody>
                     {apps.map((a, i) => (
                       <React.Fragment key={i}>
                         <tr data-zpaapp={a.name}>
-                          <td><input type="text" value={a.name} onChange={e => setApp(i, { name: e.target.value })} data-zpaedit="name" style={{minWidth:'150px', fontSize:'12px'}} />
+                          <td><input type="text" value={a.name} onChange={e => setApp(i, { name: e.target.value })} data-zpaedit="name" style={{width:'100%', fontSize:'12px'}} />
                             <div className="form-hint" style={{margin:'2px 0 0'}}><code>{segName(a.name || '…')}</code></div></td>
-                          <td><input type="text" value={destText(a.destinations)} onChange={e => setApp(i, { destinations: e.target.value })} data-zpaedit="destinations" placeholder="app.domain.com, 10.0.0.0/24" style={{minWidth:'200px', fontSize:'12px'}} /></td>
-                          <td><input type="text" value={a.tcpPorts || ''} onChange={e => setApp(i, { tcpPorts: e.target.value })} data-zpaedit="tcp" placeholder="443, 8000-8100" style={{width:'130px', fontSize:'12px'}} /></td>
-                          <td><input type="text" value={a.udpPorts || ''} onChange={e => setApp(i, { udpPorts: e.target.value })} data-zpaedit="udp" placeholder="—" style={{width:'110px', fontSize:'12px'}} /></td>
+                          <td><input type="text" value={destText(a.destinations)} onChange={e => setApp(i, { destinations: e.target.value })} data-zpaedit="destinations" placeholder="app.domain.com, 10.0.0.0/24" style={{width:'100%', fontSize:'12px'}} /></td>
+                          <td><input type="text" value={a.tcpPorts || ''} onChange={e => setApp(i, { tcpPorts: e.target.value })} data-zpaedit="tcp" placeholder="443, 8000-8100" style={{width:'100%', fontSize:'12px'}} /></td>
+                          <td><input type="text" value={a.udpPorts || ''} onChange={e => setApp(i, { udpPorts: e.target.value })} data-zpaedit="udp" placeholder="—" style={{width:'100%', fontSize:'12px'}} /></td>
                           <td style={{fontSize:'12px'}}>{Object.keys(a.settings || {}).length ? <span className="badge badge-update">{Object.keys(a.settings).length} custom</span> : 'Shared defaults'}</td>
                           <td style={{whiteSpace:'nowrap'}}>
                             <button className="btn btn-ghost btn-sm" onClick={() => setOpenApp(openApp === i ? null : i)} data-zpaappsettings={a.name}>{openApp === i ? 'Close' : 'Settings'}</button>
