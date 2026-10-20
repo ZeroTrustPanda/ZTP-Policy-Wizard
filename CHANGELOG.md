@@ -1,5 +1,47 @@
 # Changelog
 
+## v2.3.0 — 2026-10-20
+
+POV Start is now a guided flow, one step at a time.
+
+### Guided POV (POV Start)
+- **Steps, in order:** Tenant readiness → Build the POV → Customer intake → Client Connector → Internet Access → Private Access → Digital Experience → Dry run & apply.
+  - A stepper at the top shows where you are. Only one step is on screen at a time; earlier steps stay clickable and keep what you entered.
+  - Steps for products that are not in scope are left out.
+- **Build the POV:** pick what is in scope: Zscaler Internet Access, Zscaler Private Access and Zscaler Digital Experience. Client Connector is set up first whenever Internet Access or Private Access is in scope.
+- **Customer intake:** customer name, prefix, internal domain, preset and baseline policies.
+  - The prefix is generated from the customer name and can be edited.
+  - The internal domain is saved for Private Access.
+- **Client Connector:** the existing forwarding and app profile wizard, guided. The review step saves the profile for the final dry run. *Save and also set up macOS / Windows* covers both platforms; *Skip Client Connector* leaves it out.
+- **Internet Access:** the existing scope → baseline → rules flow, with the baseline from the intake preselected. All the rule toggles work as before.
+- **Private Access:** the existing ZPA wizard, pre-filled from the preset, with:
+  - a wildcard segment for `*.<internal domain>`
+  - common apps found in every vertical: Active Directory, file shares, intranet and a remote desktop jump host
+  - the vertical's own apps (Healthcare: Epic, Imprivata, PACS, Cerner).
+- **Digital Experience:** the existing ZDX wizard, pre-filled with apps for the market segment:
+  - Healthcare: UpToDate, Epic UserWeb, Doximity
+  - Financial services: Bloomberg, Workday, DocuSign
+  - General enterprise: Salesforce, Workday, DocuSign
+  - Education: Canvas, Google Classroom, PowerSchool
+  - Outlook Online is added for every segment, on top of the Microsoft Login, Teams, Zoom and Webex probes the template already includes.
+- **Dry run & apply:** one dry run starts automatically for everything the steps collected. One apply follows, with live progress. Each product has an *Edit* button that goes back to its step.
+- **New preset:** Education.
+
+### Tenant readiness: licensing
+- Checks the whole tenant's subscriptions against a fully licensed POV tenant.
+- **Missing core licences are cautions:**
+  - URL Filtering, Cloud App Control, SSL Inspection, Advanced Threat Protection, Antivirus
+  - Cloud Sandbox, web DLP, Cloud Firewall, DNS Security, Client Connector, Cloud Browser Isolation
+- **Missing optional licences are listed for information:**
+  - Advanced Cloud Firewall, IPS, CASB, Gen AI security, EDM / IDM, Bandwidth Control, Deception, log streaming, Z-API
+- Also flagged:
+  - subscriptions that end within 21 days
+  - ZPA tenants without AppProtection (inspection) or Privileged Remote Access
+
+### Navigation
+- **The global prefix bar is gone.** The prefix comes from the customer intake. Product modules show which prefix they use, and point to POV Start when there is none yet.
+- **Bulk Rule Manager** is one sidebar item above Policy Catalog, with tabs for ZIA, ZPA and ZDX. It replaces the per-product Bulk Manager sub-items.
+
 ## v2.2.0 — 2026-10-19
 
 Faster POV kick-off and more to show once the POV is running.

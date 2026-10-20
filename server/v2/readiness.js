@@ -4,6 +4,7 @@
  * One failing area never stops the others; the Client Connector check costs one ZCC call (rate-limited API).
  */
 'use strict';
+const { licenceChecks } = require('./licences');
 const list = (r) => (Array.isArray(r) ? r : (r && (r.list || r.items)) || []);
 
 async function safe(checks, area, name, fn) {
@@ -13,6 +14,7 @@ async function safe(checks, area, name, fn) {
 
 async function readiness({ client, zccClient, zdxClient, zpa, licensing }) {
   const checks = [];
+  let licenceSummary = null;
   // ---------- ZIA ----------
   await safe(checks, 'ZIA', 'Pending changes', async () => {
     const st = await client.apiCall('GET', '/api/v1/status');
@@ -41,9 +43,14 @@ async function readiness({ client, zccClient, zdxClient, zpa, licensing }) {
     return groups.length ? { status: 'pass', detail: `${groups.length >= 100 ? '100+' : groups.length} group(s) synced from the identity provider.` }
       : { status: 'warn', detail: 'No user groups yet.', fix: 'Connect the identity provider (SAML/SCIM) in ZIdentity so users can sign in to Client Connector.' };
   });
-  if (licensing && licensing.items) {
-    const off = Object.entries(licensing.items).filter(([, v]) => v.licensed === false).map(([k]) => k);
-    checks.push({ area: 'ZIA', name: 'Licensing', status: off.length ? 'info' : 'pass', detail: off.length ? `Not licensed (greyed out in the wizard): ${off.join(', ')}` : 'Every wizard area is licensed.' });
+  // ---------- Licensing (v2.3: whole tenant, compared with a fully licensed POV tenant) ----------
+  {
+    let raw = null, zpaCustomer = null;
+    try { raw = await client.apiCall('GET', '/api/v1/subscriptions'); } catch (e) { raw = null; }
+    if (zpa) { try { zpaCustomer = await zpa.apiCall('GET', await zpa.base()); } catch (e) { zpaCustomer = null; } }
+    const lic = licenceChecks(raw, { zpaCustomer });
+    checks.push(...lic.checks);
+    licenceSummary = lic.summary;
   }
 
   // ---------- ZPA ----------
@@ -87,7 +94,7 @@ async function readiness({ client, zccClient, zdxClient, zpa, licensing }) {
   });
 
   const counts = checks.reduce((c, x) => { c[x.status] = (c[x.status] || 0) + 1; return c; }, {});
-  return { checks, counts, at: new Date().toISOString() };
+  return { checks, counts, licences: licenceSummary, at: new Date().toISOString() };
 }
 
 module.exports = { readiness };
