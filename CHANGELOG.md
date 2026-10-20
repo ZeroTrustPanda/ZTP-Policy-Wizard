@@ -1,215 +1,100 @@
 # Changelog
 
-## v2.3.1 — 2026-10-20
+## v2.0.0 → v2.3.1 — 2026-10-19 to 2026-10-20
 
-### Private Access
-- **Editable application table:** each row in the ZPA application table now has editable fields for:
-  - the application name
-  - destinations (FQDN, `*.domain`, IP or CIDR)
-  - TCP ports
-  - UDP ports
-- This applies to applications from a preset and from an uploaded CSV. The segment name updates as you type, and mistakes are flagged immediately and block *Next* until fixed.
-- **+ Add application** adds a row by hand.
+Release notes for the whole 2.x line: [docs/release-notes/v2.3.1.md](docs/release-notes/v2.3.1.md).
 
-### Layout
-- **The interface fits the window at any size.**
-  - The content column uses the available width, up to a readable maximum.
+### 2.3.1
+- **Private Access:** the application name, destinations and TCP / UDP ports are editable in the ZPA table, for preset apps and CSV uploads. Validation runs as you type. **+ Add application** adds a row by hand.
+- **Layout:** the interface adapts to the window size:
+  - The content column fills the window.
   - Wide tables scroll inside their card instead of spilling past it.
   - The ZPA table's fields shrink to fit.
-  - Side-by-side form fields stack on narrow windows.
+  - Fields stack on narrow windows.
+  - Checked at 1024, 1366 and 1920 px.
 
-## v2.3.0 — 2026-10-20
+### 2.3.0
+- **Guided POV:** Tenant readiness → Build the POV (ZIA / ZPA / ZDX) → Customer intake → Client Connector → Internet Access → Private Access → Digital Experience → one dry run and apply. The existing wizards run in guided mode.
+- **Customer intake:** name, prefix (generated from the name, editable), internal domain (saved for ZPA), preset and baseline. The global prefix bar has been removed.
+- **Presets:**
+  - ZPA gets a `*.domain` wildcard plus Active Directory, file shares, intranet and an RDP jump host, then the vertical's apps.
+  - ZDX gets apps for the market segment, plus Outlook Online.
+  - New Education preset.
+- **Licensing:** the whole tenant is compared with a fully licensed POV tenant.
+  - Missing core licences are cautions; optional ones are info.
+  - Trials ending within 21 days are flagged.
+  - ZPA AppProtection / PRA flags are checked.
+- **One Bulk Rule Manager** for ZIA, ZPA and ZDX, above Policy Catalog.
 
-POV Start is now a guided flow, one step at a time.
+### 2.2.0
+- **POV Start:**
+  - Tenant readiness.
+  - Customer intake with presets.
+  - One dry run / one apply across the products in scope.
+  - Live progress.
+- **POV Tests:** a runbook with Pass / Fail / Skip, *Prove it* for URLs, and a synthetic DLP test kit.
+- **Client Connector:** a Devices & Install page with one-time passwords and the Deployment Toolkit install builder (MSI / EXE / macOS parameters, `.bat` / `.command` scripts).
+- **Private Access:**
+  - access policy for everyone
+  - Browser Access
+  - POV isolation profile (copy / paste, upload / download, printing, watermark).
+- **Restore & Drift:** snapshots of every ZIA / ZPA apply, restore after a dry run, and a drift check with before / after values.
+- **Also:** field-level differences in dry runs, rate-limit countdowns with automatic retry, rule search / filter / shortcuts, and an update badge.
 
-### Guided POV (POV Start)
-- **Steps, in order:** Tenant readiness → Build the POV → Customer intake → Client Connector → Internet Access → Private Access → Digital Experience → Dry run & apply.
-  - A stepper at the top shows where you are. Only one step is on screen at a time; earlier steps stay clickable and keep what you entered.
-  - Steps for products that are not in scope are left out.
-- **Build the POV:** pick what is in scope: Zscaler Internet Access, Zscaler Private Access and Zscaler Digital Experience. Client Connector is set up first whenever Internet Access or Private Access is in scope.
-- **Customer intake:** customer name, prefix, internal domain, preset and baseline policies.
-  - The prefix is generated from the customer name and can be edited.
-  - The internal domain is saved for Private Access.
-- **Client Connector:** the existing forwarding and app profile wizard, guided. The review step saves the profile for the final dry run. *Save and also set up macOS / Windows* covers both platforms; *Skip Client Connector* leaves it out.
-- **Internet Access:** the existing scope → baseline → rules flow, with the baseline from the intake preselected. All the rule toggles work as before.
-- **Private Access:** the existing ZPA wizard, pre-filled from the preset, with:
-  - a wildcard segment for `*.<internal domain>`
-  - common apps found in every vertical: Active Directory, file shares, intranet and a remote desktop jump host
-  - the vertical's own apps (Healthcare: Epic, Imprivata, PACS, Cerner).
-- **Digital Experience:** the existing ZDX wizard, pre-filled with apps for the market segment:
-  - Healthcare: UpToDate, Epic UserWeb, Doximity
-  - Financial services: Bloomberg, Workday, DocuSign
-  - General enterprise: Salesforce, Workday, DocuSign
-  - Education: Canvas, Google Classroom, PowerSchool
-  - Outlook Online is added for every segment, on top of the Microsoft Login, Teams, Zoom and Webex probes the template already includes.
-- **Dry run & apply:** one dry run starts automatically for everything the steps collected. One apply follows, with live progress. Each product has an *Edit* button that goes back to its step.
-- **New preset:** Education.
-
-### Tenant readiness: licensing
-- Checks the whole tenant's subscriptions against a fully licensed POV tenant.
-- **Missing core licences are cautions:**
-  - URL Filtering, Cloud App Control, SSL Inspection, Advanced Threat Protection, Antivirus
-  - Cloud Sandbox, web DLP, Cloud Firewall, DNS Security, Client Connector, Cloud Browser Isolation
-- **Missing optional licences are listed for information:**
-  - Advanced Cloud Firewall, IPS, CASB, Gen AI security, EDM / IDM, Bandwidth Control, Deception, log streaming, Z-API
-- Also flagged:
-  - subscriptions that end within 21 days
-  - ZPA tenants without AppProtection (inspection) or Privileged Remote Access
-
-### Navigation
-- **The global prefix bar is gone.** The prefix comes from the customer intake. Product modules show which prefix they use, and point to POV Start when there is none yet.
-- **Bulk Rule Manager** is one sidebar item above Policy Catalog, with tabs for ZIA, ZPA and ZDX. It replaces the per-product Bulk Manager sub-items.
-
-## v2.2.0 — 2026-10-19
-
-Faster POV kick-off and more to show once the POV is running.
-
-### POV Start (new, first page after sign-in)
-- **Tenant readiness:** read-only checks right after sign-in, so blockers show up before the customer sees them:
-  - ZIA pending changes, SSL rules placed above *Zscaler Recommended Exemptions*, isolation profiles, the Zscaler Trusted Resolver, identity-provider groups and licensing.
-  - ZPA App Connectors online, PRA portal, web certificates and ZPA isolation profiles.
-  - Client Connector enrolled devices and ZDX reachability.
-- **Customer intake:** customer name, internal domain, preset (Healthcare, General enterprise, Financial services, or empty), VPN gateways, private applications and ZDX web apps.
-  - The Healthcare preset fills Epic Hyperspace and Interconnect, Imprivata, PACS, Cerner and the intranet for the customer's domain, with HIPAA as the baseline.
-  - The prefix is suggested from the customer name.
-- **One dry run, one apply** across the products in scope:
-  - Product toggles: Client Connector (Windows, macOS), Internet Access, Private Access, Digital Experience.
-  - Runs in order: Client Connector → Internet Access → Private Access → ZDX.
-  - A product whose dry run fails is skipped; the others still apply.
-- **Live progress:** each object appears as it is created or updated, instead of a spinner until the end.
-
-### POV Tests (new)
-- **Runbook:** one test for each policy created in this session, covering about 25 policy areas. Each test has its steps, the expected result and Pass / Fail / Skip with a note. Results go into the summary report, and the runbook downloads as Markdown.
-- **Prove it:** for a URL, shows its categories and the first URL Filtering rule that matches, plus the Z-Insights totals for the last hour.
-  - API clients can't read individual log lines (Zscaler refuses client-credential tokens for that), so the page points to Web Insights › Logs for the exact transaction.
-- **DLP test kit:** three synthetic, clearly labelled files:
-  - PHI with MRN, Medicare MBI and ICD-10 codes.
-  - Card-network test card numbers.
-  - Social Security numbers.
-
-### Client Connector
-- **Devices & Install** (new page):
-  - Lists enrolled devices and issues **one-time passwords** per device. One-time passwords are shown on screen only and never logged.
-  - The **install builder** comes from the ZTP Deployment Toolkit's Client Connector installer. It covers every documented MSI, EXE and macOS parameter with validation (cloud name, strict enforcement requirements, Business Continuity pairs and more).
-  - The policy token is picked from the tenant's app profiles.
-  - It builds the masked command and a ready-to-run script: `.bat` for Windows, `.command` for macOS.
-
-### Private Access
-- **Access policy** for everyone signed in to ZPA, covering the wizard's segments, Browser Access and PRA apps. It's on by default, so the first call works end to end.
-- **Browser Access** (optional): publish one internal web app with no client, using a web certificate picked from the tenant. The wizard warns when the certificate does not cover the domain.
-- **POV isolation profile:** copy / paste, upload / download, printing and watermark, set in the wizard and used by the ZPA isolation policy. It is created through the Cloud Browser Isolation API and appears as a ZPA isolation profile.
-
-### Refining the process
-- **Restore:** every ZIA and ZPA apply saves a snapshot of what it changed (no secrets) next to the logs. Restore deletes what the run created and puts back what it updated, newest first, then activates ZIA. A dry run is required first.
-- **Drift check:** re-plans the last applied runs and lists anything changed or deleted since, with before / after values.
-- **Field-level differences:** dry runs show the old and new value for every changed field, not just the field name.
-- **Client Connector / ZDX rate limits:** about 100 calls per hour are counted and shown. When Zscaler asks the wizard to wait, a countdown appears and POV Start retries the step on its own.
-
-### Interface
-- **Rule review:** search, *Changed from default* filter, Expand all / Collapse all, and keyboard shortcuts (`/` search, `E` expand, `C` collapse, `Esc` clear).
-- **Update check:** a badge in the header when a newer version is on GitHub.
-
-## v2.1.0 — 2026-10-19
-
-More policies are built into the existing templates, so each one can be shown during a POV. They are ordinary template rules, on by default like the others, with plain names and descriptions.
-
-### Zscaler Internet Access
-- **SSL inspection order:** the catch-all rule that inspects all remaining traffic (Strict *Inspect-All*, Balanced *Inspect-Remaining*, Zero Trust Hospital *Catch-All*, Permissive *No-Inspection*) is now always placed **last**, below Zscaler's predefined rules. Before, it could land above *Zscaler Recommended Exemptions* and override it. A catch-all left in the wrong place by an earlier run is moved to the bottom on the next run, and the dry run shows the move. The bypass rules (Health, Finance) still go right after the predefined rules.
-- **Minimum TLS 1.2** on the inspect-remaining rule (Strict and Balanced; Zero Trust Hospital already had it).
-- **DNS over HTTPS is inspected** (`<prefix>-DNS-DoH-Block-Risky`): DoH lookups of newly registered or revived domains, dynamic DNS and spyware domains are blocked. Other DoH lookups resolve and are logged, so 1.1.1.1/help still works. The Cloud App Control *Block-DoH* rule is now off by default; turn it on to block DoH apps outright instead.
-- **DNS resolver control** (`<prefix>-DNS-Trusted-Resolver`): DNS sent to any resolver (for example 8.8.8.8) is answered by the Zscaler Trusted Resolver. The ZPA resolver rules above it still apply. This rule can't be flipped to Block by the Allow / Block all buttons.
-- **High-risk countries** (`<prefix>-FW-Geo-Block-Out` / `-In`): SSH, RDP and FTP to and from China, Russia, North Korea and Iran are dropped. These rules sit above the rule that allows SSH and RDP.
-- Cloud Sandbox *Office / PDF* keeps **Quarantine & Isolate** with the tenant's isolation profile (confirmed live). The report now reminds you to set copy/paste, upload/download and watermark controls in that isolation profile.
-
-### Zscaler Private Access
-New, on by default for the wizard's application segment(s), wildcard or bulk:
-- **Timeout policy** (`<prefix>-timeout-policy`): re-authenticate every 8 hours, or after 1 hour idle.
-- **AppProtection inspection:** an OWASP Core Rule Set profile (`<prefix>-inspection-profile`, paranoia level 1, all predefined controls) and an INSPECT rule (`<prefix>-inspection-policy`).
-- **Browser isolation** (`<prefix>-isolation-policy`): Browser Access users get an isolated session, using the tenant's default ZPA isolation profile.
-- **Privileged Remote Access (optional):** enter an RDP and/or SSH server. The wizard creates the PRA application (`<prefix>-pra-rdp` / `-pra-ssh`) and a console in the tenant's existing PRA portal. When the tenant has no portal, creating one (domain and certificate) is listed as a manual step.
-- The ZPA bulk manager also lists and deletes these policy rules, the inspection profile and the PRA consoles, in dependency order.
-
-### Zscaler Client Connector
-- **Tamper protection passwords** (Windows and macOS Best Practice): one password protects logout, exit and uninstall, and turning off ZIA, ZPA or ZDX. The wizard generates it in your browser (masked, with Show / Copy / Generate new). It is checked on read-back and listed in the summary report, which is then marked sensitive. It is never written to logs. The report also explains how to issue one-time passwords per device.
-
-### Zscaler Digital Experience
-- The **Zscaler POV Best Practice** template adds Microsoft Teams, Zoom and Webex. Zoom and Webex need the customer's account prefix; left blank, they are skipped with a note instead of failing the run.
-
-## v2.0.0 — 2026-10-19
-
-Implements the *Policy Wizard 2.0 Requirements Specification* plus the review feedback below. Live-tested end to end on a Zscaler tenant (ZIA, ZCC Windows and macOS, ZPA): every run creates, re-runs, updates and cleans up its objects.
-
-### Everywhere
-- **Global prefix** (GLB-02): set once after sign-in, it names every object the wizard creates. Running again with the same prefix **updates** objects instead of duplicating them, across ZIA, ZCC and ZPA (GLB-05).
-- **Mandatory dry run** (GLB-03): the server refuses an apply that doesn't match a dry run of exactly the same choices. Each object is listed as Create / Update / No change, and the apply does exactly that.
-- **Automatic ZIA activation** (GLB-04). One failed object never stops the rest: failures are listed with their reason, and anything that depends on them is skipped.
-- **Licensing detection** (GLB-08): features the tenant isn't licensed for are greyed out.
-- **Summary report** (GLB-07): Markdown and printable HTML, marked *sensitive* when it holds a ZPA provisioning key.
-- **No secrets in logs** (GLB-09): request bodies are redacted, and the provisioning key is never logged.
-- **Sidebar in POV order:** Zscaler Client Connector → Zscaler Internet Access → Zscaler Private Access → Zscaler Digital Experience → Summary Report.
-
-### Zscaler Internet Access
-- Renamed from "ZIA POV Policy Wizard" to **Zscaler Internet Access**.
-- **Scope screen** (§1), then a **Baseline Framework** step (§2):
-  - Compliance baselines: HIPAA, HITRUST, NIST 800-53, NIST 800-171, PCI DSS, CJIS, SOX, FERPA, GDPR.
-  - Non-mapped baselines: Strict, Balanced, Permissive, Zero Trust Hospital.
-  - Each framework is a data file with cited sources.
-- **Rule review:** Select / Deselect all and Allow / Block all, per category and for the whole page. Isolate is available for URL rules. Choices persist across Back / Next. Selections can be saved and loaded.
-- **New policy areas:**
-  - **Inline DLP Monitor:** Zscaler's predefined engines.
-  - **Inline DLP Block:** custom dictionaries (ICD-10, MBI, MRN and others, with cited sources) and custom engines.
-  - **Endpoint DLP:** USB, personal cloud storage and printing.
-  - **Cloud Sandbox:** Standard and Advanced tiers. AI Instant Verdict on every Advanced rule.
-  - **AI Prompt Capture:** 14 GenAI apps.
-  - **ATP defaults.**
-- **UCaaS:** Zoom, GoTo, RingCentral, Webex and Talkdesk are their own settings group, enabled on every Zscaler Internet Access run and shown on the rule review page.
-- **Granular Cloud App Control:** app-specific rules sit above the category-wide rules, with app IDs and actions read live from the tenant:
-  - Google Drive, Dropbox and Box: view-only.
-  - Facebook and X: view but no posting.
-  - LinkedIn: read-only.
-  - ChatGPT, Gemini and Copilot: allowed, but no file uploads.
-  - Slack: chat but no file uploads.
-  If a tenant refuses the first action set, the wizard uses a fallback set, and re-runs accept either.
-- **Isolate Miscellaneous / Unknown:** a URL rule opens these categories in Cloud Browser Isolation with the tenant's profile, and falls back to Caution when the tenant has none. Those categories were removed from the Security-Risk block rule.
-- **Cloud Sandbox file types:** groups list only types the sandbox accepts. JavaScript, IMG, LNK, GZIP, text, CSV and image types are rejected by ZIA for sandbox rules, and DMG needs Sandbox macOS.
-
-### Zscaler Client Connector
-- The predefined IP-based bypass apps are read live and shown directly under the *Bypass IP-based Applications* switch, behind a warning.
-- New inputs for **VPN Gateway Bypasses, IP Inclusions / Exclusions and DNS Inclusions / Exclusions**, validated before anything is sent. IP lists take an IP address or CIDR only.
-- **ZPA reauthentication** is on by default, stored in `policyExtension` on Windows and macOS.
-- **Two IPv6 switches** in the forwarding profile: *Drop IPv6 Traffic (dual-stack networks)* and *Drop IPv6 Traffic in IPv6-only networks*.
-- Same-name profiles are updated in place; customer profiles and Default are never overwritten.
-
-### Zscaler Private Access (new)
-- **Wizard:** App Connector Group (San Jose, CA) → Provisioning Key (max 5; masked, with reveal and copy) → Segment Group → Server Group (dynamic discovery) → Application Segment, with the recommended defaults.
-- **CSV bulk upload of application segments** (optional): columns Application Name, Destinations, Ports. Separate several values with `;`, and write UDP ports as `udp:53`. The screen offers a template download, per-application settings overrides and row-numbered validation. Each application becomes `<prefix>-<name>`, in place of the wildcard segment.
-- **Bulk Manager:** deletes prefixed objects in dependency order.
-
-### Zscaler Digital Experience
-- **Bulk Manager** for prefixed custom apps and collections.
-
-### Standalone builds
-- Windows x64, macOS Apple silicon and macOS Intel. Logs go to `ZTP-Wizard/logs` in the home folder.
-
-### Found and fixed during live testing
+### 2.1.0
 - **ZIA:**
-  - The ZIA API session can end before the OAuth token does (403 "Resource Access Blocked"); the client signs in again and retries.
-  - A failed rule create gives back its rule order, so later rules don't fail with "not allowed at order N".
-  - A timed-out GET or PUT is retried once.
-  - Descriptions are clamped to 255 bytes (DLP dictionaries).
-  - Cloud App Control: Caution needs browsers named. Category-wide rules accept web-use actions only.
-- **ZCC:**
-  - A domain name in an IP list makes ZCC reject the whole app profile. The dry run now refuses it; this deviates from ZCC-08.
-  - Re-runs compare bypass apps with the apps that were picked, so they report No change.
-  - The Mobile Admin page could show a render error when the bypass-app list arrived early.
-  - Long rate-limit waits are capped with a clear message (about 100 calls per hour for ZCC and ZDX).
+  - The SSL inspect-remaining rule is always last (below *Zscaler Recommended Exemptions*) with TLS 1.2 minimum.
+  - DoH is inspected, with risky lookups blocked.
+  - DNS goes to the Zscaler Trusted Resolver.
+  - SSH / RDP / FTP to and from high-risk countries is dropped.
 - **ZPA:**
-  - Continuous health checks aren't allowed on subnet destinations; the dry run refuses them.
-  - Re-runs no longer report a false update.
-- **Standalone:** the first Mac build crashed at start because it tried to create the build machine's log folder.
+  - timeout policy
+  - AppProtection inspection (OWASP CRS, tenant's current version)
+  - browser isolation policy
+  - optional PRA RDP / SSH consoles.
+- **Client Connector:** a tamper protection password for logout, exit, uninstall and turning off ZIA / ZPA / ZDX.
+- **ZDX:** Teams, Zoom and Webex in the POV template (Zoom / Webex are skipped without a prefix).
 
-### Not live-tested
-- Endpoint DLP rule creation. The test tenant isn't licensed, and the wizard correctly reports it as not licensed.
+### 2.0.0
+- **Everywhere:**
+  - A global prefix, with update-in-place re-runs.
+  - A mandatory dry run (Create / Update / No change); an apply that doesn't match it is refused.
+  - Automatic ZIA activation.
+  - Licensing read from the tenant.
+  - A summary report.
+- **ZIA:**
+  - Scope → Baseline Framework (9 compliance frameworks or Strict / Balanced / Permissive / Zero Trust Hospital) → Rules → Dry run → Apply.
+  - DLP Monitor / Block with custom dictionaries, Endpoint DLP, Sandbox Standard / Advanced, AI Prompt Capture and UCaaS.
+  - Granular Cloud App Control.
+  - Isolate for Miscellaneous / Unknown.
+  - ATP defaults.
+- **Client Connector:**
+  - Predefined bypass apps read live.
+  - VPN / IP / DNS lists validated.
+  - ZPA reauthentication on.
+  - Two IPv6 switches.
+- **ZPA (new):** a wizard creating the connector group, provisioning key, segment and server groups, and application segment(s). Optional CSV bulk upload.
+- **Bulk managers** for ZPA and ZDX.
+- **Standalone builds** for Windows x64, macOS Apple silicon and macOS Intel.
+
+### Fixed during live testing (2.x)
+- **ZIA:**
+  - ZIA API sessions that end before the token are renewed.
+  - A failed rule gives back its order.
+  - Timed-out reads and writes are retried once.
+  - Descriptions are clamped to 255 bytes.
+  - Cloud App Control actions and Cloud Sandbox file types match what ZIA accepts.
+  - DNS gateway redirects use `REDIR_REQ_KEEP_SENDER`.
+- **ZCC:**
+  - A domain in an IP list is refused in the dry run.
+  - Re-runs report No change correctly.
+  - Rate-limit waits are capped with a clear message.
+- **ZPA:**
+  - Subnet + Continuous health checks are refused in the dry run.
+  - Policy rules are read through `/policySet/rules/policyType/…` (no duplicates on re-run).
+  - Inspection profiles use the tenant's current OWASP version.
+  - Isolation profiles are created through the Cloud Browser Isolation API.
+- **Standalone:** the first Mac build crashed at start because of the build machine's log folder.
 
 ## v1.9.0 — 2026-10-14
 
