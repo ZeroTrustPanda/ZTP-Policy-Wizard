@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ZeroTrustPanda ZS Policy Wizard v2.3.0 - Zscaler Template Policy Configuration</title>
+  <title>ZeroTrustPanda ZS Policy Wizard v2.3.1 - Zscaler Template Policy Configuration</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
   <style>
@@ -511,7 +511,7 @@
     // ========================
     // App Version
     // ========================
-    const APP_VERSION = '2.3.0';
+    const APP_VERSION = '2.3.1';
     const BUILD_DATE = '2026-03-30';
 
     // ========================
@@ -861,6 +861,7 @@
                     <p>HIPAA, HITRUST CSF, NIST 800-53, NIST 800-171, PCI-DSS, CJIS, SOX, FERPA, GDPR</p>
                     <h3 style={{fontSize:'15px', color:'var(--accent-cyan)', margin:'1.5rem 0 0.5rem'}}>Version History</h3>
                     <div style={{paddingLeft:'1rem', fontSize:'12px'}}>
+                      <div><strong>v2.3.1</strong> — Private Access: application name, destinations and TCP / UDP ports are editable in the table, plus + Add application.</div>
                       <div><strong>v2.3.0</strong> — Guided POV on POV Start: readiness → Build the POV (ZIA / ZPA / ZDX) → customer intake (name, generated prefix, internal domain, preset, baseline) → Client Connector → Internet Access → Private Access → Digital Experience → one dry run and apply. Presets fill ZPA with a *.domain wildcard and common apps, and ZDX with apps for the market; Education preset. Readiness flags missing core licences. The prefix comes from the intake (no global prefix bar). One Bulk Rule Manager for ZIA, ZPA and ZDX.</div>
                       <div><strong>v2.2.0</strong> — POV Start (tenant readiness, customer intake with a Healthcare preset, one dry run and one apply across the products you toggle on, live progress); POV Tests (runbook with Pass / Fail, prove it, DLP test kit); Client Connector devices, one-time passwords and the install builder from the Deployment Toolkit; ZPA access policy, Browser Access and POV isolation profile; restore from snapshots and drift check; field-level differences; rate-limit countdowns; rule search and shortcuts; update check.</div>
                       <div><strong>v2.1.0</strong> — More policies built into the templates, so each one can be shown during a POV: SSL inspect-remaining always last (below Zscaler Recommended Exemptions) with TLS 1.2 minimum; DNS over HTTPS inspected; DNS sent to the Zscaler Trusted Resolver; SSH / RDP / FTP dropped to and from high-risk countries; ZPA timeout, AppProtection inspection and isolation policies; Privileged Remote Access RDP / SSH consoles; Client Connector tamper protection passwords; Teams, Zoom and Webex in the ZDX template.</div>
@@ -1380,10 +1381,10 @@
       useEffect(() => { setPlan(null); setConfirmed(false); }, [JSON.stringify([form, settings, bulk, apps, policies, pra, iso, ba])]);
       useEffect(() => {
         if (bulk && !apps.length) { setErrors([]); return; }
-        const t = setTimeout(() => api.call('POST', '/v2/zpa/validate', bulk ? { apps, settings, pra, browserAccess: ba } : { domains: form.domains, tcpPorts: form.tcpPorts, udpPorts: form.udpPorts, settings, pra, browserAccess: ba }).then(r => setErrors(r.errors)).catch(() => {}), 250);
+        const t = setTimeout(() => api.call('POST', '/v2/zpa/validate', bulk ? { apps: apps.map(a => ({ ...a, destinations: destList(a.destinations) })), settings, pra, browserAccess: ba } : { domains: form.domains, tcpPorts: form.tcpPorts, udpPorts: form.udpPorts, settings, pra, browserAccess: ba }).then(r => setErrors(r.errors)).catch(() => {}), 250);
         return () => clearTimeout(t);
       }, [form.domains, form.tcpPorts, form.udpPorts, settings.healthReporting, bulk, JSON.stringify(apps), pra.rdpHost, pra.sshHost, ba.domain, ba.port]);
-      const body = () => ({ prefix, ...(bulk ? { apps } : { domains: form.domains, tcpPorts: form.tcpPorts, udpPorts: form.udpPorts }), settings, connectorGroupId: form.connectorGroupId || null, descriptions: form.descriptions, policies, pra,
+      const body = () => ({ prefix, ...(bulk ? { apps: apps.map(a => ({ ...a, destinations: destList(a.destinations) })) } : { domains: form.domains, tcpPorts: form.tcpPorts, udpPorts: form.udpPorts }), settings, connectorGroupId: form.connectorGroupId || null, descriptions: form.descriptions, policies, pra,
         isolationProfile: policies.isolation ? iso : { ...iso, enabled: false }, browserAccess: ba.domain.trim() ? ba : {} });
       const downloadTemplate = () => {
         const blob = new Blob([meta.copy.zpa.bulkTemplate], { type: 'text/csv' });
@@ -1400,6 +1401,11 @@
       };
       const segName = (name) => `${prefix}-${String(name).trim().replace(/\s+/g, '-')}`;
       const appSettings = (a) => ({ ...settings, ...(a.settings || {}) });
+      // v2.3.1: name, destinations and ports are editable in the table (destinations kept as typed, split when sent)
+      const destText = (d) => Array.isArray(d) ? d.join(', ') : String(d || '');
+      const destList = (d) => Array.isArray(d) ? d : String(d || '').split(/[,;\s]+/).map(x => x.trim()).filter(Boolean);
+      const setApp = (i, patch) => setApps(apps.map((a, j) => j === i ? { ...a, ...patch } : a));
+      const addApp = () => { setApps([...apps, { name: '', destinations: '', tcpPorts: '443', udpPorts: '', settings: {} }]); };
       const setAppSettings = (i, v) => setApps(apps.map((a, j) => j === i ? { ...a, settings: Object.fromEntries(Object.entries(v).filter(([k, val]) => settings[k] !== val)) } : a));
       const dry = async () => { setBusy(true); setError(null); try { setPlan(await api.call('POST', '/v2/zpa/plan', body())); setConfirmed(false); } catch (e) { setError(e.message); } setBusy(false); };
       const apply = async () => { setBusy(true); setError(null); try { setResult(await api.call('POST', '/v2/zpa/apply', { ...body(), planId: plan.planId })); } catch (e) { setError(e.message); } setBusy(false); };
@@ -1448,15 +1454,16 @@
               {csvErrors.length > 0 && <div className="alert alert-danger" style={{display:'block'}} data-zpacsverrors>{csvErrors.map((e, i) => <div key={i}>✕ {e}</div>)}</div>}
               {apps.length > 0 && (
                 <table className="diff-table" data-zpaapps>
-                  <thead><tr><th>Application segment</th><th>Destinations</th><th>TCP</th><th>UDP</th><th>Settings</th><th></th></tr></thead>
+                  <thead><tr><th>Application name</th><th>Destinations (FQDN, *.domain, IP, CIDR)</th><th>TCP ports</th><th>UDP ports</th><th>Settings</th><th></th></tr></thead>
                   <tbody>
                     {apps.map((a, i) => (
                       <React.Fragment key={i}>
                         <tr data-zpaapp={a.name}>
-                          <td><code>{segName(a.name)}</code></td>
-                          <td style={{fontSize:'12px'}}>{(a.destinations || []).join(', ')}</td>
-                          <td style={{fontSize:'12px'}}>{a.tcpPorts || '—'}</td>
-                          <td style={{fontSize:'12px'}}>{a.udpPorts || '—'}</td>
+                          <td><input type="text" value={a.name} onChange={e => setApp(i, { name: e.target.value })} data-zpaedit="name" style={{minWidth:'150px', fontSize:'12px'}} />
+                            <div className="form-hint" style={{margin:'2px 0 0'}}><code>{segName(a.name || '…')}</code></div></td>
+                          <td><input type="text" value={destText(a.destinations)} onChange={e => setApp(i, { destinations: e.target.value })} data-zpaedit="destinations" placeholder="app.domain.com, 10.0.0.0/24" style={{minWidth:'200px', fontSize:'12px'}} /></td>
+                          <td><input type="text" value={a.tcpPorts || ''} onChange={e => setApp(i, { tcpPorts: e.target.value })} data-zpaedit="tcp" placeholder="443, 8000-8100" style={{width:'130px', fontSize:'12px'}} /></td>
+                          <td><input type="text" value={a.udpPorts || ''} onChange={e => setApp(i, { udpPorts: e.target.value })} data-zpaedit="udp" placeholder="—" style={{width:'110px', fontSize:'12px'}} /></td>
                           <td style={{fontSize:'12px'}}>{Object.keys(a.settings || {}).length ? <span className="badge badge-update">{Object.keys(a.settings).length} custom</span> : 'Shared defaults'}</td>
                           <td style={{whiteSpace:'nowrap'}}>
                             <button className="btn btn-ghost btn-sm" onClick={() => setOpenApp(openApp === i ? null : i)} data-zpaappsettings={a.name}>{openApp === i ? 'Close' : 'Settings'}</button>
@@ -1475,6 +1482,7 @@
                   </tbody>
                 </table>
               )}
+              <button className="btn btn-ghost btn-sm" style={{marginTop:'6px'}} onClick={addApp} data-zpaaddapp>+ Add application</button>
             </div>
           ) : (<>
           <div className="form-group">

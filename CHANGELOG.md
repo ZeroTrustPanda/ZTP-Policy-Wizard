@@ -1,5 +1,16 @@
 # Changelog
 
+## v2.3.1 — 2026-10-20
+
+### Private Access
+- **Editable application table:** each row in the ZPA application table now has editable fields for:
+  - the application name
+  - destinations (FQDN, `*.domain`, IP or CIDR)
+  - TCP ports
+  - UDP ports
+- This applies to applications from a preset and from an uploaded CSV. The segment name updates as you type, and mistakes are flagged immediately and block *Next* until fixed.
+- **+ Add application** adds a row by hand.
+
 ## v2.3.0 — 2026-10-20
 
 POV Start is now a guided flow, one step at a time.

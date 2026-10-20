@@ -1,18 +1,18 @@
-# 🐼 ZeroTrustPanda — ZTP Policy Wizard v2.3.0
+# 🐼 ZeroTrustPanda — ZTP Policy Wizard v2.3.1
 
 Proof-of-value automation for Zscaler SEs: Zscaler Internet Access (ZIA), Zscaler Client Connector (ZCC), Zscaler Private Access (ZPA) and Zscaler Digital Experience (ZDX), all with one set of OneAPI (ZIdentity) client credentials.
 
-## ⬇️ Download v2.3.0 (nothing to install)
+## ⬇️ Download v2.3.1 (nothing to install)
 
 | Computer | Download (click to download) |
 |---|---|
-| **Mac with Apple silicon (M1–M4)** | [**ZTP-Wizard-2.3.0-macos-arm64.zip**](https://github.com/ZeroTrustPanda/ZTP-Policy-Wizard/raw/standalone/standalone/release/ZTP-Wizard-2.3.0-macos-arm64.zip) |
-| Windows 10/11 (64-bit) | [ZTP-Wizard-2.3.0-windows-x64.zip](https://github.com/ZeroTrustPanda/ZTP-Policy-Wizard/raw/standalone/standalone/release/ZTP-Wizard-2.3.0-windows-x64.zip) |
-| Intel Mac | [ZTP-Wizard-2.3.0-macos-x64.zip](https://github.com/ZeroTrustPanda/ZTP-Policy-Wizard/raw/standalone/standalone/release/ZTP-Wizard-2.3.0-macos-x64.zip) |
+| **Mac with Apple silicon (M1–M4)** | [**ZTP-Wizard-2.3.1-macos-arm64.zip**](https://github.com/ZeroTrustPanda/ZTP-Policy-Wizard/raw/standalone/standalone/release/ZTP-Wizard-2.3.1-macos-arm64.zip) |
+| Windows 10/11 (64-bit) | [ZTP-Wizard-2.3.1-windows-x64.zip](https://github.com/ZeroTrustPanda/ZTP-Policy-Wizard/raw/standalone/standalone/release/ZTP-Wizard-2.3.1-windows-x64.zip) |
+| Intel Mac | [ZTP-Wizard-2.3.1-macos-x64.zip](https://github.com/ZeroTrustPanda/ZTP-Policy-Wizard/raw/standalone/standalone/release/ZTP-Wizard-2.3.1-macos-x64.zip) |
 
 Unzip and double-click `ZTP-Wizard`. Your browser opens the wizard at `http://127.0.0.1:3000`, and your API credentials stay on your computer. The builds aren't code-signed yet. On a Mac, right-click → *Open* → *Open* the first time. On Windows, SmartScreen → *More info* → *Run anyway*.
 
-Release notes: [v2.3.0](docs/release-notes/v2.3.0.md) · [v2.2.0](docs/release-notes/v2.2.0.md) · [v2.1.0](docs/release-notes/v2.1.0.md) · [v2.0.0](https://github.com/ZeroTrustPanda/ZTP-Policy-Wizard/releases/tag/v2.0.0) · Full history: [CHANGELOG.md](CHANGELOG.md)
+Release notes: [v2.3.1](docs/release-notes/v2.3.1.md) · [v2.3.0](docs/release-notes/v2.3.0.md) · [v2.2.0](docs/release-notes/v2.2.0.md) · [v2.1.0](docs/release-notes/v2.1.0.md) · [v2.0.0](https://github.com/ZeroTrustPanda/ZTP-Policy-Wizard/releases/tag/v2.0.0) · Full history: [CHANGELOG.md](CHANGELOG.md)
 
 ## What's new in 2.3
 
@@ -314,6 +314,7 @@ The DLP module uses a **dictionary-first** approach:
 
 | Version | Changes |
 |---------|---------|
+| **2.3.1** | ZPA application table editable (name, destinations, TCP / UDP ports) and + Add application. |
 | **2.3.0** | Guided POV (readiness → scope → intake → Client Connector → ZIA → ZPA → ZDX → one dry run and apply), presets fill ZPA (wildcard + common apps) and ZDX (market apps), Education preset, licensing cautions in readiness, prefix from the intake (no global prefix bar), one Bulk Rule Manager for ZIA / ZPA / ZDX. |
 | **2.2.0** | POV Start (readiness, intake presets, combined dry run / apply with live progress), POV Tests (runbook, prove it, DLP kit), Client Connector devices / one-time passwords / install builder, ZPA access policy, Browser Access and POV isolation profile, snapshot restore, drift check, field-level diffs, rate-limit countdowns, rule search, update check. |
 | **2.1.0** | Policies built into the templates for POV test cases: SSL catch-all last (below Zscaler exemptions) with TLS 1.2, DoH inspection, Zscaler Trusted Resolver, high-risk country firewall block, ZPA timeout / inspection / isolation policies and PRA consoles, ZCC tamper protection passwords, Teams / Zoom / Webex in ZDX. |
