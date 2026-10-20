@@ -11,6 +11,13 @@
 - This applies to applications from a preset and from an uploaded CSV. The segment name updates as you type, and mistakes are flagged immediately and block *Next* until fixed.
 - **+ Add application** adds a row by hand.
 
+### Layout
+- **The interface fits the window at any size.**
+  - The content column uses the available width, up to a readable maximum.
+  - Wide tables scroll inside their card instead of spilling past it.
+  - The ZPA table's fields shrink to fit.
+  - Side-by-side form fields stack on narrow windows.
+
 ## v2.3.0 — 2026-10-20
 
 POV Start is now a guided flow, one step at a time.
