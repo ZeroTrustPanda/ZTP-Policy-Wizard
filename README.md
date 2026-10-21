@@ -1,4 +1,4 @@
-# 🐼 ZeroTrustPanda — ZTP Policy Wizard v2.3.1
+# 🐼 ZeroTrustPanda — ZTP Policy Wizard v2.4.0
 
 Proof-of-value automation for Zscaler SEs: Zscaler Internet Access (ZIA), Zscaler Client Connector (ZCC), Zscaler Private Access (ZPA) and Zscaler Digital Experience (ZDX), all with one set of OneAPI (ZIdentity) client credentials.
 
@@ -8,9 +8,9 @@ No Node.js, no npm, nothing to install. Click your download, unzip it, and doubl
 
 | Computer | Download (click to download) |
 |---|---|
-| **Mac with Apple silicon (M1–M4)** | [**ZTP-Wizard-2.3.1-macos-arm64.zip**](https://github.com/ZeroTrustPanda/ZTP-Policy-Wizard/raw/standalone/standalone/release/ZTP-Wizard-2.3.1-macos-arm64.zip) |
-| Windows 10/11 (64-bit) | [ZTP-Wizard-2.3.1-windows-x64.zip](https://github.com/ZeroTrustPanda/ZTP-Policy-Wizard/raw/standalone/standalone/release/ZTP-Wizard-2.3.1-windows-x64.zip) |
-| Intel Mac | [ZTP-Wizard-2.3.1-macos-x64.zip](https://github.com/ZeroTrustPanda/ZTP-Policy-Wizard/raw/standalone/standalone/release/ZTP-Wizard-2.3.1-macos-x64.zip) |
+| **Mac with Apple silicon (M1–M4)** | [**ZTP-Wizard-2.4.0-macos-arm64.zip**](https://github.com/ZeroTrustPanda/ZTP-Policy-Wizard/raw/standalone/standalone/release/ZTP-Wizard-2.4.0-macos-arm64.zip) |
+| Windows 10/11 (64-bit) | [ZTP-Wizard-2.4.0-windows-x64.zip](https://github.com/ZeroTrustPanda/ZTP-Policy-Wizard/raw/standalone/standalone/release/ZTP-Wizard-2.4.0-windows-x64.zip) |
+| Intel Mac | [ZTP-Wizard-2.4.0-macos-x64.zip](https://github.com/ZeroTrustPanda/ZTP-Policy-Wizard/raw/standalone/standalone/release/ZTP-Wizard-2.4.0-macos-x64.zip) |
 
 The wizard starts on `http://127.0.0.1:3000` (or the next free port), opens your browser, and keeps your API credentials on your computer. Logs go to `ZTP-Wizard/logs` in your home folder.
 
@@ -18,11 +18,16 @@ The wizard starts on `http://127.0.0.1:3000` (or the next free port), opens your
 - **Mac:** right-click `ZTP-Wizard` → *Open* → *Open*. If macOS still refuses, run `xattr -d com.apple.quarantine ZTP-Wizard` in the unzipped folder. If it then reports "killed", also run `codesign --force --sign - ZTP-Wizard`.
 - **Windows:** SmartScreen → *More info* → *Run anyway*.
 
-These are the same features as the v2.3.1 server version on `main`. The UI is compiled ahead of time, with React and fonts built in, so it works without reaching any CDN; only the Zscaler API calls need the network.
+These are the same features as the v2.4.0 server version on `main`. The UI is compiled ahead of time, with React and fonts built in, so it works without reaching any CDN; only the Zscaler API calls need the network.
 
-**Release notes (2.0 → 2.3.1):** [docs/release-notes/v2.3.1.md](docs/release-notes/v2.3.1.md) · **Change log:** [CHANGELOG.md](CHANGELOG.md) · **Releases:** [GitHub releases](https://github.com/ZeroTrustPanda/ZTP-Policy-Wizard/releases)
+**Release notes (2.0 → 2.4.0):** [docs/release-notes/v2.4.0.md](docs/release-notes/v2.4.0.md) · **Change log:** [CHANGELOG.md](CHANGELOG.md) · **Releases:** [GitHub releases](https://github.com/ZeroTrustPanda/ZTP-Policy-Wizard/releases)
 
-## What's in 2.x (2.0 → 2.3.1)
+## What's in 2.x (2.0 → 2.4.0)
+
+- **Active POVs (2.4):**
+  - Every POV is saved on this computer with its plan, the exact step you left off, what the wizard did (runs, restore points, drift), tests and customer success criteria, a timeline, notes and follow-ups.
+  - Pick a POV in the sidebar, sign in to its tenant and press *Resume*. A POV never opens against a different tenant, and no credentials or other secrets are saved.
+  - Saved templates, export / import, and a quiet-POV flag.
 
 - **Guided POV (POV Start):** one step at a time.
   1. Tenant readiness, including licensing cautions.
@@ -65,7 +70,7 @@ These are the same features as the v2.3.1 server version on `main`. The UI is co
   - A layout that fits any window size.
   - An update badge.
 
-The full feature list, by product and by version, is in the [release notes](docs/release-notes/v2.3.1.md).
+The full feature list, by product and by version, is in the [release notes](docs/release-notes/v2.4.0.md).
 
 ## 1.9 flows (still available)
 
@@ -259,6 +264,7 @@ The DLP module uses a **dictionary-first** approach:
 
 | Version | Changes |
 |---------|---------|
+| **2.4.0** | Active POVs: saved workspaces per POV with resume, plan, runs / restore / drift, tests and success criteria, timeline, notes and follow-ups; tenant guard; no secrets saved; templates; export / import. |
 | **2.3.1** | ZPA application table editable (name, destinations, TCP / UDP ports) and + Add application. |
 | **2.3.0** | Guided POV (readiness → scope → intake → Client Connector → ZIA → ZPA → ZDX → one dry run and apply), presets fill ZPA (wildcard + common apps) and ZDX (market apps), Education preset, licensing cautions in readiness, prefix from the intake (no global prefix bar), one Bulk Rule Manager for ZIA / ZPA / ZDX. |
 | **2.2.0** | POV Start (readiness, intake presets, combined dry run / apply with live progress), POV Tests (runbook, prove it, DLP kit), Client Connector devices / one-time passwords / install builder, ZPA access policy, Browser Access and POV isolation profile, snapshot restore, drift check, field-level diffs, rate-limit countdowns, rule search, update check. |
