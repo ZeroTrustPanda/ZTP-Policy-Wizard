@@ -23,3 +23,5 @@ livetest-*.json
 livecheck*.json
 *.har
 logs/snapshots/
+povs/
+pov-templates/

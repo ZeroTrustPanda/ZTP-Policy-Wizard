@@ -1,8 +1,29 @@
 # Changelog
 
-## v2.0.0 → v2.3.1 — 2026-10-19 to 2026-10-20
+## v2.0.0 → v2.4.0 — 2026-10-19 to 2026-10-21
 
-Release notes for the whole 2.x line: [docs/release-notes/v2.3.1.md](docs/release-notes/v2.3.1.md).
+Release notes for the whole 2.x line: [docs/release-notes/v2.4.0.md](docs/release-notes/v2.4.0.md).
+
+### 2.4.0
+- **Active POVs** (sidebar): each POV is a local folder (`ZTP-Wizard/povs/<id>/pov.json`). It holds:
+  - the plan
+  - the exact resume point of the guided flow
+  - every run (ledger, restore point)
+  - test results and customer success criteria
+  - the timeline (kickoff, check-ins, end), notes and follow-ups (the wizard adds its own).
+- **Status:** moves on by itself (Planning → Built after the first apply → Testing after the first test result) and can be set by hand. A POV untouched for 7 days is flagged quiet.
+- **POV home:** Overview, What the tool did, Tests & success criteria, Timeline & notes, with export, Save as template and Archive.
+- **Tenant guard:**
+  - A POV stores only its vanity domain and cloud.
+  - Opening it while signed in to another tenant is refused.
+  - When signed out, picking a POV pre-fills that tenant's sign-in.
+- **No secrets are written:** credentials, provisioning keys, tamper / one-time passwords and tokens are scrubbed. A resumed POV gets a new tamper password and says so.
+- **Saved templates** of a POV's choices (no customer, tenant, prefix, host names or secrets), and New POV from a template.
+- **New API:**
+  - `/api/v2/povs`: list, create, open, close, update, archive, export, import.
+  - `/api/v2/pov-templates`.
+  - On this computer, the POV list can be read before signing in.
+- **Fix:** date fields follow the dark theme.
 
 ### 2.3.1
 - **Private Access:** the application name, destinations and TCP / UDP ports are editable in the ZPA table, for preset apps and CSV uploads. Validation runs as you type. **+ Add application** adds a row by hand.
