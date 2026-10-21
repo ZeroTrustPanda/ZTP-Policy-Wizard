@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ZeroTrustPanda ZS Policy Wizard v2.3.1 - Zscaler Template Policy Configuration</title>
+  <title>ZeroTrustPanda ZS Policy Wizard v2.4.0 - Zscaler Template Policy Configuration</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
   <style>
@@ -156,7 +156,7 @@
       color: var(--text-secondary); margin-bottom: 6px;
     }
     .form-hint { font-size: 12px; color: var(--text-muted); margin-top: 4px; }
-    input[type="text"], input[type="password"], select, textarea {
+    input[type="text"], input[type="password"], input[type="date"], select, textarea {
       width: 100%;
       padding: 10px 14px;
       background: var(--bg-input);
@@ -168,6 +168,7 @@
       transition: border-color 0.15s;
       outline: none;
     }
+    input[type="date"] { color-scheme: dark; }
     input:focus, select:focus, textarea:focus { border-color: var(--accent-blue); }
     select { cursor: pointer; }
     textarea { resize: vertical; min-height: 80px; }
@@ -531,7 +532,7 @@
     // ========================
     // App Version
     // ========================
-    const APP_VERSION = '2.3.1';
+    const APP_VERSION = '2.4.0';
     const BUILD_DATE = '2026-03-30';
 
     // ========================
@@ -794,7 +795,7 @@
                 <div className="sidebar-section">
                   <div className={`sidebar-item ${activeModule === 'start' ? 'active' : ''}`} data-nav="start"
                     onClick={() => switchModule('start')} style={{cursor:'pointer', fontWeight:600}}>
-                    <span className="step-num">🚀</span> POV Start
+                    <span className="step-num">🚀</span> POV Start{activePov ? <span className="form-hint" style={{margin:'0 0 0 6px', fontWeight:400, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}>· {activePov.customerName}</span> : ''}
                   </div>
                   <div className="sidebar-section-title">Modules</div>
                   <div className={`sidebar-item ${zccExpanded ? 'active' : ''}`} data-nav="zcc-top"
@@ -959,6 +960,7 @@
                     <p>HIPAA, HITRUST CSF, NIST 800-53, NIST 800-171, PCI-DSS, CJIS, SOX, FERPA, GDPR</p>
                     <h3 style={{fontSize:'15px', color:'var(--accent-cyan)', margin:'1.5rem 0 0.5rem'}}>Version History</h3>
                     <div style={{paddingLeft:'1rem', fontSize:'12px'}}>
+                      <div><strong>v2.4.0</strong> — Active POVs: every POV is saved on this computer with its plan, the exact step you left off, what the wizard did (runs, restore points, drift), tests and customer success criteria, a timeline, notes and follow-ups. Resume any POV after signing in to its tenant (a POV never opens against a different tenant); credentials and other secrets are never saved. Saved templates, export / import, quiet-POV flag.</div>
                       <div><strong>v2.3.1</strong> — Private Access: application name, destinations and TCP / UDP ports are editable in the table, plus + Add application.</div>
                       <div><strong>v2.3.0</strong> — Guided POV on POV Start: readiness → Build the POV (ZIA / ZPA / ZDX) → customer intake (name, generated prefix, internal domain, preset, baseline) → Client Connector → Internet Access → Private Access → Digital Experience → one dry run and apply. Presets fill ZPA with a *.domain wildcard and common apps, and ZDX with apps for the market; Education preset. Readiness flags missing core licences. The prefix comes from the intake (no global prefix bar). One Bulk Rule Manager for ZIA, ZPA and ZDX.</div>
                       <div><strong>v2.2.0</strong> — POV Start (tenant readiness, customer intake with a Healthcare preset, one dry run and one apply across the products you toggle on, live progress); POV Tests (runbook with Pass / Fail, prove it, DLP test kit); Client Connector devices, one-time passwords and the install builder from the Deployment Toolkit; ZPA access policy, Browser Access and POV isolation profile; restore from snapshots and drift check; field-level differences; rate-limit countdowns; rule search and shortcuts; update check.</div>
