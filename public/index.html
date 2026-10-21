@@ -694,22 +694,28 @@
         try {
           const r = await api.call('POST', `/v2/povs/${p.id}/open`);
           const pv = r.pov;
-          setActivePov(pv);
-          if (pv.prefix) { setGlobalPrefix(pv.prefix); safeStore.set('zpw.prefix', pv.prefix); }
-          setPov((pv.guide && pv.guide.pov) || POV_DEFAULT);
-          setGuideResume(pv.guide || null); setGuideTemplate(null); setGuideKey(k => k + 1);
+          const batch = ReactDOM.unstable_batchedUpdates || ((f) => f());
+          batch(() => {
+            setGuideKey(k => k + 1); setGuideResume(pv.guide || null); setGuideTemplate(null);
+            setActivePov(pv);
+            if (pv.prefix) { setGlobalPrefix(pv.prefix); safeStore.set('zpw.prefix', pv.prefix); }
+            setPov((pv.guide && pv.guide.pov) || POV_DEFAULT);
+            switchModule('start');
+          });
           refreshPovs();
-          switchModule('start');
         } catch (e) { setError(e.message); }
       };
       /** A fresh POV (optionally from a template): closes the one open in this session first. */
       const newPov = async (template) => {
         setError(null);
         if (auth.connected) await api.call('POST', '/v2/povs/close').catch(() => {});
-        setActivePov(null);
-        setPov(template && template.pov ? { ...POV_DEFAULT, ...template.pov } : POV_DEFAULT);
-        setGuideResume(null); setGuideTemplate(template || null); setGuideKey(k => k + 1);
-        switchModule('start');
+        const batch = ReactDOM.unstable_batchedUpdates || ((f) => f());
+        batch(() => {
+          setGuideKey(k => k + 1); setGuideResume(null); setGuideTemplate(template || null);
+          setActivePov(null);
+          setPov(template && template.pov ? { ...POV_DEFAULT, ...template.pov } : POV_DEFAULT);
+          switchModule('start');
+        });
       };
       const connectFor = async (p) => {
         if (auth.connected) { try { await api.call('POST', '/auth/logout'); } catch (e) {} api.sessionId = null; setAuth({ connected: false }); }
@@ -1158,7 +1164,9 @@
     }
 
     // ---------- §2.1 Rule review ----------
-    function PovRulesStep({ meta, pov, setPov, prefix, auth, setError, onNext, onBack, nextLabel }) {
+    // v2.4: switching POVs can briefly render the rules step with a reset (scope-less) selection; show nothing until it has one
+    function PovRulesStep(props) { return props.pov && props.pov.scope ? <PovRulesStepInner {...props} /> : null; }
+    function PovRulesStepInner({ meta, pov, setPov, prefix, auth, setError, onNext, onBack, nextLabel }) {
       const [tpl, setTpl] = useState(null);
       const [open, setOpen] = useState({});
       const [q, setQ] = useState('');
