@@ -36,6 +36,8 @@ function checkPlan(session, kind, input, planId) {
 }
 
 function registerV2Routes(app, requireAuth) {
+  // v2.4: Active POVs (registered first so its change hook sees every later route)
+  require('./routes24').register(app, requireAuth, { v2 });
   // Everything the 2.0 UI needs that does not depend on the tenant (copy is editable in one place: copy.js)
   app.get('/api/v2/meta', (req, res) => {
     res.json({

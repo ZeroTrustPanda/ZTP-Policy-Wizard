@@ -626,9 +626,23 @@
       const [povStep, setPovStep] = useState('scope');
       const [povResult, setPovResult] = useState(null);
       const [povReached, setPovReached] = useState(0);
+      // v2.4: Active POVs
+      const [povList, setPovList] = useState([]);
+      const [povsOpen, setPovsOpen] = useState(true);
+      const [activePov, setActivePov] = useState(null);
+      const [sessionTenant, setSessionTenant] = useState(null);
+      const [povHomeId, setPovHomeId] = useState(null);
+      const [guideKey, setGuideKey] = useState(1);
+      const [guideResume, setGuideResume] = useState(null);
+      const [guideTemplate, setGuideTemplate] = useState(null);
+      const [pendingOpen, setPendingOpen] = useState(null);
+      const [connectPrefill, setConnectPrefill] = useState(null);
+      const refreshPovs = () => api.call('GET', '/v2/povs').then(r => setPovList(r.povs || [])).catch(() => {});
+      useEffect(() => { refreshPovs(); const t = setInterval(refreshPovs, 60000); return () => clearInterval(t); }, [auth.connected]);
       const goPov = (id) => { setError(null); setPovStep(id); setPovReached(r => Math.max(r, POV_STEPS.findIndex(s => s.id === id))); };
       useEffect(() => {
-        if (!auth.connected) { setLicensing(null); return; }
+        if (!auth.connected) { setLicensing(null); setActivePov(null); setSessionTenant(null); return; }
+        api.call('GET', '/v2/povs/active').then(r => { setSessionTenant(r.tenant); if (r.pov) setActivePov(r.pov); }).catch(() => {});
         if (globalPrefix) api.call('POST', '/v2/prefix', { prefix: globalPrefix }).catch(() => {});
         api.call('GET', '/v2/licensing').then(setLicensing).catch(() => setLicensing({ items: {}, endpointDlpEnabledInZcc: null }));
       }, [auth.connected]);
@@ -667,13 +681,42 @@
         else if (['zpa', 'report'].includes(mod)) setStep(mod);
         else if (mod === 'zia-ssl') setStep('ssl');
         else if (mod === 'zcc') setStep('zcc');
-        else if (['start', 'tests', 'zcc-devices', 'restore'].includes(mod)) setStep(mod);
+        else if (['start', 'tests', 'zcc-devices', 'restore', 'pov-home', 'pov-templates'].includes(mod)) setStep(mod);
         else if (mod === 'zdx') setStep('zdx');
         else if (mod === 'about') setStep('about');
         else if (mod === 'catalog') setStep('catalog');
       };
 
-      const showConnect = !auth.connected && activeModule !== 'catalog' && activeModule !== 'about';
+      const openPovHome = (id) => { setPovHomeId(id); switchModule('pov-home'); };
+      /** Open a POV in this session and continue the guided flow exactly where it was left. */
+      const resumePov = async (p) => {
+        setError(null);
+        try {
+          const r = await api.call('POST', `/v2/povs/${p.id}/open`);
+          const pv = r.pov;
+          setActivePov(pv);
+          if (pv.prefix) { setGlobalPrefix(pv.prefix); safeStore.set('zpw.prefix', pv.prefix); }
+          setPov((pv.guide && pv.guide.pov) || POV_DEFAULT);
+          setGuideResume(pv.guide || null); setGuideTemplate(null); setGuideKey(k => k + 1);
+          refreshPovs();
+          switchModule('start');
+        } catch (e) { setError(e.message); }
+      };
+      /** A fresh POV (optionally from a template): closes the one open in this session first. */
+      const newPov = async (template) => {
+        setError(null);
+        if (auth.connected) await api.call('POST', '/v2/povs/close').catch(() => {});
+        setActivePov(null);
+        setPov(template && template.pov ? { ...POV_DEFAULT, ...template.pov } : POV_DEFAULT);
+        setGuideResume(null); setGuideTemplate(template || null); setGuideKey(k => k + 1);
+        switchModule('start');
+      };
+      const connectFor = async (p) => {
+        if (auth.connected) { try { await api.call('POST', '/auth/logout'); } catch (e) {} api.sessionId = null; setAuth({ connected: false }); }
+        setPendingOpen(p); setConnectPrefill({ vanity: p.tenant && p.tenant.vanity, cloud: p.tenant && p.tenant.cloud !== 'production' ? p.tenant.cloud : '' });
+        setActiveModule(null); setStep('connect');
+      };
+      const showConnect = !auth.connected && activeModule !== 'catalog' && activeModule !== 'about' && activeModule !== 'pov-home' && activeModule !== 'pov-templates';
       const showZiaWizard = auth.connected && activeModule === 'zia-wizard';
       const showZcc = auth.connected && activeModule === 'zcc';
       const showZdx = auth.connected && activeModule === 'zdx';
@@ -709,7 +752,7 @@
               {auth.connected && (
                 <button className="btn btn-ghost btn-sm" onClick={async () => {
                   try { await api.call('POST', '/auth/logout'); } catch(e) {}
-                  api.sessionId = null; setAuth({ connected: false }); setActiveModule(null); setCompletedSteps(new Set()); goTo('connect');
+                  api.sessionId = null; setAuth({ connected: false }); setActiveModule(null); setCompletedSteps(new Set()); setActivePov(null); goTo('connect');
                 }}>Disconnect</button>
               )}
             </div>
@@ -722,6 +765,24 @@
                   <span className="step-num">{auth.connected ? '✓' : '🔌'}</span>
                   {auth.connected ? 'Connected' : 'Connect'}
                 </div>
+              </div>
+              <div className="sidebar-section" data-activepovs>
+                <div className="sidebar-item" data-nav="povs" onClick={() => setPovsOpen(!povsOpen)} style={{cursor:'pointer', fontWeight:600}}>
+                  <span className="step-num">📂</span> Active POVs <span className="badge badge-category" style={{marginLeft:'auto'}}>{povList.filter(x => x.status !== 'closed').length}</span> <span style={{fontSize:'10px'}}>{povsOpen ? '▾' : '▸'}</span>
+                </div>
+                {povsOpen && povList.filter(x => x.status !== 'closed').map(x => (
+                  <div key={x.id} className={`sidebar-item ${activeModule === 'pov-home' && povHomeId === x.id ? 'active' : ''}`} data-povitem={x.id} onClick={() => openPovHome(x.id)}
+                    style={{paddingLeft:'1.6rem', fontSize:'12px', alignItems:'flex-start', cursor:'pointer'}} title={`${x.tenant && x.tenant.vanity} · prefix ${x.prefix}`}>
+                    <span style={{width:'8px', height:'8px', borderRadius:'50%', marginTop:'5px', flexShrink:0, background:(POV_STATUS[x.status] || POV_STATUS.planning).color}}></span>
+                    <div style={{minWidth:0}}>
+                      <div style={{overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}>{x.customerName}{activePov && activePov.id === x.id ? ' ●' : ''}</div>
+                      <div style={{fontSize:'10px', color: x.quiet ? 'var(--accent-amber)' : 'var(--text-muted)'}}>{(POV_STATUS[x.status] || POV_STATUS.planning).label} · {x.resume || 'not started'} · {ago(x.lastActivityAt)}{x.quiet ? ' · quiet' : ''}</div>
+                    </div>
+                  </div>
+                ))}
+                {povsOpen && povList.some(x => x.status === 'closed') && <div className="form-hint" style={{paddingLeft:'1.6rem', fontSize:'10px'}}>{povList.filter(x => x.status === 'closed').map(x => <a key={x.id} href="#" onClick={e => { e.preventDefault(); openPovHome(x.id); }} style={{marginRight:'6px', color:'var(--text-muted)'}}>{x.customerName} (closed)</a>)}</div>}
+                {povsOpen && auth.connected && <div className="sidebar-item" data-nav="newpov" onClick={() => newPov(null)} style={{paddingLeft:'1.6rem', fontSize:'12px', cursor:'pointer'}}>＋ New POV</div>}
+                {povsOpen && <div className={`sidebar-item ${activeModule === 'pov-templates' ? 'active' : ''}`} data-nav="povtemplates" onClick={() => switchModule('pov-templates')} style={{paddingLeft:'1.6rem', fontSize:'12px', cursor:'pointer'}}>📑 Templates</div>}
               </div>
               {auth.connected && (
                 <div className="sidebar-section">
@@ -812,12 +873,23 @@
               {auth.connected && activeModule === 'bulk' && <BulkHub key={bulkTab} initialTab={bulkTab} meta={meta} prefix={globalPrefix} setError={setError} loading={loading} setLoading={setLoading} />}
               {auth.connected && activeModule === 'report' && <ReportStep setError={setError} />}
               {auth.connected && <RateLimitBar />}
-              {auth.connected && meta && <div style={{display: activeModule === 'start' ? 'block' : 'none'}}><PovGuide meta={meta} auth={auth} prefix={globalPrefix} setPrefix={setGlobalPrefix} licensing={licensing} pov={pov} setPov={setPov} setError={setError} onReport={() => switchModule('report')} /></div>}
+              {auth.connected && meta && <div style={{display: activeModule === 'start' ? 'block' : 'none'}}><PovGuide key={guideKey} meta={meta} auth={auth} prefix={globalPrefix} setPrefix={setGlobalPrefix} licensing={licensing} pov={pov} setPov={setPov} setError={setError} onReport={() => switchModule('report')}
+                activePov={activePov} resume={guideResume} template={guideTemplate} onPovCreated={(pv) => { setActivePov(pv); refreshPovs(); }} onPovChanged={() => refreshPovs()} /></div>}
+              {activeModule === 'pov-home' && povHomeId && <PovHome id={povHomeId} auth={auth} sessionTenant={sessionTenant} activePov={activePov} onResume={resumePov} onConnectFor={connectFor}
+                onClosed={(id) => { if (activePov && activePov.id === id) setActivePov(null); refreshPovs(); setPovHomeId(null); setActiveModule(auth.connected ? 'start' : null); setStep(auth.connected ? 'start' : 'connect'); }}
+                onChanged={refreshPovs} onGo={switchModule} setError={setError} />}
+              {activeModule === 'pov-templates' && <PovTemplates auth={auth} onStart={newPov} setError={setError} />}
               {auth.connected && activeModule === 'tests' && <PovTests setError={setError} />}
               {auth.connected && activeModule === 'zcc-devices' && <ZccDevicesInstall setError={setError} />}
               {auth.connected && activeModule === 'restore' && <RestoreDrift prefix={globalPrefix} setError={setError} />}
               {showConnect && (<ConnectStep auth={auth} setAuth={setAuth} setError={setError} loading={loading} setLoading={setLoading}
-                onComplete={() => { markComplete('connect'); setActiveModule('start'); setStep('start'); }} />)}
+                prefill={connectPrefill}
+                onComplete={async () => {
+                  markComplete('connect');
+                  const pend = pendingOpen; setPendingOpen(null); setConnectPrefill(null);
+                  if (pend) { setPovHomeId(pend.id); setActiveModule('pov-home'); setStep('pov-home'); }
+                  else { setActiveModule('start'); setStep('start'); }
+                }} />)}
               {auth.connected && !activeModule && (
                 <div className="card">
                   <div className="card-header"><h2>🐼 Welcome to ZeroTrustPanda</h2><p>Select a module from the sidebar or choose below.</p></div>
@@ -1378,16 +1450,20 @@
 
     function ZpaWizard({ meta, prefix, setError, onReport, guided }) {
       const [ctx, setCtx] = useState(null);
-      const init = (guided && guided.initial) || {};
-      const [form, setForm] = useState({ domains: init.domains || '', tcpPorts: '1-52, 54-65535', udpPorts: '1-52, 54-65535', connectorGroupId: '',
-        descriptions: { connectorGroup: meta.copy.zpa.connectorGroupDescription, appSegment: meta.copy.zpa.appSegmentDescription } });
-      const [settings, setSettings] = useState({ ...meta.zpaDefaults });
-      const [policies, setPolicies] = useState({ access: true, timeout: true, inspection: true, isolation: true });
-      const [pra, setPra] = useState({ rdpHost: '', sshHost: '' });
-      const [iso, setIso] = useState({ enabled: true, copyPaste: 'none', uploadDownload: 'none', allowPrinting: false, watermark: true, watermarkMessage: 'Zscaler POV' });
-      const [ba, setBa] = useState({ domain: '', port: '443', certificateId: '' });
+      // v2.4: init = { domains } or { apps } from the preset, or the saved choices of a POV being resumed ({ saved: body }); seed = template choices
+      const init0 = (guided && guided.initial) || {};
+      const saved = init0.saved || null;
+      const seedZ = (guided && guided.seed) || {};
+      const init = saved ? { domains: saved.domains, apps: saved.apps } : init0;
+      const [form, setForm] = useState({ domains: init.domains || '', tcpPorts: (saved && saved.tcpPorts) || '1-52, 54-65535', udpPorts: (saved && saved.udpPorts !== undefined ? saved.udpPorts : '1-52, 54-65535'), connectorGroupId: (saved && saved.connectorGroupId) || '',
+        descriptions: { connectorGroup: meta.copy.zpa.connectorGroupDescription, appSegment: meta.copy.zpa.appSegmentDescription, ...((saved || seedZ).descriptions || {}) } });
+      const [settings, setSettings] = useState({ ...meta.zpaDefaults, ...((saved || seedZ).settings || {}) });
+      const [policies, setPolicies] = useState({ access: true, timeout: true, inspection: true, isolation: true, ...((saved || seedZ).policies || {}) });
+      const [pra, setPra] = useState({ rdpHost: '', sshHost: '', ...((saved && saved.pra) || {}) });
+      const [iso, setIso] = useState({ enabled: true, copyPaste: 'none', uploadDownload: 'none', allowPrinting: false, watermark: true, watermarkMessage: 'Zscaler POV', ...((saved || seedZ).isolationProfile || {}) });
+      const [ba, setBa] = useState({ domain: '', port: '443', certificateId: '', ...((saved && saved.browserAccess) || {}) });
       const [bulk, setBulk] = useState(!!(init.apps && init.apps.length));
-      const [apps, setApps] = useState(() => (init.apps || []).map(a => ({ ...a, settings: {} })));            // [{ name, destinations[], tcpPorts, udpPorts, row, settings }]
+      const [apps, setApps] = useState(() => (init.apps || []).map(a => ({ ...a, settings: a.settings || {} })));            // [{ name, destinations[], tcpPorts, udpPorts, row, settings }]
       const [csvErrors, setCsvErrors] = useState([]);
       const [csvName, setCsvName] = useState('');
       const [openApp, setOpenApp] = useState(null);
@@ -1838,21 +1914,36 @@
       );
     }
 
-    function PovGuide({ meta, auth, prefix, setPrefix, licensing, pov, setPov, setError, onReport }) {
-      const [g, setG] = useState(() => { try { const j = JSON.parse(safeStore.get('zpw.guide') || '{}'); return { ...GUIDE_DEFAULT, ...j, scope: { ...GUIDE_DEFAULT.scope, ...(j.scope || {}) } }; } catch (e) { return GUIDE_DEFAULT; } });
-      const [stage, setStage] = useState('readiness');
-      const [visited, setVisited] = useState(() => new Set(['readiness']));
+    // v2.4: secrets never leave the browser with a POV's resume point
+    const stripPw = (payloads) => ({ ...payloads, zcc: Object.fromEntries(Object.entries((payloads && payloads.zcc) || {}).map(([k, v]) => { const { tamperPassword, ...rest } = v || {}; return [k, rest]; })) });
+    const wantsTamper = (p) => !p.enabledSettings || p.enabledSettings.includes('tamperPasswords');
+
+    function PovGuide({ meta, auth, prefix, setPrefix, licensing, pov, setPov, setError, onReport, activePov, resume, template, onPovCreated, onPovChanged }) {
+      const R = resume || null;
+      const T = template || null;
+      const [pwRegenerated] = useState(() => !!(R && R.payloads && Object.values(R.payloads.zcc || {}).some(p => p && !p.tamperPassword && wantsTamper(p))));
+      const [g, setG] = useState(() => {
+        if (R && R.g) return { ...GUIDE_DEFAULT, ...R.g, scope: { ...GUIDE_DEFAULT.scope, ...(R.g.scope || {}) } };
+        if (T) return { ...GUIDE_DEFAULT, scope: { ...GUIDE_DEFAULT.scope, ...(T.scope || {}) }, presetId: T.presetId || GUIDE_DEFAULT.presetId, baseline: T.baseline || GUIDE_DEFAULT.baseline };
+        return GUIDE_DEFAULT;
+      });
+      const [stage, setStage] = useState((R && R.stage) || 'readiness');
+      const [visited, setVisited] = useState(() => new Set((R && R.visited) || ['readiness']));
       const [presets, setPresets] = useState([]);
-      const [preset, setPreset] = useState(null);
-      const [zpaInitial, setZpaInitial] = useState(null);
-      const [wizardKey, setWizardKey] = useState('');
-      const [payloads, setPayloads] = useState({ zcc: {}, ziaReady: false, zpa: null, zdx: null });
-      const [ziaSub, setZiaSub] = useState('scope');
+      const [preset, setPreset] = useState((R && R.preset) || null);
+      const [zpaInitial, setZpaInitial] = useState((R && R.zpaInitial) || null);
+      const [wizardKey, setWizardKey] = useState((R && R.wizardKey) || '');
+      const [payloads, setPayloads] = useState(() => {
+        const p = (R && R.payloads) || { zcc: {}, ziaReady: false, zpa: null, zdx: null };
+        // tamper passwords are never saved with a POV: a resumed POV gets a fresh one
+        const zcc = Object.fromEntries(Object.entries(p.zcc || {}).map(([k, v]) => [k, v && !v.tamperPassword && wantsTamper(v) ? { ...v, tamperPassword: genPassword() } : v]));
+        return { zcc: {}, ziaReady: false, zpa: null, zdx: null, ...p, zcc };
+      });
+      const [ziaSub, setZiaSub] = useState((R && R.ziaSub) || 'scope');
       const [fwdProfiles, setFwdProfiles] = useState(null);
       const [busy, setBusy] = useState(false);
       useEffect(() => { api.call('GET', '/v2/intake/presets').then(setPresets).catch(() => {}); }, []);
       useEffect(() => {
-        safeStore.set('zpw.guide', JSON.stringify(g));
         const t = setTimeout(() => api.call('POST', '/v2/intake', { customerName: g.customerName, domain: DOMAIN_OK(g.domain) ? g.domain : '', presetId: g.presetId, baseline: g.baseline, products: g.scope }).catch(() => {}), 800);
         return () => clearTimeout(t);
       }, [JSON.stringify(g)]);
@@ -1870,12 +1961,27 @@
       const back = () => go(stages[Math.max(idx - 1, 0)].id);
       const nextLabel = stages[idx + 1] ? `Next: ${stages[idx + 1].label} →` : 'Next →';
 
-      // Intake → save the prefix, fill the preset for the domain and prepare each product's wizard
+      // v2.4: the resume point is saved to the open POV a moment after anything changes
+      useEffect(() => {
+        if (!activePov) return;
+        const blob = { g, stage, stageLabel: (stages[idx] || {}).label, visited: [...visited], preset, zpaInitial, wizardKey, payloads: stripPw(payloads), ziaSub, pov };
+        const t = setTimeout(() => api.call('PUT', `/v2/povs/${activePov.id}`, { guide: blob }).then(r => onPovChanged && onPovChanged(r.summary)).catch(() => {}), 1200);
+        return () => clearTimeout(t);
+      }, [activePov && activePov.id, JSON.stringify([g, stage, [...visited], payloads, ziaSub, wizardKey, pov])]);
+
+      // Intake → save the prefix, create (or rename) the POV, fill the preset for the domain and prepare each product's wizard
       const finishIntake = async () => {
         setBusy(true); setError(null);
         try {
           await api.call('POST', '/v2/prefix', { prefix: g.prefix });
           setPrefix(g.prefix); safeStore.set('zpw.prefix', g.prefix);
+          if (!activePov) {
+            const c = await api.call('POST', '/v2/povs', { customerName: g.customerName, prefix: g.prefix, templateId: (T && T.id) || null });
+            if (onPovCreated) onPovCreated(c.pov);
+          } else if (activePov.customerName !== g.customerName || activePov.prefix !== g.prefix) {
+            const u = await api.call('PUT', `/v2/povs/${activePov.id}`, { customerName: g.customerName, prefix: g.prefix });
+            if (onPovChanged) onPovChanged(u.summary);
+          }
           const r = await api.call('POST', '/v2/intake/preset', { id: g.presetId, domain: g.domain, customerName: g.customerName });
           setPreset(r.preset);
           let apps = [];
@@ -1895,16 +2001,23 @@
           if (g.scope.zia && pov.baseline !== g.baseline) {
             setPov(prev => ({ ...prev, baseline: g.baseline, disabledRules: { 'firewallFiltering:Default-Block-All': true }, actionSettings: { policy: {}, rules: {} }, settingOverrides: {} }));
           }
-          if (needZcc && !fwdProfiles) api.call('GET', '/zcc/profiles').then(d => setFwdProfiles(d.forwardingProfiles || [])).catch(() => setFwdProfiles([]));
           next();
         } catch (e) { setError(e.message); }
         setBusy(false);
       };
+      // Client Connector profiles are read when its step is first shown (also after resuming a POV)
+      useEffect(() => {
+        if (stage === 'zcc' && needZcc && !fwdProfiles) api.call('GET', '/zcc/profiles').then(d => setFwdProfiles(d.forwardingProfiles || [])).catch(() => setFwdProfiles([]));
+      }, [stage]);
 
       const show = (id) => ({ display: stage === id ? 'block' : 'none' });
       const savedZcc = Object.keys(payloads.zcc);
+      const zccSeed = savedZcc.length ? payloads.zcc : (T && T.zcc) || null;
+      const pwNote = pwRegenerated && <div className="alert alert-warning" data-pwregen><span>🔑 Client Connector tamper passwords are never saved with a POV, so a new one was generated when this POV was resumed. If the profile was already applied, applying again changes its password (the new one is in the summary report).</span></div>;
       return (
         <div data-step="start">
+          {activePov && <div className="form-hint" style={{margin:'0 0 6px'}} data-guidepov>POV: <strong>{activePov.customerName}</strong> · prefix <code>{activePov.prefix || prefix}</code> · progress is saved automatically</div>}
+          {T && !activePov && <div className="form-hint" style={{margin:'0 0 6px'}} data-guidetemplate>Starting from template <strong>{T.name}</strong></div>}
           <GuideStepper stages={stages} stage={stage} visited={visited} go={go} />
           {stage === 'readiness' && (<>
             <ReadinessPanel setError={setError} />
@@ -1915,11 +2028,12 @@
 
           {wizardKey && needZcc && visited.has('zcc') && (
             <div style={show('zcc')} data-guide="zcc">
+              {pwNote}
               {savedZcc.length > 0 && <div className="alert alert-success"><span>✓ Saved for the dry run: {savedZcc.map(k => k === 'macos' ? 'macOS' : 'Windows').join(' and ')} profile{savedZcc.length > 1 ? 's' : ''}
                 <button className="btn btn-ghost btn-sm" style={{marginLeft:'8px'}} onClick={() => setPayloads(p => ({ ...p, zcc: {} }))}>Clear</button></span></div>}
               {fwdProfiles ? (
-                <ZccCreateWizard key={wizardKey} setError={setError} config={{ globalPrefix: prefix }} forwardingProfiles={fwdProfiles}
-                  guided={{ saved: payloads.zcc, onSave: (plat, p) => setPayloads(prev => ({ ...prev, zcc: { ...prev.zcc, [plat]: p } })), onNext: next, onBack: back, onSkip: () => { setPayloads(prev => ({ ...prev, zcc: {} })); next(); } }} />
+                <ZccCreateWizard key={wizardKey} setError={setError} config={{ globalPrefix: prefix }} forwardingProfiles={fwdProfiles} initialPlatform={zccSeed ? Object.keys(zccSeed)[0] : undefined}
+                  guided={{ seed: zccSeed, saved: payloads.zcc, onSave: (plat, p) => setPayloads(prev => ({ ...prev, zcc: { ...prev.zcc, [plat]: p } })), onNext: next, onBack: back, onSkip: () => { setPayloads(prev => ({ ...prev, zcc: {} })); next(); } }} />
               ) : <div className="card"><span className="spinner"></span> Reading Client Connector profiles…</div>}
             </div>
           )}
@@ -1931,21 +2045,22 @@
                 nextLabel={nextLabel} onNext={() => { setPayloads(p => ({ ...p, ziaReady: true })); next(); }} />}
             </div>
           )}
-          {wizardKey && g.scope.zpa && visited.has('zpa') && meta && zpaInitial && (
+          {wizardKey && g.scope.zpa && visited.has('zpa') && meta && (zpaInitial || payloads.zpa) && (
             <div style={show('zpa')} data-guide="zpa">
               <ZpaWizard key={wizardKey} meta={meta} prefix={prefix} setError={setError} onReport={onReport}
-                guided={{ initial: zpaInitial, onBack: back, nextLabel, onNext: (body) => { setPayloads(p => ({ ...p, zpa: body })); next(); } }} />
+                guided={{ initial: payloads.zpa ? { saved: payloads.zpa } : zpaInitial, seed: (T && T.zpa) || null, onBack: back, nextLabel, onNext: (body) => { setPayloads(p => ({ ...p, zpa: body })); next(); } }} />
             </div>
           )}
-          {wizardKey && g.scope.zdx && visited.has('zdx') && preset && (
+          {wizardKey && g.scope.zdx && visited.has('zdx') && (preset || payloads.zdx) && (
             <div style={show('zdx')} data-guide="zdx">
               <ZdxWizard key={wizardKey} setError={setError}
-                guided={{ custom: preset.zdxApps || [], predefined: preset.zdxPredefined || [], onBack: back, nextLabel, onNext: (pl) => { setPayloads(p => ({ ...p, zdx: pl })); next(); } }} />
+                guided={{ custom: (preset && preset.zdxApps) || [], predefined: (preset && preset.zdxPredefined) || [], saved: payloads.zdx || (T && T.zdx) || null, onBack: back, nextLabel, onNext: (pl) => { setPayloads(p => ({ ...p, zdx: pl })); next(); } }} />
             </div>
           )}
-          {stage === 'run' && (
+          {stage === 'run' && (<>
+            {pwNote}
             <GuidedRun g={g} prefix={prefix} pov={pov} payloads={payloads} stages={stages} go={go} setError={setError} onReport={onReport} onBack={back} />
-          )}
+          </>)}
         </div>
       );
     }
@@ -2089,6 +2204,269 @@
           {tab === 'zia' && <BulkDeleteStep setError={setError} loading={loading} setLoading={setLoading} />}
           {tab === 'zpa' && meta && <BulkManagerV2 key="zpa" product="zpa" prefix={prefix} meta={meta} setError={setError} />}
           {tab === 'zdx' && meta && <BulkManagerV2 key="zdx" product="zdx" prefix={prefix} meta={meta} setError={setError} />}
+        </div>
+      );
+    }
+
+    // ========================
+    // v2.4 — Active POVs: POV home, templates
+    // ========================
+    const POV_STATUS = { planning: { label: 'Planning', color: 'var(--accent-blue)' }, built: { label: 'Built', color: 'var(--accent-purple)' }, testing: { label: 'Testing', color: 'var(--accent-amber)' }, 'wrapping-up': { label: 'Wrapping up', color: 'var(--accent-cyan)' }, closed: { label: 'Closed', color: 'var(--text-muted)' } };
+    const ago = (iso) => { if (!iso) return ''; const m = Math.round((Date.now() - new Date(iso).getTime()) / 60000); return m < 1 ? 'just now' : m < 60 ? `${m} min ago` : m < 1440 ? `${Math.round(m / 60)} h ago` : `${Math.round(m / 1440)} d ago`; };
+    const StatusPill = ({ status }) => { const s = POV_STATUS[status] || POV_STATUS.planning; return <span className="badge" style={{background:'transparent', border:`1px solid ${s.color}`, color: s.color}} data-povstatus={status}>{s.label}</span>; };
+    const sameTenant = (a, b) => a && b && String(a.vanity || '').toLowerCase() === String(b.vanity || '').toLowerCase() && String(a.cloud || 'production').toLowerCase() === String(b.cloud || 'production').toLowerCase();
+    const ledgerCounts = (ledger) => (ledger || []).reduce((c, e) => { c[e.action] = (c[e.action] || 0) + 1; return c; }, {});
+
+    /** Template choices from a POV's saved resume point: what was chosen, never who / where (no customer, tenant, prefix, names, lists of customer hosts, secrets). */
+    function templateChoices(guide) {
+      const gd = guide || {}, pl = gd.payloads || {};
+      const zcc = Object.fromEntries(Object.entries(pl.zcc || {}).map(([k, v]) => {
+        const { name, description, tamperPassword, forwardingProfileId, newForwardingProfile, lists, ...rest } = v || {};
+        const keptLists = lists ? Object.fromEntries(Object.entries(lists).filter(([lk]) => lk !== 'vpnGateways')) : null;
+        return [k, { ...rest, lists: keptLists, newForwardingProfile: newForwardingProfile ? { templateId: newForwardingProfile.templateId, enabledSettings: newForwardingProfile.enabledSettings } : null }];
+      }));
+      const z = pl.zpa || null;
+      return {
+        scope: gd.g ? gd.g.scope : null, presetId: gd.g ? gd.g.presetId : null, baseline: gd.g ? gd.g.baseline : null,
+        pov: gd.pov ? { ...gd.pov, cbiProfile: null, sslCertificate: null } : null,
+        zcc: Object.keys(zcc).length ? zcc : null,
+        zpa: z ? { settings: z.settings, policies: z.policies, isolationProfile: z.isolationProfile, descriptions: z.descriptions } : null,
+        zdx: pl.zdx || null
+      };
+    }
+
+    function PovHome({ id, auth, sessionTenant, activePov, onResume, onConnectFor, onClosed, onChanged, onGo, setError }) {
+      const [data, setData] = useState(null);
+      const [tab, setTab] = useState('overview');
+      const [noteText, setNoteText] = useState('');
+      const [fuText, setFuText] = useState('');
+      const [crText, setCrText] = useState('');
+      const [tpl, setTpl] = useState(null);           // { name, description } while saving a template
+      const [tplSaved, setTplSaved] = useState(null);
+      const [archiving, setArchiving] = useState(false);
+      const [busy, setBusy] = useState(false);
+      const [openRun, setOpenRun] = useState(null);
+      const load = () => api.call('GET', `/v2/povs/${id}`).then(setData).catch(e => setError(e.message));
+      useEffect(() => { setData(null); setTab('overview'); load(); }, [id]);
+      useEffect(() => { if (activePov && activePov.id === id) { const t = setInterval(load, 15000); return () => clearInterval(t); } }, [id, activePov && activePov.id]);
+      if (!data) return <div className="card"><span className="spinner"></span> Loading POV…</div>;
+      const p = data.pov, sum = data.summary, gd = p.guide || {}, gg = gd.g || {};
+      const put = async (patch) => { try { const r = await api.call('PUT', `/v2/povs/${id}`, patch); setData(d => ({ ...d, pov: r.pov, summary: r.summary })); if (onChanged) onChanged(); } catch (e) { setError(e.message); } };
+      const isActive = activePov && activePov.id === id;
+      const tenantOk = auth.connected && sameTenant(p.tenant, sessionTenant);
+      const tenantLabel = `${p.tenant && p.tenant.vanity}${p.tenant && p.tenant.cloud && p.tenant.cloud !== 'production' ? ` (${p.tenant.cloud})` : ''}`;
+      const runsFlat = ['zcc', 'zia', 'zpa', 'zdx'].flatMap(k => (p.runs && p.runs[k] || []).map((r, i) => ({ k, i, r }))).sort((a, b) => (a.r.at < b.r.at ? 1 : -1));
+      const PRODUCT = { zcc: 'Client Connector', zia: 'Internet Access', zpa: 'Private Access', zdx: 'Digital Experience' };
+      const exportIt = async () => { try { const ex = await api.call('GET', `/v2/povs/${id}/export`); download(`${p.id}.ztp-pov.json`, JSON.stringify(ex, null, 2), 'application/json'); } catch (e) { setError(e.message); } };
+      const saveTemplate = async () => { try { const r = await api.call('POST', '/v2/pov-templates', { name: tpl.name, description: tpl.description, choices: templateChoices(gd), fromPov: p.id }); setTplSaved(r.template.name); setTpl(null); } catch (e) { setError(e.message); } };
+      const archive = async () => { try { await api.call('DELETE', `/v2/povs/${id}`); if (onClosed) onClosed(id); } catch (e) { setError(e.message); } };
+      const resume = async () => { setBusy(true); await onResume(p); setBusy(false); };
+      const planRows = [
+        ['Products', ['zia', 'zpa', 'zdx'].filter(k => gg.scope && gg.scope[k]).map(k => PRODUCT[k]).join(', ') || '—'],
+        ['Preset', gg.presetId || '—'], ['Baseline (ZIA)', (gd.pov && gd.pov.baseline) || gg.baseline || '—'], ['Internal domain', gg.domain || '—'],
+        ['Client Connector', Object.keys((gd.payloads && gd.payloads.zcc) || {}).map(k => k === 'macos' ? 'macOS' : 'Windows').join(' + ') || 'not set up yet'],
+        ['Private Access', gd.payloads && gd.payloads.zpa ? (gd.payloads.zpa.apps ? `${gd.payloads.zpa.apps.length} application segments` : `wildcard ${gd.payloads.zpa.domains || ''}`) : 'not set up yet'],
+        ['Digital Experience', gd.payloads && gd.payloads.zdx ? `${(gd.payloads.zdx.predefined || []).length + (gd.payloads.zdx.custom || []).length} apps` : 'not set up yet']
+      ];
+      const openFu = (p.followUps || []).filter(f => !f.done);
+      return (
+        <div data-povhome={p.id}>
+          <div className="card">
+            <div style={{display:'flex', justifyContent:'space-between', gap:'12px', flexWrap:'wrap', alignItems:'flex-start'}}>
+              <div>
+                <h2 style={{fontSize:'20px', margin:0}}>{p.customerName} <StatusPill status={p.status} /></h2>
+                <div className="form-hint">Tenant <strong>{tenantLabel}</strong> · prefix <code>{p.prefix || '—'}</code> · last activity {ago(sum.lastActivityAt)} · started {new Date(p.createdAt).toLocaleDateString()}</div>
+              </div>
+              <select value={p.status} onChange={e => put({ status: e.target.value })} style={{width:'auto'}} data-povstatusselect>
+                {Object.entries(POV_STATUS).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+              </select>
+            </div>
+            {sum.quiet && <div className="alert alert-warning" style={{marginTop:'0.75rem'}} data-povquiet><span>⏰ No activity for {sum.daysQuiet} days.{sum.next ? ` Next: ${sum.next.label} on ${sum.next.date}.` : ''}</span></div>}
+            <div style={{marginTop:'0.75rem'}} data-povresume>
+              {!auth.connected ? (
+                <div className="alert alert-info"><span>Sign in to <strong>{tenantLabel}</strong> to resume this POV. Credentials are never saved with a POV.
+                  <button className="btn btn-primary btn-sm" style={{marginLeft:'8px'}} onClick={() => onConnectFor(p)} data-povconnect>Sign in to {p.tenant && p.tenant.vanity}</button></span></div>
+              ) : !tenantOk ? (
+                <div className="alert alert-danger" data-povmismatch><span>⛔ You are signed in to <strong>{sessionTenant && sessionTenant.vanity}</strong>, but this POV belongs to <strong>{tenantLabel}</strong>. Disconnect and sign in to the POV's tenant to resume it; nothing will be written to the wrong tenant.</span></div>
+              ) : (
+                <div style={{display:'flex', gap:'8px', alignItems:'center', flexWrap:'wrap'}}>
+                  <button className="btn btn-primary" onClick={resume} disabled={busy} data-povresumebtn>{busy ? <span className="spinner"></span> : '▶'} {isActive ? 'Continue' : 'Resume'}{gd.stageLabel ? `: ${gd.stageLabel}` : ''}</button>
+                  {isActive && <span className="badge badge-create">Open in this session</span>}
+                  {isActive && <button className="btn btn-ghost btn-sm" onClick={() => onGo('restore')}>Restore & drift</button>}
+                  {isActive && <button className="btn btn-ghost btn-sm" onClick={() => onGo('tests')}>POV tests</button>}
+                  {isActive && <button className="btn btn-ghost btn-sm" onClick={() => onGo('report')}>Summary report</button>}
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div style={{display:'flex', gap:'6px', flexWrap:'wrap', marginBottom:'1rem'}}>
+            {[['overview', 'Overview'], ['runs', `What the tool did (${runsFlat.length})`], ['tests', `Tests & success criteria (${sum.tests.pass}/${sum.tests.total})`], ['timeline', `Timeline & notes`]].map(([k, l]) => (
+              <button key={k} className={`btn btn-sm ${tab === k ? 'btn-primary' : 'btn-ghost'}`} onClick={() => setTab(k)} data-povtab={k}>{l}</button>
+            ))}
+          </div>
+
+          {tab === 'overview' && (
+            <div className="card" data-povoverview>
+              <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(280px, 1fr))', gap:'1rem'}}>
+                <div>
+                  <h3 style={{fontSize:'14px', margin:'0 0 0.5rem'}}>POV plan</h3>
+                  <table className="diff-table"><tbody>{planRows.map(([k, v]) => <tr key={k}><td style={{width:'40%', color:'var(--text-muted)'}}>{k}</td><td>{v}</td></tr>)}</tbody></table>
+                </div>
+                <div>
+                  <h3 style={{fontSize:'14px', margin:'0 0 0.5rem'}}>Where things stand</h3>
+                  <table className="diff-table"><tbody>
+                    <tr><td style={{width:'40%', color:'var(--text-muted)'}}>Left off at</td><td><strong>{gd.stageLabel || 'Not started'}</strong></td></tr>
+                    <tr><td style={{color:'var(--text-muted)'}}>Runs</td><td>{sum.runs ? `${sum.runs} apply run${sum.runs === 1 ? '' : 's'}` : 'Nothing applied yet'}</td></tr>
+                    <tr><td style={{color:'var(--text-muted)'}}>Tests</td><td>{sum.tests.total ? `${sum.tests.pass} passed · ${sum.tests.fail} failed · ${sum.tests.total - sum.tests.pass - sum.tests.fail} to do` : 'No tests yet'}</td></tr>
+                    <tr><td style={{color:'var(--text-muted)'}}>Success criteria</td><td>{sum.criteria.total ? `${sum.criteria.met} of ${sum.criteria.total} met` : 'None yet'}</td></tr>
+                    <tr><td style={{color:'var(--text-muted)'}}>Next date</td><td>{sum.next ? `${sum.next.label} · ${sum.next.date}` : '—'}</td></tr>
+                  </tbody></table>
+                </div>
+              </div>
+              <h3 style={{fontSize:'14px', margin:'1.25rem 0 0.5rem'}}>Next steps ({openFu.length})</h3>
+              {openFu.length ? openFu.map(f => <div key={f.id} className="form-hint" style={{margin:'2px 0'}}>☐ {f.text} {f.source === 'wizard' && <span className="badge badge-category">wizard</span>}</div>) : <div className="form-hint">Nothing open. Add follow-ups under Timeline & notes.</div>}
+              {(p.notes || []).length > 0 && (<><h3 style={{fontSize:'14px', margin:'1.25rem 0 0.5rem'}}>Latest note</h3><div style={{fontSize:'13px', whiteSpace:'pre-wrap'}}>{p.notes[p.notes.length - 1].text}</div><div className="form-hint">{new Date(p.notes[p.notes.length - 1].at).toLocaleString()}</div></>)}
+              <div className="btn-group">
+                <button className="btn btn-ghost btn-sm" onClick={exportIt} data-povexport>⬇ Export POV</button>
+                <button className="btn btn-ghost btn-sm" onClick={() => { setTplSaved(null); setTpl({ name: `${p.customerName} setup`, description: '' }); }} disabled={!p.guide} data-povsavetpl>💾 Save as template</button>
+                {!archiving ? <button className="btn btn-ghost btn-sm" onClick={() => setArchiving(true)} data-povarchive>🗄 Archive</button>
+                  : <span style={{display:'flex', gap:'6px', alignItems:'center'}}><span className="form-hint" style={{margin:0}}>Archive this POV? It leaves the list (the folder is kept under povs/_archive).</span><button className="btn btn-danger btn-sm" onClick={archive} data-povarchiveyes>Archive</button><button className="btn btn-ghost btn-sm" onClick={() => setArchiving(false)}>Cancel</button></span>}
+              </div>
+              {tpl && (
+                <div className="card" style={{background:'var(--bg-input)', marginTop:'0.75rem'}} data-tplform>
+                  <div className="form-hint" style={{marginTop:0}}>A template keeps this POV's choices (products, preset, baseline, ZIA rule choices, Client Connector settings, ZPA settings and policies, ZDX apps), never the customer, tenant, prefix, host names or secrets.</div>
+                  <div style={{display:'grid', gridTemplateColumns:'1fr 2fr', gap:'8px'}}>
+                    <input type="text" value={tpl.name} maxLength={80} onChange={e => setTpl({ ...tpl, name: e.target.value })} placeholder="Template name" data-tplname />
+                    <input type="text" value={tpl.description} maxLength={300} onChange={e => setTpl({ ...tpl, description: e.target.value })} placeholder="What it is for (optional)" />
+                  </div>
+                  <div className="btn-group" style={{marginTop:'0.5rem'}}><button className="btn btn-primary btn-sm" onClick={saveTemplate} disabled={!tpl.name.trim()} data-tplsave>Save template</button><button className="btn btn-ghost btn-sm" onClick={() => setTpl(null)}>Cancel</button></div>
+                </div>
+              )}
+              {tplSaved && <div className="alert alert-success" style={{marginTop:'0.75rem'}}><span>✓ Saved template "{tplSaved}". Start a new POV from it under Active POVs › Templates.</span></div>}
+            </div>
+          )}
+
+          {tab === 'runs' && (
+            <div className="card" data-povruns>
+              {!runsFlat.length && <div className="form-hint">Nothing applied yet. Dry runs and applies made while this POV is open are recorded here.</div>}
+              {runsFlat.map(({ k, i, r }) => {
+                const key = `${k}-${i}`, c = ledgerCounts(r.ledger);
+                return (
+                  <div key={key} style={{borderBottom:'1px solid var(--border)', padding:'8px 0'}} data-povrun={k}>
+                    <div style={{display:'flex', gap:'8px', alignItems:'center', flexWrap:'wrap'}}>
+                      <strong style={{fontSize:'13px'}}>{PRODUCT[k]}</strong>
+                      <span className="form-hint" style={{margin:0}}>{new Date(r.at).toLocaleString()}</span>
+                      <span className="form-hint" style={{margin:0}}>{k === 'zdx' ? `${(r.apps || []).length} apps` : countLine(c)}</span>
+                      {r.snapshot && <span className="badge badge-category" title={r.snapshot}>restorable</span>}
+                      {r.activated === true && <span className="badge badge-create">activated</span>}
+                      {(r.ledger || r.apps) && <button className="btn btn-ghost btn-sm" style={{marginLeft:'auto'}} onClick={() => setOpenRun(openRun === key ? null : key)}>{openRun === key ? 'Hide' : 'Details'}</button>}
+                    </div>
+                    {openRun === key && (r.ledger ? <LedgerTable ledger={r.ledger} filterProduct /> : <div className="form-hint">{(r.apps || []).map(a => `${a.ok ? '✓' : '✗'} ${a.name}`).join(' · ')}</div>)}
+                  </div>
+                );
+              })}
+              {isActive && runsFlat.length > 0 && <div className="btn-group"><button className="btn btn-ghost btn-sm" onClick={() => onGo('restore')} data-povdrift>Check drift / restore a run</button></div>}
+            </div>
+          )}
+
+          {tab === 'tests' && (
+            <div className="card" data-povtests>
+              <h3 style={{fontSize:'14px', margin:'0 0 0.5rem'}}>Customer success criteria</h3>
+              <div className="form-hint" style={{marginTop:0}}>What the customer agreed the POV must prove. Link the tests that show each one.</div>
+              {(p.criteria || []).map((c, i) => (
+                <div key={c.id} className="toggle-item" style={{alignItems:'flex-start', gap:'8px'}} data-criterion={i}>
+                  <div style={{flex:1}}>
+                    <div style={{fontWeight:600, fontSize:'13px'}}>{c.text}</div>
+                    <div style={{display:'flex', gap:'6px', flexWrap:'wrap', marginTop:'4px'}}>
+                      {data.tests.map(t => (
+                        <label key={t.id} style={{fontSize:'11px', display:'flex', gap:'3px', alignItems:'center', cursor:'pointer', opacity: (c.testIds || []).includes(t.id) ? 1 : 0.55}}>
+                          <input type="checkbox" checked={(c.testIds || []).includes(t.id)} onChange={() => put({ criteria: p.criteria.map((x, j) => j === i ? { ...x, testIds: (x.testIds || []).includes(t.id) ? x.testIds.filter(y => y !== t.id) : [...(x.testIds || []), t.id] } : x) })} />
+                          {t.title}{t.result ? ` (${t.result.status})` : ''}
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                  <select value={c.status} style={{width:'auto'}} onChange={e => put({ criteria: p.criteria.map((x, j) => j === i ? { ...x, status: e.target.value } : x) })} data-criterionstatus>
+                    <option value="pending">Pending</option><option value="met">Met</option><option value="not-met">Not met</option>
+                  </select>
+                  <button className="btn btn-ghost btn-sm" onClick={() => put({ criteria: p.criteria.filter((_, j) => j !== i) })}>✕</button>
+                </div>
+              ))}
+              <div style={{display:'flex', gap:'6px', marginTop:'6px'}}>
+                <input type="text" value={crText} onChange={e => setCrText(e.target.value)} placeholder="e.g. Clinicians reach Epic without the VPN" data-criterioninput />
+                <button className="btn btn-primary btn-sm" disabled={!crText.trim()} onClick={() => { put({ criteria: [...(p.criteria || []), { text: crText.trim(), status: 'pending', testIds: [] }] }); setCrText(''); }} data-criterionadd>Add</button>
+              </div>
+              <h3 style={{fontSize:'14px', margin:'1.25rem 0 0.5rem'}}>POV tests ({sum.tests.pass} passed of {sum.tests.total})</h3>
+              {!data.tests.length && <div className="form-hint">Tests appear once something has been applied.</div>}
+              <table className="diff-table"><tbody>
+                {data.tests.map(t => <tr key={t.id}><td style={{width:'24px'}}>{t.result ? (t.result.status === 'pass' ? '✅' : t.result.status === 'fail' ? '❌' : '⏭') : '⬜'}</td><td>{t.title}</td><td className="form-hint">{t.result && t.result.note}</td></tr>)}
+              </tbody></table>
+              {isActive && <div className="btn-group"><button className="btn btn-ghost btn-sm" onClick={() => onGo('tests')}>Run tests →</button></div>}
+            </div>
+          )}
+
+          {tab === 'timeline' && (
+            <div className="card" data-povtimeline>
+              <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(200px, 1fr))', gap:'12px'}}>
+                <div className="form-group"><label className="form-label">Kickoff</label><input type="date" value={(p.timeline && p.timeline.kickoff) || ''} onChange={e => put({ timeline: { ...p.timeline, kickoff: e.target.value || null } })} data-povkickoff /></div>
+                <div className="form-group"><label className="form-label">POV ends</label><input type="date" value={(p.timeline && p.timeline.end) || ''} onChange={e => put({ timeline: { ...p.timeline, end: e.target.value || null } })} data-povend /></div>
+              </div>
+              <div className="form-label">Check-ins</div>
+              {((p.timeline && p.timeline.checkins) || []).map((c, i) => (
+                <div key={i} style={{display:'flex', gap:'6px', marginBottom:'4px'}}>
+                  <input type="date" value={c.date || ''} style={{width:'auto'}} onChange={e => put({ timeline: { ...p.timeline, checkins: p.timeline.checkins.map((x, j) => j === i ? { ...x, date: e.target.value } : x) } })} />
+                  <input type="text" value={c.label} onChange={e => put({ timeline: { ...p.timeline, checkins: p.timeline.checkins.map((x, j) => j === i ? { ...x, label: e.target.value } : x) } })} />
+                  <button className="btn btn-ghost btn-sm" onClick={() => put({ timeline: { ...p.timeline, checkins: p.timeline.checkins.filter((_, j) => j !== i) } })}>✕</button>
+                </div>
+              ))}
+              <button className="btn btn-ghost btn-sm" onClick={() => put({ timeline: { ...p.timeline, checkins: [...((p.timeline && p.timeline.checkins) || []), { date: new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10), label: 'Check-in' }] } })} data-povaddcheckin>+ Add check-in</button>
+
+              <h3 style={{fontSize:'14px', margin:'1.25rem 0 0.5rem'}}>Follow-ups</h3>
+              {(p.followUps || []).map((f, i) => (
+                <label key={f.id} className="toggle-item" style={{cursor:'pointer', padding:'6px 10px'}} data-followup={i}>
+                  <span style={{textDecoration: f.done ? 'line-through' : 'none', opacity: f.done ? 0.6 : 1}}><input type="checkbox" checked={f.done} onChange={() => put({ followUps: p.followUps.map((x, j) => j === i ? { ...x, done: !x.done } : x) })} style={{marginRight:'8px'}} />{f.text} {f.source === 'wizard' && <span className="badge badge-category">wizard</span>}</span>
+                </label>
+              ))}
+              <div style={{display:'flex', gap:'6px', marginTop:'6px'}}>
+                <input type="text" value={fuText} onChange={e => setFuText(e.target.value)} placeholder="e.g. Get the real PACS host name from the imaging team" data-followupinput />
+                <button className="btn btn-primary btn-sm" disabled={!fuText.trim()} onClick={() => { put({ followUps: [...(p.followUps || []), { text: fuText.trim(), done: false, source: 'me' }] }); setFuText(''); }} data-followupadd>Add</button>
+              </div>
+
+              <h3 style={{fontSize:'14px', margin:'1.25rem 0 0.5rem'}}>Notes</h3>
+              <textarea rows={3} value={noteText} onChange={e => setNoteText(e.target.value)} placeholder="Where you left off, what the customer said, what to show next time…" data-noteinput />
+              <div className="btn-group" style={{marginTop:'0.5rem'}}><button className="btn btn-primary btn-sm" disabled={!noteText.trim()} onClick={() => { put({ notes: [...(p.notes || []), { text: noteText.trim(), at: new Date().toISOString() }] }); setNoteText(''); }} data-noteadd>Add note</button></div>
+              {(p.notes || []).slice().reverse().map((n, i) => (
+                <div key={i} style={{borderTop:'1px solid var(--border)', padding:'8px 0'}} data-note={i}><div className="form-hint" style={{margin:0}}>{new Date(n.at).toLocaleString()}</div><div style={{fontSize:'13px', whiteSpace:'pre-wrap'}}>{n.text}</div></div>
+              ))}
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    function PovTemplates({ auth, onStart, setError }) {
+      const [list, setList] = useState(null);
+      const [confirm, setConfirm] = useState(null);
+      const load = () => api.call('GET', '/v2/pov-templates').then(r => setList(r.templates)).catch(e => setError(e.message));
+      useEffect(() => { load(); }, []);
+      const start = async (t) => { try { const r = await api.call('GET', `/v2/pov-templates/${t.id}`); onStart({ id: r.template.id, name: r.template.name, ...r.template.choices }); } catch (e) { setError(e.message); } };
+      return (
+        <div className="card" data-povtemplates>
+          <div className="card-header"><h2>POV templates</h2><p>Reusable choices (products, preset, baseline, ZIA rule choices, Client Connector settings, ZPA settings and policies, ZDX apps). Save one from any POV's Overview with <em>Save as template</em>. A template never holds a customer, tenant, prefix, host names or secrets.</p></div>
+          {!list && <span className="spinner"></span>}
+          {list && !list.length && <div className="form-hint">No templates yet.</div>}
+          {list && list.map(t => (
+            <div key={t.id} className="toggle-item" style={{alignItems:'flex-start'}} data-template={t.id}>
+              <div style={{flex:1}}><div style={{fontWeight:600}}>{t.name}</div><div className="form-hint">{t.description || ''} · saved {new Date(t.createdAt).toLocaleDateString()}</div></div>
+              <div style={{display:'flex', gap:'6px', flexWrap:'wrap'}}>
+                <button className="btn btn-primary btn-sm" disabled={!auth.connected} title={auth.connected ? '' : 'Sign in to the new customer\'s tenant first'} onClick={() => start(t)} data-templatestart>New POV from template</button>
+                {confirm === t.id ? <><button className="btn btn-danger btn-sm" onClick={async () => { await api.call('DELETE', `/v2/pov-templates/${t.id}`).catch(() => {}); setConfirm(null); load(); }}>Delete</button><button className="btn btn-ghost btn-sm" onClick={() => setConfirm(null)}>Cancel</button></>
+                  : <button className="btn btn-ghost btn-sm" onClick={() => setConfirm(t.id)}>🗑</button>}
+              </div>
+            </div>
+          ))}
+          {!auth.connected && <div className="form-hint">Sign in to the new customer's tenant to start a POV from a template.</div>}
         </div>
       );
     }
@@ -2411,10 +2789,11 @@
     // ========================
     // Step: Connect
     // ========================
-    function ConnectStep({ auth, setAuth, setError, loading, setLoading, onComplete }) {
+    function ConnectStep({ auth, setAuth, setError, loading, setLoading, onComplete, prefill }) {
       const [form, setForm] = useState({
-        clientId: '', clientSecret: '', vanityDomain: '', cloud: ''
+        clientId: '', clientSecret: '', vanityDomain: (prefill && prefill.vanity) || '', cloud: (prefill && prefill.cloud) || ''
       });
+      useEffect(() => { if (prefill) setForm(f => ({ ...f, vanityDomain: prefill.vanity || '', cloud: prefill.cloud || '' })); }, [prefill && prefill.vanity]);
 
       const handleConnect = async () => {
         setLoading(true); setError(null);
@@ -2439,6 +2818,7 @@
               <h2>Connect to Zscaler</h2>
               <p>Authenticate using OneAPI (OAuth2) credentials from ZIdentity. This provides access to ZIA, ZCC, and other Zscaler services through a single token.</p>
             </div>
+            {prefill && prefill.vanity && <div className="alert alert-info" data-connectfor><span>Signing in to resume a POV on <strong>{prefill.vanity}</strong>. Credentials are used for this session only and are never saved.</span></div>}
 
             <div className="explainer">
               <strong>Prerequisites:</strong> You need an API client configured in ZIdentity → Integration → API Clients
@@ -4024,21 +4404,24 @@
       const [step, setStep] = useState('platform');
       const [platform, setPlatform] = useState(initialPlatform || 'windows');
       const initTag = initialPlatform === 'macos' ? 'macOS' : 'Windows';
+      // v2.4: a saved POV (resume) or a template seeds the first platform's choices; used once, on the first load
+      const seedRef = useRef((guided && guided.seed && guided.seed[initialPlatform || 'windows']) || null);
+      const seed = seedRef.current;
       const [catalog, setCatalog] = useState(null);
-      const [templateId, setTemplateId] = useState('BEST_PRACTICE');
+      const [templateId, setTemplateId] = useState((seed && seed.templateId) || 'BEST_PRACTICE');
       const [enabled, setEnabled] = useState(null); // Set of app profile setting keys
       const [form, setForm] = useState({
-        name: `${prefix}-${initTag}-BestPractice`,
-        description: 'Created by ZTP Policy Wizard from the Best Practice template',
-        forwardingProfileId: 0,
-        active: false
+        name: (seed && seed.name) || `${prefix}-${initTag}-BestPractice`,
+        description: (seed && seed.description) || 'Created by ZTP Policy Wizard from the Best Practice template',
+        forwardingProfileId: (seed && seed.forwardingProfileId) || 0,
+        active: !!(seed && seed.active)
       });
       // Forwarding profile (created first, then linked to the app profile)
       const [fwdCatalog, setFwdCatalog] = useState(null);
-      const [fwdMode, setFwdMode] = useState('new'); // 'new' | 'existing'
-      const [fwdTemplateId, setFwdTemplateId] = useState('BEST_PRACTICE');
+      const [fwdMode, setFwdMode] = useState(seed && !seed.newForwardingProfile && seed.forwardingProfileId ? 'existing' : 'new'); // 'new' | 'existing'
+      const [fwdTemplateId, setFwdTemplateId] = useState((seed && seed.newForwardingProfile && seed.newForwardingProfile.templateId) || 'BEST_PRACTICE');
       const [fwdEnabled, setFwdEnabled] = useState(null);
-      const [fwdName, setFwdName] = useState(`${prefix}-FWD-${initTag}-BestPractice`);
+      const [fwdName, setFwdName] = useState((seed && seed.newForwardingProfile && seed.newForwardingProfile.name) || `${prefix}-FWD-${initTag}-BestPractice`);
       const [plan, setPlan] = useState(null);
       const [busy, setBusy] = useState(false);
       const [confirmed, setConfirmed] = useState(false);
@@ -4046,7 +4429,7 @@
       // v2.0: predefined IP-based bypass apps from the tenant (ZCC-03) and the five lists (ZCC-06..09)
       const [bypassApps, setBypassApps] = useState(null);
       const [bypassChecked, setBypassChecked] = useState(null);
-      const [tamperPassword, setTamperPassword] = useState(() => genPassword());
+      const [tamperPassword, setTamperPassword] = useState(() => (seed && seed.tamperPassword) || genPassword());
       const [showPw, setShowPw] = useState(false);
       const [listDefaults, setListDefaults] = useState(null);
       const [lists, setLists] = useState(null);      // { key: text } per list; null = defaults not loaded yet
@@ -4055,7 +4438,7 @@
       const plat = ZCC_PLATFORMS.find(p => p.id === platform);
       useEffect(() => {
         api.call('GET', '/v2/meta').then(setV2meta).catch(() => {});
-        api.call('GET', '/v2/zcc/bypass-apps').then(apps => { setBypassChecked(new Set(apps.map(a => a.id))); setBypassApps(apps); })
+        api.call('GET', '/v2/zcc/bypass-apps').then(apps => { setBypassChecked(new Set(seed && Array.isArray(seed.bypassAppIds) ? seed.bypassAppIds : apps.map(a => a.id))); setBypassApps(apps); })
           .catch(e => setBypassApps({ error: e.message }));
       }, []);
       // Defaults shown for each list = what the chosen template produces (ZCC-07); reloaded when the template changes
@@ -4063,8 +4446,11 @@
         if (!templateId || !enabled) return;
         api.call('POST', `/v2/zcc/list-defaults/${platform}`, { templateId, enabledSettings: [...enabled] }).then(d => {
           setListDefaults(d);
-          setLists(prev => prev && prev.__platform === platform && prev.__template === templateId ? prev
-            : { __platform: platform, __template: templateId, ...Object.fromEntries(Object.entries(d).map(([k, v]) => [k, v.join(', ')])) });
+          setLists(prev => {
+            if (prev && prev.__platform === platform && prev.__template === templateId) return prev;
+            const fromSeed = !prev && seed && seed.lists && platform === (initialPlatform || 'windows');
+            return { __platform: platform, __template: templateId, ...Object.fromEntries(Object.entries(d).map(([k, v]) => [k, (fromSeed && Array.isArray(seed.lists[k]) ? seed.lists[k] : v).join(', ')])) };
+          });
         }).catch(() => {});
       }, [platform, templateId, enabled && [...enabled].sort().join(',')]);
       const listErrors = lists && v2meta ? zccListErrors(lists, v2meta.zccListKeys) : {};
@@ -4082,8 +4468,9 @@
       useEffect(() => {
         api.call('GET', '/zcc/fwd-templates').then(c => {
           setFwdCatalog(c);
-          const t = c.find(x => x.id === 'BEST_PRACTICE') || c[0];
-          setFwdEnabled(new Set(t.settings.map(s => s.key)));
+          const t = c.find(x => x.id === fwdTemplateId) || c.find(x => x.id === 'BEST_PRACTICE') || c[0];
+          const sf = seed && seed.newForwardingProfile && Array.isArray(seed.newForwardingProfile.enabledSettings) ? seed.newForwardingProfile.enabledSettings : null;
+          setFwdEnabled(new Set(sf || t.settings.map(s => s.key)));
         }).catch(e => setError(e.message));
       }, []);
 
@@ -4095,8 +4482,9 @@
           setCatalog(c);
           const t = c.find(x => x.id === templateId) || c.find(x => x.id === 'BEST_PRACTICE') || c[0];
           setTemplateId(t.id);
-          setEnabled(new Set(t.settings.map(s => s.key)));
-          setForm(f => ({ ...f, forwardingProfileId: recommendedFwdId(t) }));
+          const se = seedRef.current && platform === (initialPlatform || 'windows') && Array.isArray(seedRef.current.enabledSettings) ? seedRef.current.enabledSettings : null;
+          setEnabled(new Set(se || t.settings.map(s => s.key)));
+          if (!(seedRef.current && seedRef.current.forwardingProfileId)) setForm(f => ({ ...f, forwardingProfileId: recommendedFwdId(t) }));
         }).catch(e => setError(e.message));
         return () => { cancelled = true; };
       }, [platform]);
@@ -4580,9 +4968,10 @@
     }
 
     function ZdxWizard({ setError, onExit, guided }) {
+      const seededZdx = useRef(false);
       const [step, setStep] = useState('template');
       const [catalog, setCatalog] = useState(null);
-      const [templateId, setTemplateId] = useState('POV_BEST_PRACTICE');
+      const [templateId, setTemplateId] = useState((guided && guided.saved && guided.saved.templateId) || 'POV_BEST_PRACTICE');
       const [predef, setPredef] = useState({});   // provider -> { on, prefix, web, cloudpath }
       const [custom, setCustom] = useState([]);   // [{ name, url, cloudpath, frequency, protocol }]
       const [plan, setPlan] = useState(null);
@@ -4597,6 +4986,17 @@
         t.predefined.forEach(x => { p[x.provider] = { ...(p[x.provider] || {}), on: true, web: x.web !== false, cloudpath: !!x.cloudpath }; });
         // v2.3 guided: the customer intake preset adds its segment's apps on top of the template
         if (guided) (guided.predefined || []).forEach(prov => { if (p[prov]) p[prov] = { ...p[prov], on: true }; });
+        // v2.4: a resumed POV or a template brings back exactly the apps chosen before (once, on the first load)
+        const sv = guided && guided.saved && !seededZdx.current ? guided.saved : null;
+        if (sv) {
+          seededZdx.current = true;
+          Object.keys(p).forEach(k => { p[k] = { ...p[k], on: false }; });
+          (sv.predefined || []).forEach(x => { if (p[x.provider]) p[x.provider] = { ...p[x.provider], on: true, prefix: x.prefix || p[x.provider].prefix, web: x.web !== false, cloudpath: !!x.cloudpath }; });
+          setPredef(p);
+          setCustom((sv.custom || []).map(c => ({ name: c.name, url: c.url, cloudpath: c.cloudpath !== false, frequency: c.frequency || 300, protocol: c.protocol || 'ADAPTIVE' })));
+          setPlan(null);
+          return;
+        }
         setPredef(p);
         const extra = guided ? (guided.custom || []).filter(c => !t.custom.some(x => x.url === c.url)) : [];
         setCustom([...t.custom, ...extra].map(c => ({ name: c.name, url: c.url, cloudpath: c.cloudpath !== false, frequency: c.frequency || 300, protocol: c.protocol || 'ADAPTIVE' })));
@@ -4604,7 +5004,7 @@
       };
 
       useEffect(() => {
-        api.call('GET', '/zdx/catalog').then(c => { setCatalog(c); applyTemplate(c, 'POV_BEST_PRACTICE'); })
+        api.call('GET', '/zdx/catalog').then(c => { setCatalog(c); applyTemplate(c, (guided && guided.saved && guided.saved.templateId) || 'POV_BEST_PRACTICE'); })
           .catch(e => setError('Could not load ZDX: ' + e.message));
       }, []);
 
