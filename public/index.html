@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ZeroTrustPanda ZS Policy Wizard v2.5.1 - Zscaler Template Policy Configuration</title>
+  <title>ZeroTrustPanda ZS Policy Wizard v2.5.2 - Zscaler Template Policy Configuration</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
   <style>
@@ -642,7 +642,7 @@
     // ========================
     // App Version
     // ========================
-    const APP_VERSION = '2.5.1';
+    const APP_VERSION = '2.5.2';
     const BUILD_DATE = '2026-03-30';
 
     // ========================
@@ -1122,6 +1122,7 @@
                     <summary style={{cursor:'pointer', fontWeight:600, fontSize:'14px'}}>Version history</summary>
                     <div style={{marginTop:'0.75rem', lineHeight:1.7}}>
                     <div style={{paddingLeft:'1rem', fontSize:'12px'}}>
+                      <div><strong>v2.5.2</strong> — Allow in ZIA now includes Claude, Anthropic, OpenAI, Grok and Glean: ZIA's action lookup lists nothing for them, but it accepts them in an Allow rule.</div>
                       <div><strong>v2.5.1</strong> — AI Guard compliance profile: HIPAA, HITRUST, PCI, GDPR, CJIS, FERPA, SOX, NIST 800-171 / 800-53 or General, Monitor or Block per POV, created as an AI Guard detection policy and applied to the AI apps' providers. Allow in ZIA: pick the AI apps to allow above Block / Caution / Isolate rules (Cloud App Control, plus URL Filtering when a URL rule would stop them). The ZTH tier's Caution-AI rule now targets AI &amp; ML Applications instead of Other Information Technology.</div>
                       <div><strong>v2.5.0</strong> — AI Guard (needs ZIA; switching it on switches ZIA on): sends ChatGPT, Microsoft 365 Copilot, Claude, Gemini and other AI apps through ZIA inspection to AI Guard with proxy chaining, blocks QUIC, puts an Inspect rule above every SSL bypass (including Office 365 One Click), turns on Gen AI prompt capture when licensed and checks the AI Guard API. Reuses an AI Guard proxy and gateway already in ZIA. New light theme (dark is a toggle), an About page and product icons.</div>
                       <div><strong>v2.4.0</strong> — Active POVs: every POV is saved on this computer with its plan, the exact step you left off, what the wizard did (runs, restore points, drift), tests and customer success criteria, a timeline, notes and follow-ups. Resume any POV after signing in to its tenant (a POV never opens against a different tenant); credentials and other secrets are never saved. Saved templates, export / import, quiet-POV flag.</div>
