@@ -831,7 +831,7 @@
         else if (['zpa', 'report'].includes(mod)) setStep(mod);
         else if (mod === 'zia-ssl') setStep('ssl');
         else if (mod === 'zcc') setStep('zcc');
-        else if (['start', 'tests', 'zcc-devices', 'restore', 'pov-home', 'pov-templates'].includes(mod)) setStep(mod);
+        else if (['start', 'tests', 'zcc-devices', 'restore', 'pov-home', 'pov-templates', 'aiguard'].includes(mod)) setStep(mod);
         else if (mod === 'zdx') setStep('zdx');
         else if (mod === 'about') setStep('about');
         else if (mod === 'catalog') setStep('catalog');
@@ -879,15 +879,15 @@
       const showAbout = activeModule === 'about';
       const showCatalog = activeModule === 'catalog';
       const showZiaSsl = auth.connected && activeModule === 'zia-ssl';
-      const ziaExpanded = ['zia-pov', 'zia-wizard', 'zia-ssl'].includes(activeModule);
+      const ziaExpanded = ['zia-pov', 'zia-wizard', 'zia-ssl', 'aiguard'].includes(activeModule);
       const zpaExpanded = activeModule === 'zpa';
       const zdxExpanded = activeModule === 'zdx';
-      const needsPrefix = auth.connected && !globalPrefix && ['zia-pov', 'zpa', 'zcc'].includes(activeModule);
+      const needsPrefix = auth.connected && !globalPrefix && ['zia-pov', 'zpa', 'zcc', 'aiguard'].includes(activeModule);
       const zccExpanded = activeModule === 'zcc' || activeModule === 'zcc-devices';
       const sub = (mod, icon, label, extra = {}) => (
         <div className={`sidebar-item ${activeModule === mod ? 'active' : ''}`} data-nav={mod} onClick={() => switchModule(mod)}
           style={{paddingLeft:'2.2rem', fontSize:'12px', cursor:'pointer', ...extra}}>
-          <span className="step-num" style={{fontSize:'10px', width:'16px', height:'16px'}}>{icon}</span> {label}
+          <span className="step-num" style={{width:'16px', height:'16px'}}><Icon name={icon} size={12} /></span> {label}
         </div>
       );
 
@@ -953,13 +953,13 @@
                     onClick={() => switchModule('zcc')} style={{cursor:'pointer', fontWeight: zccExpanded ? 600 : 400}}>
                     <span className="step-num"><Icon name="zcc" size={14} /></span> Zscaler Client Connector
                   </div>
-                  {zccExpanded && (<>{sub('zcc', '🧭', 'Profiles')}{sub('zcc-devices', '💻', 'Devices & Install')}</>)}
+                  {zccExpanded && (<>{sub('zcc', 'chevron', 'Profiles')}{sub('zcc-devices', 'zcc', 'Devices & Install')}</>)}
                   <div className={`sidebar-item ${ziaExpanded ? 'active' : ''}`} data-nav="zia-top"
                     onClick={() => switchModule('zia-pov')} style={{cursor:'pointer', fontWeight: ziaExpanded ? 600 : 400}}>
                     <span className="step-num"><Icon name="zia" size={14} /></span> Zscaler Internet Access
                   </div>
                   {ziaExpanded && (<>
-                    {sub('zia-pov', '🧭', 'Policy Wizard')}
+                    {sub('zia-pov', 'chevron', 'Policy Wizard')}
                     {activeModule === 'zia-pov' && POV_STEPS.map((st, i) => (
                       <div key={st.id} className={`sidebar-item ${povStep === st.id ? 'active' : ''} ${i < povReached && povStep !== st.id ? 'completed' : ''}`}
                         onClick={() => { if (i <= povReached && !(st.id === 'done' && !povResult)) goPov(st.id); }}
@@ -967,7 +967,7 @@
                         <span className="step-num" style={{fontSize:'9px', width:'15px', height:'15px'}}>{i < povReached && povStep !== st.id ? '✓' : i + 1}</span> {st.label}
                       </div>
                     ))}
-                    {sub('zia-wizard', '📁', 'Framework Files (1.9)')}
+                    {sub('zia-wizard', 'templates', 'Framework Files (1.9)')}
                     {showZiaWizard && WIZARD_STEPS.map((s, i) => (
                       <div key={s.id} className={`sidebar-item ${step === s.id ? 'active' : ''} ${completedSteps.has(s.id) ? 'completed' : ''}`}
                         onClick={() => { if (completedSteps.has(s.id) || step === s.id) goTo(s.id); }}
@@ -975,7 +975,8 @@
                         <span className="step-num" style={{fontSize:'9px', width:'15px', height:'15px'}}>{completedSteps.has(s.id) ? '✓' : i + 1}</span> {s.label}
                       </div>
                     ))}
-                    {sub('zia-ssl', '🔐', 'SSL Certificate Manager')}
+                    {sub('zia-ssl', 'zpa', 'SSL Certificate Manager')}
+                    {sub('aiguard', 'aiguard', 'AI Guard')}
                   </>)}
                   <div className={`sidebar-item ${zpaExpanded ? 'active' : ''}`} data-nav="zpa-top"
                     onClick={() => switchModule('zpa')} style={{cursor:'pointer', fontWeight: zpaExpanded ? 600 : 400}}>
@@ -1036,6 +1037,7 @@
               {activeModule === 'pov-home' && povHomeId && <PovHome id={povHomeId} auth={auth} sessionTenant={sessionTenant} activePov={activePov} onResume={resumePov} onConnectFor={connectFor}
                 onClosed={(id) => { if (activePov && activePov.id === id) setActivePov(null); refreshPovs(); setPovHomeId(null); setActiveModule(auth.connected ? 'start' : null); setStep(auth.connected ? 'start' : 'connect'); }}
                 onChanged={refreshPovs} onGo={switchModule} setError={setError} />}
+              {auth.connected && activeModule === 'aiguard' && globalPrefix && <AiGuardStep prefix={globalPrefix} setError={setError} onReport={() => switchModule('report')} />}
               {activeModule === 'pov-templates' && <PovTemplates auth={auth} onStart={newPov} setError={setError} />}
               {auth.connected && activeModule === 'tests' && <PovTests setError={setError} />}
               {auth.connected && activeModule === 'zcc-devices' && <ZccDevicesInstall setError={setError} />}
@@ -1100,7 +1102,8 @@
                             <div className="about-mono" aria-hidden="true">SH</div>
                             <div>
                               <div style={{fontWeight:600, fontSize:'16px'}}>Steven Hajny</div>
-                              <div className="form-hint" style={{marginTop:0}}>Distinguished Solutions Engineer, Healthcare · Zscaler</div>
+                              <div className="form-hint" style={{marginTop:0}}>Zscaler Distinguished Sales Engineer</div>
+                              <a href="https://www.linkedin.com/in/stevenzhajny" target="_blank" rel="noreferrer" style={{fontSize:'13px', color:'var(--accent-blue)'}} data-aboutlinkedin>linkedin.com/in/stevenzhajny</a>
                             </div>
                           </div>
                           <p style={{fontSize:'14px', color:'var(--text-secondary)', margin:'0.9rem 0 0'}}>Steven helps hospitals and health systems adopt zero trust, and created the Zero Trust Hospital framework. He built ZeroTrustPanda to take the repetitive setup out of POVs, so the first call is spent on Epic, imaging and clinical workflows rather than on clicking through consoles.</p>
@@ -2129,7 +2132,7 @@
       const needZcc = g.scope.zia || g.scope.zpa;
       const stages = [
         { id: 'readiness', label: 'Tenant readiness' }, { id: 'scope', label: 'Build the POV' }, { id: 'intake', label: 'Customer intake' },
-        needZcc && { id: 'zcc', label: 'Client Connector' }, g.scope.zia && { id: 'zia', label: 'Internet Access' },
+        needZcc && { id: 'zcc', label: 'Client Connector' }, g.scope.zia && { id: 'zia', label: 'Internet Access' }, g.scope.aiguard && g.scope.zia && { id: 'aiguard', label: 'AI Guard' },
         g.scope.zpa && { id: 'zpa', label: 'Private Access' }, g.scope.zdx && { id: 'zdx', label: 'Digital Experience' },
         { id: 'run', label: 'Dry run & apply' }
       ].filter(Boolean);
@@ -2223,6 +2226,12 @@
                 nextLabel={nextLabel} onNext={() => { setPayloads(p => ({ ...p, ziaReady: true })); next(); }} />}
             </div>
           )}
+          {wizardKey && g.scope.aiguard && g.scope.zia && visited.has('aiguard') && (
+            <div style={show('aiguard')} data-guide="aiguard">
+              <AiGuardStep key={wizardKey} prefix={prefix} setError={setError}
+                guided={{ saved: payloads.aiguard || null, onBack: back, nextLabel, onNext: (b) => { setPayloads(p => ({ ...p, aiguard: b })); next(); } }} />
+            </div>
+          )}
           {wizardKey && g.scope.zpa && visited.has('zpa') && meta && (zpaInitial || payloads.zpa) && (
             <div style={show('zpa')} data-guide="zpa">
               <ZpaWizard key={wizardKey} meta={meta} prefix={prefix} setError={setError} onReport={onReport}
@@ -2256,18 +2265,20 @@
         payloads.zcc.windows && { key: 'zccWin', product: 'zcc', stage: 'zcc', label: 'Client Connector (Windows)', platform: 'windows', payload: payloads.zcc.windows },
         payloads.zcc.macos && { key: 'zccMac', product: 'zcc', stage: 'zcc', label: 'Client Connector (macOS)', platform: 'macos', payload: payloads.zcc.macos },
         g.scope.zia && payloads.ziaReady && pov.baseline && { key: 'zia', product: 'zia', stage: 'zia', label: 'Internet Access', payload: ziaPayload() },
+        g.scope.aiguard && g.scope.zia && payloads.aiguard && { key: 'aiguard', product: 'aiguard', stage: 'aiguard', label: 'AI Guard', payload: { ...payloads.aiguard, prefix } },
         g.scope.zpa && payloads.zpa && { key: 'zpa', product: 'zpa', stage: 'zpa', label: 'Private Access', payload: payloads.zpa },
         g.scope.zdx && payloads.zdx && { key: 'zdx', product: 'zdx', stage: 'zdx', label: 'Digital Experience', payload: payloads.zdx }
       ].filter(Boolean);
       const missing = [
         g.scope.zia && !(payloads.ziaReady && pov.baseline) && { stage: 'zia', label: 'Internet Access' },
+        g.scope.aiguard && g.scope.zia && !payloads.aiguard && { stage: 'aiguard', label: 'AI Guard' },
         g.scope.zpa && !payloads.zpa && { stage: 'zpa', label: 'Private Access' },
         g.scope.zdx && !payloads.zdx && { stage: 'zdx', label: 'Digital Experience' }
       ].filter(Boolean);
 
       const planOne = async (st) => {
         try {
-          if (st.product === 'zia' || st.product === 'zpa') {
+          if (st.product === 'zia' || st.product === 'zpa' || st.product === 'aiguard') {
             const p = await api.call('POST', `/v2/${st.product}/plan`, st.payload);
             return { status: (p.errors && p.errors.length) ? 'error' : 'ok', error: (p.errors || []).join(' '), payload: st.payload, planId: p.planId, counts: p.counts, rows: p.ledger, warnings: p.warnings };
           }
@@ -2316,6 +2327,7 @@
           out[st.key] = { status: 'running' }; setResults({ ...out });
           try {
             if (st.product === 'zia') { const r = await api.call('POST', '/v2/zia/apply', { ...pl.payload, planId: pl.planId }); out[st.key] = { status: 'ok', counts: r.counts, rows: r.ledger, note: r.activated ? 'Activated' : '' }; }
+            else if (st.product === 'aiguard') { const r = await api.call('POST', '/v2/aiguard/apply', { ...pl.payload, planId: pl.planId }); out[st.key] = { status: 'ok', counts: r.counts, rows: r.ledger, warnings: [...(r.warnings || []), ...(r.gatewayMissing ? ['Create the proxy gateway in the ZIA portal, then re-run AI Guard to add the forwarding rule.'] : [])], note: r.activated ? 'Activated' : '' }; }
             else if (st.product === 'zpa') { const r = await api.call('POST', '/v2/zpa/apply', { ...pl.payload, planId: pl.planId }); out[st.key] = { status: 'ok', counts: r.counts, rows: r.ledger, key: !!r.provisioningKey }; }
             else if (st.product === 'zcc') { const r = await api.call('POST', `/zcc/app-profiles/${st.platform}`, { ...pl.payload, planId: pl.planId }); out[st.key] = { status: r.verified ? 'ok' : 'warn', rows: [{ product: 'ZCC', category: 'App Profile', name: r.name, action: r.action, note: r.verified ? 'Verified on read-back' : 'Some settings did not verify' }] }; }
             else if (st.product === 'zdx') { const r = await api.call('POST', '/zdx/apply', pl.payload); out[st.key] = { status: r.success ? 'ok' : 'warn', rows: r.results.map(x => ({ product: 'ZDX', category: x.kind, name: x.name, action: x.ok ? 'CREATE' : 'FAILED' })) }; }
@@ -2332,7 +2344,7 @@
         : r.status === 'warn' ? <span className="badge badge-update">Check</span> : r.status === 'skipped' ? <span className="badge badge-category">Skipped</span> : <span className="badge badge-risk">Failed</span>;
       return (
         <div className="card" data-combined>
-          <div className="card-header"><h2>Dry run & apply</h2><p>One dry run covers everything you set up for <strong>{g.customerName || 'this customer'}</strong> (prefix <code>{prefix}</code>). Nothing changes until you apply; Apply runs Client Connector → Internet Access → Private Access → Digital Experience and shows each object as it is created.</p></div>
+          <div className="card-header"><h2>Dry run & apply</h2><p>One dry run covers everything you set up for <strong>{g.customerName || 'this customer'}</strong> (prefix <code>{prefix}</code>). Nothing changes until you apply; Apply runs Client Connector → Internet Access → AI Guard → Private Access → Digital Experience and shows each object as it is created.</p></div>
           {missing.map(m => <div key={m.stage} className="alert alert-warning"><span>{m.label} is in scope but its step was not finished. <button className="btn btn-ghost btn-sm" onClick={() => go(m.stage)}>Go to {m.label}</button></span></div>)}
           {!steps.length && <div className="alert alert-info"><span>Nothing to run yet. Finish at least one product step.</span></div>}
           {steps.map(st => {
@@ -2433,8 +2445,8 @@
       const isActive = activePov && activePov.id === id;
       const tenantOk = auth.connected && sameTenant(p.tenant, sessionTenant);
       const tenantLabel = `${p.tenant && p.tenant.vanity}${p.tenant && p.tenant.cloud && p.tenant.cloud !== 'production' ? ` (${p.tenant.cloud})` : ''}`;
-      const runsFlat = ['zcc', 'zia', 'zpa', 'zdx'].flatMap(k => (p.runs && p.runs[k] || []).map((r, i) => ({ k, i, r }))).sort((a, b) => (a.r.at < b.r.at ? 1 : -1));
-      const PRODUCT = { zcc: 'Client Connector', zia: 'Internet Access', zpa: 'Private Access', zdx: 'Digital Experience' };
+      const runsFlat = ['zcc', 'zia', 'aiguard', 'zpa', 'zdx'].flatMap(k => (p.runs && p.runs[k] || []).map((r, i) => ({ k, i, r }))).sort((a, b) => (a.r.at < b.r.at ? 1 : -1));
+      const PRODUCT = { zcc: 'Client Connector', zia: 'Internet Access', aiguard: 'AI Guard', zpa: 'Private Access', zdx: 'Digital Experience' };
       const exportIt = async () => { try { const ex = await api.call('GET', `/v2/povs/${id}/export`); download(`${p.id}.ztp-pov.json`, JSON.stringify(ex, null, 2), 'application/json'); } catch (e) { setError(e.message); } };
       const saveTemplate = async () => { try { const r = await api.call('POST', '/v2/pov-templates', { name: tpl.name, description: tpl.description, choices: templateChoices(gd), fromPov: p.id }); setTplSaved(r.template.name); setTpl(null); } catch (e) { setError(e.message); } };
       const archive = async () => { try { await api.call('DELETE', `/v2/povs/${id}`); if (onClosed) onClosed(id); } catch (e) { setError(e.message); } };
@@ -2443,6 +2455,7 @@
         ['Products', ['zia', 'aiguard', 'zpa', 'zdx'].filter(k => gg.scope && gg.scope[k]).map(k => k === 'aiguard' ? 'AI Guard' : PRODUCT[k]).join(', ') || '—'],
         ['Preset', ({ HEALTHCARE: 'Healthcare', GENERAL: 'General enterprise', FINANCE: 'Financial services', EDUCATION: 'Education', BLANK: 'Start empty' })[gg.presetId] || gg.presetId || '—'], ['Baseline (ZIA)', (gd.pov && gd.pov.baseline) || gg.baseline || '—'], ['Internal domain', gg.domain || '—'],
         ['Client Connector', Object.keys((gd.payloads && gd.payloads.zcc) || {}).map(k => k === 'macos' ? 'macOS' : 'Windows').join(' + ') || 'not set up yet'],
+        ...(gg.scope && gg.scope.aiguard ? [['AI Guard', gd.payloads && gd.payloads.aiguard ? `${(gd.payloads.aiguard.apps || []).length} AI apps` : 'not set up yet']] : []),
         ['Private Access', gd.payloads && gd.payloads.zpa ? (gd.payloads.zpa.apps ? `${gd.payloads.zpa.apps.length} application segments` : `wildcard ${gd.payloads.zpa.domains || ''}`) : 'not set up yet'],
         ['Digital Experience', gd.payloads && gd.payloads.zdx ? `${(gd.payloads.zdx.predefined || []).length + (gd.payloads.zdx.custom || []).length} apps` : 'not set up yet']
       ];
@@ -2645,6 +2658,132 @@
             </div>
           ))}
           {!auth.connected && <div className="form-hint">Sign in to the new customer's tenant to start a POV from a template.</div>}
+        </div>
+      );
+    }
+
+    // ========================
+    // v2.5 — AI Guard: ZIA inspects AI apps and proxy-chains them to AI Guard
+    // ========================
+    function AiGuardStep({ prefix, setError, guided, onReport }) {
+      const saved = (guided && guided.saved) || null;
+      const [ctx, setCtx] = useState(null);
+      const [apps, setApps] = useState(() => new Set((saved && saved.apps) || []));
+      const [extra, setExtra] = useState(((saved && saved.extraDomains) || []).join(', '));
+      const [cloudMs, setCloudMs] = useState(!!(saved && saved.includeCloudMicrosoft));
+      const [cert, setCert] = useState(() => (saved && saved.cert) || { mode: '' });
+      const [certFile, setCertFile] = useState('');
+      const [opts, setOpts] = useState(() => ({ blockQuic: saved ? saved.blockQuic !== false : true, sslInspect: saved ? saved.sslInspect !== false : true, promptCapture: saved ? saved.promptCapture !== false : true }));
+      const [plan, setPlan] = useState(null);
+      const [result, setResult] = useState(null);
+      const [busy, setBusy] = useState(false);
+      const [confirmed, setConfirmed] = useState(false);
+      const load = () => api.call('GET', '/v2/aiguard/context').then(c => {
+        setCtx(c);
+        setApps(prev => prev.size ? prev : new Set(c.apps.filter(a => a.default).map(a => a.id)));
+        if (!cert.mode && c.rootCertificates && c.rootCertificates.length) setCert({ mode: 'existing', id: c.rootCertificates[0].id });
+      }).catch(e => setCtx({ error: e.message }));
+      useEffect(() => { load(); }, []);
+      useEffect(() => { setPlan(null); setConfirmed(false); }, [JSON.stringify([[...apps], extra, cloudMs, cert, opts])]);
+      const body = () => ({ prefix, apps: [...apps], extraDomains: splitItems(extra), includeCloudMicrosoft: cloudMs, cert, ...opts });
+      const readPem = async (file) => { if (!file) return; setCertFile(file.name); const t = await file.text(); setCert({ mode: 'upload', pem: t.trim() }); };
+      const dry = async () => { setBusy(true); setError(null); try { setPlan(await api.call('POST', '/v2/aiguard/plan', body())); } catch (e) { setError(e.message); } setBusy(false); };
+      const apply = async () => { setBusy(true); setError(null); try { setResult(await api.call('POST', '/v2/aiguard/apply', { ...body(), planId: plan.planId })); } catch (e) { setError(e.message); } setBusy(false); };
+      const toggleApp = (id) => setApps(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
+      const pemOk = cert.mode === 'existing' ? !!cert.id : cert.mode === 'upload' ? /^-----BEGIN CERTIFICATE-----[\s\S]+-----END CERTIFICATE-----$/.test(String(cert.pem || '').trim()) : false;
+      const ready = pemOk && apps.size > 0;
+      const N = ctx && ctx.names ? ctx.names : null;
+      const gwFound = ctx && N && (ctx.gateways || []).find(g => g.name === N.gateway);
+      if (!ctx) return <div className="card"><span className="spinner"></span> Checking AI Guard and ZIA…</div>;
+      const opt = (k, label, hint, disabled) => (
+        <div className="toggle-item" style={{opacity: disabled ? 0.55 : 1}} data-agopt={k}>
+          <div><label onClick={() => !disabled && setOpts({ ...opts, [k]: !opts[k] })} style={{cursor: disabled ? 'not-allowed' : 'pointer'}}>{label}</label><div className="form-hint">{hint}</div></div>
+          <div className={`toggle-switch ${opts[k] && !disabled ? 'active' : ''}`} onClick={() => !disabled && setOpts({ ...opts, [k]: !opts[k] })}><div className="toggle-knob"></div></div>
+        </div>
+      );
+      return (
+        <div className="card" data-step="aiguard">
+          <div className="card-header"><h2>AI Guard</h2><p>ZIA decrypts the AI apps you pick and sends their traffic to AI Guard by proxy chaining, so prompts and responses are checked by your AI Guard detection policies. Follows Zscaler's "Integrating ZIA with AI Guard" guide.</p></div>
+          {ctx.error && <div className="alert alert-danger"><span>{ctx.error}</span></div>}
+          <table className="diff-table" style={{marginBottom:'1rem'}} data-agchecks><tbody>
+            {(ctx.checks || []).map((c, i) => <tr key={i} data-agcheck={c.name}><td style={{width:'24px'}}>{STATUS_ICON[c.status]}</td><td style={{width:'230px'}}>{c.name}</td><td style={{fontSize:'12px'}}>{c.detail}{c.fix && <div className="form-hint" style={{margin:0}}>→ {c.fix}</div>}</td></tr>)}
+          </tbody></table>
+
+          <h3 style={{fontSize:'14px', margin:'0 0 0.5rem'}}>AI apps to protect</h3>
+          <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(240px, 1fr))', gap:'8px'}} data-agapps>
+            {ctx.apps.map(a => (
+              <label key={a.id} className={`tier-card ${apps.has(a.id) ? 'selected' : ''}`} style={{cursor:'pointer', padding:'0.7rem', textAlign:'left', margin:0}} data-agapp={a.id}>
+                <div style={{display:'flex', gap:'8px', alignItems:'center'}}><input type="checkbox" checked={apps.has(a.id)} onChange={() => toggleApp(a.id)} /><strong style={{fontSize:'13px'}}>{a.name}</strong></div>
+                <div className="form-hint" style={{marginTop:'4px', wordBreak:'break-word'}}>{a.domains.join(', ')}</div>
+              </label>
+            ))}
+          </div>
+          <div className="toggle-item" style={{marginTop:'8px'}} data-agcloudms>
+            <div><label onClick={() => setCloudMs(!cloudMs)} style={{cursor:'pointer'}}>Also send all of <code>{ctx.cloudMicrosoft}</code> (Copilot inside Microsoft 365 apps)</label>
+              <div className="form-hint">Zscaler lists it for Copilot, but most of Microsoft 365 uses it too. Off by default; test Outlook and Teams if you turn it on.</div></div>
+            <div className={`toggle-switch ${cloudMs ? 'active' : ''}`} onClick={() => setCloudMs(!cloudMs)}><div className="toggle-knob"></div></div>
+          </div>
+          <div className="form-group" style={{marginTop:'8px'}}><label className="form-label">More AI domains (optional)</label>
+            <input type="text" value={extra} onChange={e => setExtra(e.target.value)} placeholder=".chat.example-ai.com, .api.internal-llm.example.org" data-agextra /></div>
+
+          <h3 style={{fontSize:'14px', margin:'1rem 0 0.5rem'}}>AI Guard CA certificate</h3>
+          <div className="form-hint" style={{marginTop:0}}>Download it in the AI Guard portal: Tenant Settings › Integrations › Download Zscaler AI Guard Proxy Chain Certificate. ZIA uses it to trust the AI Guard proxy.</div>
+          <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(260px, 1fr))', gap:'8px', marginTop:'6px'}}>
+            <label className={`tier-card ${cert.mode === 'upload' ? 'selected' : ''}`} style={{cursor:'pointer', padding:'0.8rem', textAlign:'left', margin:0}} data-agcertupload>
+              <div style={{display:'flex', gap:'8px', alignItems:'center'}}><input type="radio" checked={cert.mode === 'upload'} onChange={() => setCert({ mode: 'upload', pem: cert.pem || '' })} /><strong style={{fontSize:'13px'}}>Upload the .pem</strong></div>
+              <input type="file" accept=".pem,.crt,.cer,application/x-pem-file" style={{marginTop:'8px', fontSize:'12px'}} onChange={e => { readPem(e.target.files[0]); e.target.value = ''; }} data-agpem />
+              {cert.mode === 'upload' && <div className="form-hint">{pemOk ? `✓ ${certFile || 'Certificate'} loaded; uploaded to ZIA as ${N ? N.cert : 'the AI Guard CA'} (type Proxy Chaining).` : 'Pick the AI Guard CA file (PEM, -----BEGIN CERTIFICATE-----).'}</div>}
+            </label>
+            <label className={`tier-card ${cert.mode === 'existing' ? 'selected' : ''}`} style={{cursor:'pointer', padding:'0.8rem', textAlign:'left', margin:0, opacity: (ctx.rootCertificates || []).length ? 1 : 0.6}} data-agcertexisting>
+              <div style={{display:'flex', gap:'8px', alignItems:'center'}}><input type="radio" disabled={!(ctx.rootCertificates || []).length} checked={cert.mode === 'existing'} onChange={() => setCert({ mode: 'existing', id: (ctx.rootCertificates[0] || {}).id })} /><strong style={{fontSize:'13px'}}>Already in ZIA</strong></div>
+              {(ctx.rootCertificates || []).length ? (
+                <select style={{marginTop:'8px'}} value={cert.mode === 'existing' ? String(cert.id) : ''} onChange={e => setCert({ mode: 'existing', id: Number(e.target.value) || e.target.value })}>
+                  {ctx.rootCertificates.map(c => <option key={c.id} value={String(c.id)}>{c.name}</option>)}
+                </select>
+              ) : <div className="form-hint">No Proxy Chaining root certificate in ZIA yet.</div>}
+            </label>
+          </div>
+
+          <h3 style={{fontSize:'14px', margin:'1rem 0 0.5rem'}}>What ZIA does</h3>
+          {opt('sslInspect', 'Inspect the AI apps (above the Microsoft 365 one-click bypass)', 'Adds an SSL Inspect rule for the AI app domains placed above "Office 365 One Click Rule" and Zscaler\'s exemptions. Without it Microsoft 365 Copilot is never decrypted, so it can\'t reach AI Guard.')}
+          {opt('blockQuic', 'Block QUIC (Block/ICMP)', 'AI apps fall back to TLS over TCP, which ZIA can inspect and chain. Required by the guide.')}
+          {opt('promptCapture', 'Capture AI prompts in ZIA logs', ctx.genAiLicensed === false ? 'Needs the Gen AI Security licence (not on this tenant).' : 'Turns on Gen AI prompt capture for the chosen apps (Web Insights shows prompts up to 2 KB).', ctx.genAiLicensed === false)}
+
+          <div className={`alert ${gwFound ? 'alert-success' : 'alert-warning'}`} style={{marginTop:'1rem', display:'block'}} data-aggateway>
+            {gwFound ? <span>✓ Proxy gateway <strong>{gwFound.name}</strong> found{gwFound.failClosed === false ? ' (turn Fail Close on)' : ''}. The forwarding rule will send the AI apps to it.</span> : (
+              <span><strong>One step in the ZIA portal.</strong> ZIA's API can't create proxy gateways. After the dry run creates the proxy, go to Infrastructure › Internet & SaaS › Network Policies › Proxies and Gateways › Proxy Gateways › Add Gateway for Proxies:
+                name <code>{N ? N.gateway : 'PREFIX-AIG-Gateway'}</code>, Fail Close on, Primary Proxy <code>{N ? N.proxy : 'PREFIX-AIG-Proxy'}</code>, Secondary None. Then run the dry run again and the forwarding rule is created.
+                <button className="btn btn-ghost btn-sm" style={{marginLeft:'8px'}} onClick={load} data-agrecheck>↻ Check again</button></span>
+            )}
+          </div>
+
+          {!guided && plan && !result && (<>
+            <div className="alert alert-info"><span><strong>Dry run:</strong> {countLine(plan.counts)}. Nothing changed yet.</span></div>
+            {plan.warnings.map((w, i) => <div key={i} className="alert alert-warning"><span>⚠ {w}</span></div>)}
+            <LedgerTable ledger={plan.ledger} filterProduct />
+            <div className="toggle-item" style={{marginTop:'1rem'}}>
+              <label onClick={() => setConfirmed(!confirmed)} style={{cursor:'pointer'}}>I have reviewed this dry run. Apply it to ZIA and activate.</label>
+              <div className={`toggle-switch ${confirmed ? 'active' : ''}`} onClick={() => setConfirmed(!confirmed)} data-agconfirm><div className="toggle-knob"></div></div>
+            </div>
+          </>)}
+          {!guided && result && (<>
+            <div className="alert alert-success"><span>✓ {countLine(result.counts)}{result.activated ? '. Activated.' : ''}</span></div>
+            {result.warnings.map((w, i) => <div key={i} className="alert alert-warning"><span>⚠ {w}</span></div>)}
+            <LedgerTable ledger={result.ledger} filterProduct />
+            <div className="alert alert-info" style={{marginTop:'1rem', display:'block'}}>{result.followUps.map((f, i) => <div key={i}>☐ {f}</div>)}</div>
+          </>)}
+          <div className="btn-group">
+            {guided ? (<>
+              <button className="btn btn-ghost" onClick={guided.onBack}>← Back</button>
+              <button className="btn btn-primary" onClick={() => guided.onNext(body())} disabled={!ready} data-agnext>{guided.nextLabel || 'Next →'}</button>
+            </>) : (<>
+              {!result && <button className="btn btn-primary" onClick={dry} disabled={busy || !ready} data-agdry>{busy && !plan ? <><span className="spinner"></span> Checking…</> : 'Run dry run'}</button>}
+              {plan && !result && <button className="btn btn-success" onClick={apply} disabled={busy || !confirmed} data-agapply>{busy ? <><span className="spinner"></span> Applying…</> : '🚀 Apply'}</button>}
+              {result && <button className="btn btn-ghost" onClick={() => { setResult(null); setPlan(null); load(); }}>Run again</button>}
+              {result && onReport && <button className="btn btn-primary" onClick={onReport}>Summary report →</button>}
+            </>)}
+          </div>
+          {!ready && <div className="form-hint">{!apps.size ? 'Pick at least one AI app. ' : ''}{!pemOk ? 'Add the AI Guard CA certificate.' : ''}</div>}
         </div>
       );
     }
@@ -4485,8 +4624,8 @@
       }
       return out;
     }
-    const ACTION_LABEL = { CREATE: 'Create', UPDATE: 'Update', NO_CHANGE: 'No change', FAILED: 'Failed', SKIPPED: 'Skipped', DELETE: 'Delete', DELETED: 'Deleted' };
-    const ACTION_CLASS = { CREATE: 'badge-create', UPDATE: 'badge-update', NO_CHANGE: 'badge-category', FAILED: 'badge-risk', SKIPPED: 'badge-risk', DELETE: 'badge-risk', DELETED: 'badge-create' };
+    const ACTION_LABEL = { CREATE: 'Create', UPDATE: 'Update', NO_CHANGE: 'No change', MANUAL: 'Manual step', FAILED: 'Failed', SKIPPED: 'Skipped', DELETE: 'Delete', DELETED: 'Deleted' };
+    const ACTION_CLASS = { CREATE: 'badge-create', UPDATE: 'badge-update', NO_CHANGE: 'badge-category', MANUAL: 'badge-update', FAILED: 'badge-risk', SKIPPED: 'badge-risk', DELETE: 'badge-risk', DELETED: 'badge-create' };
     function ActionBadge({ action }) { return <span className={`badge ${ACTION_CLASS[action] || 'badge-category'}`} data-action={action}>{ACTION_LABEL[action] || action}</span>; }
 
     const ZCC_STEPS = [

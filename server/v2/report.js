@@ -6,11 +6,11 @@ const COPY = require('./copy');
 const { SCOPE_ITEMS } = require('./scope');
 
 const esc = (s) => String(s === undefined || s === null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-const ACTION_WORD = { CREATE: 'Created', UPDATE: 'Updated', NO_CHANGE: 'Unchanged', FAILED: 'Failed', SKIPPED: 'Skipped', DELETED: 'Deleted' };
+const ACTION_WORD = { MANUAL: 'Manual step', CREATE: 'Created', UPDATE: 'Updated', NO_CHANGE: 'Unchanged', FAILED: 'Failed', SKIPPED: 'Skipped', DELETED: 'Deleted' };
 
 function collect(runs) {
   const rows = [];
-  for (const product of ['zia', 'zcc', 'zpa']) for (const run of (runs[product] || [])) for (const e of (run.ledger || [])) rows.push({ product: product.toUpperCase(), ...e });
+  for (const product of ['zia', 'aiguard', 'zcc', 'zpa']) for (const run of (runs[product] || [])) for (const e of (run.ledger || [])) rows.push({ ...e, product: product === 'aiguard' ? 'AI Guard' : product.toUpperCase() });
   return rows;
 }
 
@@ -24,10 +24,12 @@ function buildReport({ runs, prefix, tenant, licensing, endpointWarning, include
   const pw = new Map();
   if (includeSecrets) for (const r of runs.zcc || []) if (r.secrets && r.secrets.tamperPassword) pw.set(r.secrets.profile, r.secrets.tamperPassword);
   const key = pk || pw.size > 0;
-  const warnings = [...new Set([...(runs.zia || []), ...(runs.zcc || []), ...(runs.zpa || [])].flatMap(r => r.warnings || []).map(w => typeof w === 'string' ? w : w.text))];
+  const warnings = [...new Set([...(runs.zia || []), ...(runs.aiguard || []), ...(runs.zcc || []), ...(runs.zpa || [])].flatMap(r => r.warnings || []).map(w => typeof w === 'string' ? w : w.text))];
   const followUps = [];
   if (runs.zpa && runs.zpa.length) followUps.push(...(zpa.followUps || [COPY.report.followUps.zpaLocation, COPY.report.followUps.zpaDeploy]));
   if (pw.size) followUps.push(COPY.report.followUps.otp);
+  const ag = (runs.aiguard || []).slice(-1)[0];
+  if (ag) followUps.push(...(ag.followUps || []));
   if (zia && zia.template && ['urlFiltering', 'sandbox'].some(k => (zia.template.policies[k] || []).some(r => r.action === 'ISOLATE' || r.firstTimeOperation === 'QUARANTINE_ISOLATE'))) followUps.push(COPY.report.followUps.isolationProfile);
   if (zia && zia.template && zia.template.metadata.scope.endpointDlp && endpointWarning) followUps.push(COPY.report.followUps.endpointDlp);
   if ((runs.zcc || []).some(r => (r.manualSteps || []).some(m => m.key === 'modernUi'))) followUps.push(COPY.report.followUps.modernUi);
