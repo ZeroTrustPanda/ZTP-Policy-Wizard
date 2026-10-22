@@ -1,4 +1,4 @@
-# 🐼 ZeroTrustPanda — ZTP Policy Wizard v2.4.0
+# 🐼 ZeroTrustPanda — ZTP Policy Wizard v2.5.0
 
 Proof-of-value automation for Zscaler SEs: Zscaler Internet Access (ZIA), Zscaler Client Connector (ZCC), Zscaler Private Access (ZPA) and Zscaler Digital Experience (ZDX), all with one set of OneAPI (ZIdentity) client credentials.
 
@@ -8,9 +8,9 @@ No Node.js, no npm, nothing to install. Click your download, unzip it, and doubl
 
 | Computer | Download (click to download) |
 |---|---|
-| **Mac with Apple silicon (M1–M4)** | [**ZTP-Wizard-2.4.0-macos-arm64.zip**](https://github.com/ZeroTrustPanda/ZTP-Policy-Wizard/raw/standalone/standalone/release/ZTP-Wizard-2.4.0-macos-arm64.zip) |
-| Windows 10/11 (64-bit) | [ZTP-Wizard-2.4.0-windows-x64.zip](https://github.com/ZeroTrustPanda/ZTP-Policy-Wizard/raw/standalone/standalone/release/ZTP-Wizard-2.4.0-windows-x64.zip) |
-| Intel Mac | [ZTP-Wizard-2.4.0-macos-x64.zip](https://github.com/ZeroTrustPanda/ZTP-Policy-Wizard/raw/standalone/standalone/release/ZTP-Wizard-2.4.0-macos-x64.zip) |
+| **Mac with Apple silicon (M1–M4)** | [**ZTP-Wizard-2.5.0-macos-arm64.zip**](https://github.com/ZeroTrustPanda/ZTP-Policy-Wizard/raw/standalone/standalone/release/ZTP-Wizard-2.5.0-macos-arm64.zip) |
+| Windows 10/11 (64-bit) | [ZTP-Wizard-2.5.0-windows-x64.zip](https://github.com/ZeroTrustPanda/ZTP-Policy-Wizard/raw/standalone/standalone/release/ZTP-Wizard-2.5.0-windows-x64.zip) |
+| Intel Mac | [ZTP-Wizard-2.5.0-macos-x64.zip](https://github.com/ZeroTrustPanda/ZTP-Policy-Wizard/raw/standalone/standalone/release/ZTP-Wizard-2.5.0-macos-x64.zip) |
 
 The wizard starts on `http://127.0.0.1:3000` (or the next free port), opens your browser, and keeps your API credentials on your computer. Logs go to `ZTP-Wizard/logs` in your home folder.
 
@@ -20,9 +20,18 @@ The wizard starts on `http://127.0.0.1:3000` (or the next free port), opens your
 
 These are the same features as the v2.4.0 server version on `main`. The UI is compiled ahead of time, with React and fonts built in, so it works without reaching any CDN; only the Zscaler API calls need the network.
 
-**Release notes (2.0 → 2.4.0):** [docs/release-notes/v2.4.0.md](docs/release-notes/v2.4.0.md) · **Change log:** [CHANGELOG.md](CHANGELOG.md) · **Releases:** [GitHub releases](https://github.com/ZeroTrustPanda/ZTP-Policy-Wizard/releases)
+**Release notes (2.0 → 2.5.0):** [docs/release-notes/v2.5.0.md](docs/release-notes/v2.5.0.md) · **Change log:** [CHANGELOG.md](CHANGELOG.md) · **Releases:** [GitHub releases](https://github.com/ZeroTrustPanda/ZTP-Policy-Wizard/releases)
 
-## What's in 2.x (2.0 → 2.4.0)
+## What's in 2.x (2.0 → 2.5.0)
+
+- **AI Guard (2.5):**
+  - A fourth product toggle; it needs ZIA, so turning it on turns ZIA on.
+  - Sends ChatGPT, Microsoft 365 Copilot, Claude, Gemini and other AI apps through ZIA inspection to AI Guard with proxy chaining.
+  - Blocks QUIC, and puts an SSL Inspect rule above every bypass (including Office 365 One Click).
+  - Turns on Gen AI prompt capture when licensed, and checks the AI Guard ("zguard") API.
+  - Reuses an AI Guard proxy and gateway already in ZIA. The gateway itself is a portal step, because the API can't create it.
+
+- **Light theme, About page and icons (2.5):** green-on-white by default with a dark-mode toggle, an About page, and line icons.
 
 - **Active POVs (2.4):**
   - Every POV is saved on this computer with its plan, the exact step you left off, what the wizard did (runs, restore points, drift), tests and customer success criteria, a timeline, notes and follow-ups.
@@ -70,7 +79,7 @@ These are the same features as the v2.4.0 server version on `main`. The UI is co
   - A layout that fits any window size.
   - An update badge.
 
-The full feature list, by product and by version, is in the [release notes](docs/release-notes/v2.4.0.md).
+The full feature list, by product and by version, is in the [release notes](docs/release-notes/v2.5.0.md).
 
 ## 1.9 flows (still available)
 
@@ -264,6 +273,7 @@ The DLP module uses a **dictionary-first** approach:
 
 | Version | Changes |
 |---------|---------|
+| **2.5.0** | AI Guard (needs ZIA): CA, proxy or reuse, wildcard AI app group, QUIC block, SSL Inspect at the top, prompt capture, Proxy Chaining forwarding, zguard API check; light theme with dark toggle; About page; line icons. |
 | **2.4.0** | Active POVs: saved workspaces per POV with resume, plan, runs / restore / drift, tests and success criteria, timeline, notes and follow-ups; tenant guard; no secrets saved; templates; export / import. |
 | **2.3.1** | ZPA application table editable (name, destinations, TCP / UDP ports) and + Add application. |
 | **2.3.0** | Guided POV (readiness → scope → intake → Client Connector → ZIA → ZPA → ZDX → one dry run and apply), presets fill ZPA (wildcard + common apps) and ZDX (market apps), Education preset, licensing cautions in readiness, prefix from the intake (no global prefix bar), one Bulk Rule Manager for ZIA / ZPA / ZDX. |

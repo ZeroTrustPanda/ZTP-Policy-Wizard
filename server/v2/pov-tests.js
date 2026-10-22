@@ -61,6 +61,14 @@ const TESTS = [
     steps: ['Open the PRA portal URL and sign in.', 'Open the RDP or SSH console.'], expect: 'A browser-based RDP / SSH session to the server, with no client and no inbound ports.' },
   { id: 'zcc-tamper', product: 'ZCC', title: 'Client Connector tamper protection', match: /App Profile/,
     steps: ['As the user, try to Exit, Log out or turn off Internet Security in Client Connector.', 'Try to uninstall it.', 'Issue a one-time password from Devices & Install and use it.'], expect: 'Each action asks for the password; the one-time password works once.' },
+  { id: 'aiguard-chain', product: 'AIGUARD', title: 'AI prompts reach AI Guard', match: /-AIG-Forward$/,
+    steps: ['On a test machine with Client Connector, open ChatGPT, Claude or Copilot and send a harmless prompt.', 'Send a prompt that the AI Guard detection policy should catch (for example a toxic phrase, or a fake card number).', 'Open the AI Guard portal › Insights.'],
+    expect: 'Both prompts appear in AI Guard with the user name; the second is flagged (or blocked) by the detection policy. ZIA Web Insights shows the request forwarded by Proxy Chaining.' },
+  { id: 'aiguard-copilot', product: 'AIGUARD', title: 'Microsoft 365 Copilot inspected', match: /-AIG-Inspect$/,
+    steps: ['Open Copilot (copilot.microsoft.com or Copilot Chat in Microsoft 365) and send a prompt.', 'In ZIA Web Insights, filter on the user and copilot.microsoft.com / substrate.office.com.'],
+    expect: 'The transactions show as inspected (not bypassed by the Office 365 one-click rule) and the prompt is visible in AI Guard.' },
+  { id: 'aiguard-quic', product: 'AIGUARD', title: 'QUIC blocked for AI apps', match: /-AIG-NoQUIC$/,
+    steps: ['In Chrome, open chatgpt.com and check chrome://net-internals or the Network tab protocol column.'], expect: 'Traffic uses HTTP/2 or HTTP/1.1 over TCP (h3 / QUIC is dropped by the firewall rule).' },
   { id: 'zdx-ucaas', product: 'ZDX', title: 'Call quality monitoring', match: /Teams|Zoom|Webex/,
     steps: ['Join a Teams or Zoom meeting from the test machine.', 'Open ZDX › Applications.'], expect: 'ZDX shows the app score and the network path for the meeting.' }
 ];
@@ -68,7 +76,7 @@ const TESTS = [
 /** Tests for what actually ran in this session (rows from every run's ledger). */
 function runbook(runs, results = {}) {
   const rows = [];
-  for (const p of ['zia', 'zcc', 'zpa']) for (const r of (runs[p] || [])) for (const e of (r.ledger || [])) if (e.action !== 'FAILED' && e.action !== 'SKIPPED') rows.push({ product: p.toUpperCase(), ...e });
+  for (const p of ['zia', 'zcc', 'zpa', 'aiguard']) for (const r of (runs[p] || [])) for (const e of (r.ledger || [])) if (!['FAILED', 'SKIPPED', 'MANUAL'].includes(e.action)) rows.push({ ...e, product: p.toUpperCase() });
   for (const r of (runs.zdx || [])) for (const a of (r.apps || [])) rows.push({ product: 'ZDX', category: 'App', name: a.name || '' });
   const out = [];
   for (const t of TESTS) {

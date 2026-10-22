@@ -28,7 +28,7 @@ const scrub = (o) => (o === undefined ? undefined : JSON.parse(JSON.stringify(o,
 const slug = (s) => String(s || 'pov').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40) || 'pov';
 const now = () => new Date().toISOString();
 const tenantKey = (t) => (t && t.vanity ? `${String(t.vanity).toLowerCase()}@${String(t.cloud || 'production').toLowerCase()}` : '');
-const emptyRuns = () => ({ zia: [], zcc: [], zpa: [], zdx: [] });
+const emptyRuns = () => ({ zia: [], zcc: [], zpa: [], zdx: [], aiguard: [] });
 
 function fileOf(id) {
   if (!ID_RE.test(String(id))) throw Object.assign(new Error('Unknown POV'), { status: 404 });
@@ -79,7 +79,7 @@ function summary(p, runbookFn) {
     id: p.id, customerName: p.customerName, prefix: p.prefix, tenant: p.tenant, status: p.status, updatedAt: p.updatedAt, lastActivityAt: last,
     daysQuiet: days, quiet: p.status !== 'closed' && days >= QUIET_DAYS,
     resume: p.guide && p.guide.stageLabel ? p.guide.stageLabel : null,
-    runs: ['zia', 'zcc', 'zpa', 'zdx'].reduce((n, k) => n + ((runs[k] || []).length), 0),
+    runs: ['zia', 'zcc', 'zpa', 'zdx', 'aiguard'].reduce((n, k) => n + ((runs[k] || []).length), 0),
     tests: { total: tests.length, pass: tests.filter(t => t.result && t.result.status === 'pass').length, fail: tests.filter(t => t.result && t.result.status === 'fail').length },
     criteria: { total: (p.criteria || []).length, met: (p.criteria || []).filter(c => c.status === 'met').length },
     openFollowUps: (p.followUps || []).filter(f => !f.done).length,
@@ -128,7 +128,7 @@ function syncFromSession(id, st) {
   const zpa = (p.runs.zpa || []).slice(-1)[0];
   for (const text of (zpa && zpa.followUps) || []) if (!p.followUps.some(f => f.text === text)) p.followUps.push({ id: crypto.randomBytes(3).toString('hex'), text, done: false, source: 'wizard', due: null });
   // status moves forward on its own: something applied → built; a test result → testing
-  const applied = ['zia', 'zcc', 'zpa', 'zdx'].some(k => (p.runs[k] || []).length);
+  const applied = ['zia', 'zcc', 'zpa', 'zdx', 'aiguard'].some(k => (p.runs[k] || []).length);
   if (p.status === 'planning' && applied) p.status = 'built';
   if ((p.status === 'planning' || p.status === 'built') && Object.keys(p.testResults || {}).length) p.status = 'testing';
   if (JSON.stringify([p.runs, p.testResults]) !== before) p.lastActivityAt = now();
