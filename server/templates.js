@@ -1294,9 +1294,9 @@ function generateZTHUrlFilteringRules(prefix = 'ZTP') {
     order: order++,
     state: 'ENABLED',
     action: 'CAUTION',
-    urlCategories: ['OTHER_INFORMATION_TECHNOLOGY'],
+    urlCategories: ['AI_ML_APPS'],
     protocols: ['ANY_RULE'],
-    description: 'Caution page for AI/technology platforms. If your tenant has dedicated AI/ML URL categories, update this rule in the ZIA portal.',
+    description: 'Caution page for AI and ML applications (ZIA category AI_ML_APPS). Sanctioned AI apps sent to AI Guard are allowed above this rule.',
     tier: 'ZTH_EBOOK'
   });
 
