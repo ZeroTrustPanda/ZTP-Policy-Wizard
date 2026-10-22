@@ -2673,6 +2673,7 @@
       const [cloudMs, setCloudMs] = useState(!!(saved && saved.includeCloudMicrosoft));
       const [cert, setCert] = useState(() => (saved && saved.cert) || { mode: '' });
       const [certFile, setCertFile] = useState('');
+      const [host, setHost] = useState(() => (saved && saved.proxyHost) || '');
       const [opts, setOpts] = useState(() => ({ blockQuic: saved ? saved.blockQuic !== false : true, sslInspect: saved ? saved.sslInspect !== false : true, promptCapture: saved ? saved.promptCapture !== false : true }));
       const [plan, setPlan] = useState(null);
       const [result, setResult] = useState(null);
@@ -2681,11 +2682,13 @@
       const load = () => api.call('GET', '/v2/aiguard/context').then(c => {
         setCtx(c);
         setApps(prev => prev.size ? prev : new Set(c.apps.filter(a => a.default).map(a => a.id)));
-        if (!cert.mode && c.rootCertificates && c.rootCertificates.length) setCert({ mode: 'existing', id: c.rootCertificates[0].id });
+        const exProxy = (c.existingProxies || [])[0];
+        if (!cert.mode && c.rootCertificates && c.rootCertificates.length) setCert({ mode: 'existing', id: (exProxy && exProxy.certId && c.rootCertificates.some(r => String(r.id) === String(exProxy.certId))) ? exProxy.certId : c.rootCertificates[0].id });
+        setHost(h => h || (exProxy ? exProxy.address : c.proxy.address));
       }).catch(e => setCtx({ error: e.message }));
       useEffect(() => { load(); }, []);
-      useEffect(() => { setPlan(null); setConfirmed(false); }, [JSON.stringify([[...apps], extra, cloudMs, cert, opts])]);
-      const body = () => ({ prefix, apps: [...apps], extraDomains: splitItems(extra), includeCloudMicrosoft: cloudMs, cert, ...opts });
+      useEffect(() => { setPlan(null); setConfirmed(false); }, [JSON.stringify([[...apps], extra, cloudMs, cert, opts, host])]);
+      const body = () => ({ prefix, apps: [...apps], extraDomains: splitItems(extra), includeCloudMicrosoft: cloudMs, cert, proxyHost: host, ...opts });
       const readPem = async (file) => { if (!file) return; setCertFile(file.name); const t = await file.text(); setCert({ mode: 'upload', pem: t.trim() }); };
       const dry = async () => { setBusy(true); setError(null); try { setPlan(await api.call('POST', '/v2/aiguard/plan', body())); } catch (e) { setError(e.message); } setBusy(false); };
       const apply = async () => { setBusy(true); setError(null); try { setResult(await api.call('POST', '/v2/aiguard/apply', { ...body(), planId: plan.planId })); } catch (e) { setError(e.message); } setBusy(false); };
@@ -2743,6 +2746,11 @@
               ) : <div className="form-hint">No Proxy Chaining root certificate in ZIA yet.</div>}
             </label>
           </div>
+          {(() => { const ex = (ctx.existingProxies || []).find(p => cert.mode === 'existing' && String(p.certId) === String(cert.id));
+            return ex ? <div className="alert alert-info" style={{marginTop:'8px'}} data-agreuse>Reusing the existing AI Guard proxy <strong>{ex.name}</strong> ({ex.address}:{ex.port}){ex.gateway ? <span> and gateway <strong>{ex.gateway}</strong></span> : null}. No new proxy is created.</div>
+              : <div className="form-group" style={{marginTop:'8px'}}><label className="form-label">AI Guard forwarding host</label>
+                  <input type="text" value={host} onChange={e => setHost(e.target.value.trim())} data-aghost />
+                  <div className="form-hint">From the AI Guard guide: {ctx.proxy.address}, port {ctx.proxy.port}. Some tenants use forward.zseclipse.net; use what your AI Guard portal shows.</div></div>; })()}
 
           <h3 style={{fontSize:'14px', margin:'1rem 0 0.5rem'}}>What ZIA does</h3>
           {opt('sslInspect', 'Inspect the AI apps (above the Microsoft 365 one-click bypass)', 'Adds an SSL Inspect rule for the AI app domains placed above "Office 365 One Click Rule" and Zscaler\'s exemptions. Without it Microsoft 365 Copilot is never decrypted, so it can\'t reach AI Guard.')}

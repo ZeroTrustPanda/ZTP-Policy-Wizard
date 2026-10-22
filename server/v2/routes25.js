@@ -18,7 +18,7 @@ function register(app, requireAuth, { v2, rememberPlan, checkPlan, countActions 
     const c = b.cert || {};
     const cert = c.mode === 'existing' ? { mode: 'existing', id: c.id } : c.mode === 'upload' ? { mode: 'upload', pem: String(c.pem || '') } : {};
     return { prefix, apps: Array.isArray(b.apps) ? b.apps.filter(id => ag.AI_APPS.some(a => a.id === id)) : [], extraDomains: Array.isArray(b.extraDomains) ? b.extraDomains.slice(0, 50) : [],
-      includeCloudMicrosoft: !!b.includeCloudMicrosoft, cert, blockQuic: b.blockQuic !== false, sslInspect: b.sslInspect !== false, promptCapture: b.promptCapture !== false };
+      includeCloudMicrosoft: !!b.includeCloudMicrosoft, cert, proxyHost: ag.AIG_HOST.test(String(b.proxyHost || '').trim()) ? String(b.proxyHost).trim().toLowerCase() : ag.AI_GUARD_PROXY.address, blockQuic: b.blockQuic !== false, sslInspect: b.sslInspect !== false, promptCapture: b.promptCapture !== false };
   }
   // the plan id covers the certificate by hash (the PEM itself is never logged or stored)
   const planKey = (i) => ({ ...i, cert: i.cert.mode === 'upload' ? { mode: 'upload', sha: crypto.createHash('sha256').update(i.cert.pem.trim()).digest('hex') } : i.cert });

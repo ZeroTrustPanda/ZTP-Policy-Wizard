@@ -11,6 +11,8 @@
 const list = (r) => (Array.isArray(r) ? r : (r && (r.list || r.items || r.content)) || []);
 
 const AI_GUARD_PROXY = { address: 'forward.prod.zsaiguard.net', port: 9443 };
+// AI Guard forwarders: the guide's forward.prod.zsaiguard.net and the older forward.zseclipse.net both appear on live tenants
+const AIG_HOST = /^forward(\.[a-z0-9-]+)*\.(zsaiguard|zseclipse)\.net$/i;
 
 /** Apps from the guide's supported-apps table (Sept 2026). prompt = the ZIA prompt-capture switch for the app, when there is one. */
 const AI_APPS = [
@@ -64,6 +66,7 @@ function validate(input) {
   if (c.mode === 'existing' && !c.id) errors.push('Pick the AI Guard root certificate already uploaded to ZIA, or upload it.');
   if (!c.mode) errors.push('Add the AI Guard CA certificate (upload the .pem or pick one already in ZIA).');
   for (const d of input.extraDomains || []) if (!/^(\*?\.)?[a-z0-9-]+(\.[a-z0-9-]+)+$/i.test(String(d).trim())) errors.push(`"${d}" is not a domain or wildcard domain (for example .chat.example.com).`);
+  if (input.proxyHost && !AIG_HOST.test(String(input.proxyHost))) errors.push(`"${input.proxyHost}" is not an AI Guard forwarding host (for example forward.prod.zsaiguard.net).`);
   if (!domainsFor(input).length) errors.push('Pick at least one AI app.');
   return errors;
 }
@@ -92,12 +95,18 @@ async function context(client) {
   try {
     out.rootCertificates = list(await client.apiCall('GET', '/api/v1/rootCertificates?certTypes=PROXY_CHAINING')).map(c => ({ id: c.id, name: c.name || c.displayName, expiry: c.expiryTime || null }));
   } catch (e) { out.rootCertificatesError = String(e.message).slice(0, 200); }
+  try {
+    const gws0 = list(await client.apiCall('GET', '/api/v1/proxyGateways'));
+    out.existingProxies = list(await client.apiCall('GET', '/api/v1/proxies')).filter(p => p.type === 'PROXYCHAIN' && AIG_HOST.test(String(p.address || '')))
+      .map(p => ({ id: p.id, name: p.name, address: p.address, port: p.port, certId: p.cert && p.cert.id, gateway: (gws0.find(g => g.primaryProxy && String(g.primaryProxy.id) === String(p.id)) || {}).name || null }));
+    if (out.existingProxies.length) check('Existing AI Guard proxy', 'info', `Found ${out.existingProxies.map(p => `"${p.name}" (${p.address}:${p.port}${p.gateway ? `, gateway "${p.gateway}"` : ''})`).join(', ')}. Choose its root certificate below and the wizard reuses this proxy and gateway instead of creating new ones.`);
+  } catch (e) { out.existingProxies = []; }
   try { out.gateways = list(await client.apiCall('GET', '/api/v1/proxyGateways')).map(g => ({ id: g.id, name: g.name, failClosed: g.failClosed, primaryProxy: g.primaryProxy || null, type: g.type })); } catch (e) { out.gatewaysError = String(e.message).slice(0, 200); }
   try {
     const adv = await client.apiCall('GET', '/api/v1/advancedUrlFilterAndCloudAppSettings');
     out.o365OneClick = !!(adv && adv.enableMsftO365);
     out.promptFields = Object.keys(adv || {}).filter(k => /Prompt$/.test(k));
-    if (out.o365OneClick) check('Microsoft 365 one-click bypass', 'info', 'On: Microsoft 365 traffic is not inspected by default. The wizard adds an Inspect rule for the AI app domains above the "Office 365 One Click Rule" so Copilot reaches AI Guard.');
+    if (out.o365OneClick) check('Microsoft 365 one-click bypass', 'info', 'On: Microsoft 365 traffic is not inspected by default. The wizard adds an Inspect rule for the AI app domains above the "Office 365 One Click" rule so Copilot reaches AI Guard.');
   } catch (e) { /* not fatal */ }
   check('AI Guard portal settings', 'info', 'In the AI Guard portal turn on Store Prompts/Responses (Tenant Settings › Security) and ZIA User and Group Sync plus ZIA Domain Sync (Tenant Settings › Integrations).');
   return out;
@@ -141,12 +150,17 @@ async function runAiGuard(client, input, { dryRun, logger } = {}) {
   // 2. proxy
   if (certRef) {
     try {
-      const want = { name: N.proxy, type: 'PROXYCHAIN', address: AI_GUARD_PROXY.address, port: AI_GUARD_PROXY.port, cert: { id: certRef.id, name: certRef.name },
+      const host = AIG_HOST.test(String(input.proxyHost || '')) ? String(input.proxyHost) : AI_GUARD_PROXY.address;
+      const want = { name: N.proxy, type: 'PROXYCHAIN', address: host, port: AI_GUARD_PROXY.port, cert: { id: certRef.id, name: certRef.name },
         insertXauHeader: true, base64EncodeXauHeader: false, description: 'AI Guard proxy chaining. Created by the ZTP Policy Wizard.' };
-      const ex = list(await client.apiCall('GET', '/api/v1/proxies')).find(p => p.name === N.proxy);
+      const allProxies = list(await client.apiCall('GET', '/api/v1/proxies'));
+      const ex = allProxies.find(p => p.name === N.proxy);
+      // an AI Guard proxy that already uses the chosen certificate is reused rather than duplicated
+      const reuse = !ex && certRef.id ? allProxies.find(p => p.type === 'PROXYCHAIN' && AIG_HOST.test(String(p.address || '')) && p.cert && String(p.cert.id) === String(certRef.id)) : null;
       const cmp = (p) => ({ address: p.address, port: Number(p.port), cert: p.cert && String(p.cert.id), x: !!p.insertXauHeader, b: !!p.base64EncodeXauHeader, type: p.type });
-      if (!ex) {
-        if (dryRun) { proxy = { id: 0, name: N.proxy }; rec({ category: 'Proxy', name: N.proxy, action: 'CREATE', note: `${AI_GUARD_PROXY.address}:${AI_GUARD_PROXY.port}` }); }
+      if (reuse) { proxy = { id: reuse.id, name: reuse.name }; rec({ category: 'Proxy', name: reuse.name, action: 'NO_CHANGE', note: `existing AI Guard proxy, ${reuse.address}:${reuse.port}` }); }
+      else if (!ex) {
+        if (dryRun) { proxy = { id: 0, name: N.proxy }; rec({ category: 'Proxy', name: N.proxy, action: 'CREATE', note: `${host}:${AI_GUARD_PROXY.port}` }); }
         else { const c = await client.apiCall('POST', '/api/v1/proxies', want); proxy = { id: c.id, name: N.proxy }; undo.push({ op: 'DELETE', path: `/api/v1/proxies/${c.id}`, label: `Proxy: ${N.proxy}` }); rec({ category: 'Proxy', name: N.proxy, action: 'CREATE' }); }
       } else if (same(cmp(ex), cmp(want)) || (dryRun && !certRef.id)) {
         proxy = { id: ex.id, name: N.proxy };
@@ -163,11 +177,11 @@ async function runAiGuard(client, input, { dryRun, logger } = {}) {
   // 3. proxy gateway: the API is read-only, so it is a manual step until it exists
   try {
     const gws = list(await client.apiCall('GET', '/api/v1/proxyGateways'));
-    gateway = gws.find(g => g.name === N.gateway) || (proxy && proxy.id ? gws.find(g => g.primaryProxy && String(g.primaryProxy.id) === String(proxy.id)) : null) || null;
+    gateway = (proxy && proxy.id ? gws.find(g => g.primaryProxy && String(g.primaryProxy.id) === String(proxy.id)) : null) || gws.find(g => g.name === N.gateway) || null;
     if (gateway) {
       const okGw = gateway.failClosed !== false && (!proxy || !proxy.id || (gateway.primaryProxy && String(gateway.primaryProxy.id) === String(proxy.id)));
       rec({ category: 'Proxy Gateway', name: gateway.name, action: 'NO_CHANGE', note: okGw ? 'found: Fail Close on, primary proxy = AI Guard proxy' : 'found, but check Fail Close and the primary proxy' });
-      if (!okGw) warnings.push(`Proxy gateway "${gateway.name}" should have Fail Close on and "${N.proxy}" as its primary proxy.`);
+      if (!okGw) warnings.push(`Proxy gateway "${gateway.name}" should have Fail Close on and "${proxy ? proxy.name : N.proxy}" as its primary proxy.`);
     } else {
       rec({ category: 'Proxy Gateway', name: N.gateway, action: 'MANUAL', note: 'create in the ZIA portal (the API cannot create gateways)' });
       followUps.push(`In ZIA › Infrastructure › Internet & SaaS › Network Policies › Proxies and Gateways › Proxy Gateways, add "${N.gateway}": Fail Close on, Primary Proxy "${N.proxy}", Secondary None. Then run the AI Guard dry run again to create the forwarding rule.`);
@@ -216,9 +230,10 @@ async function runAiGuard(client, input, { dryRun, logger } = {}) {
     try {
       const rules = list(await client.apiCall('GET', '/api/v1/sslInspectionRules')).filter(r => !r.defaultRule).sort((a, b) => a.order - b.order);
       const bypass = rules.find(r => r.predefined && /Office 365 One Click/i.test(r.name)) || rules.find(r => r.predefined && /Recommended Exemptions/i.test(r.name));
-      const firstBypass = rules.filter(r => r.predefined && r.action && r.action.type === 'DO_NOT_DECRYPT').sort((a, b) => a.order - b.order)[0];
-      const targetOrder = Math.min(...[bypass, firstBypass].filter(Boolean).map(r => r.order), Infinity);
       const ex = rules.find(r => r.name === N.ssl);
+      // the rule only matches the AI destination group, so it goes first: no bypass rule (custom or predefined) can catch the AI apps before it
+      const firstNoDecrypt = rules.filter(r => r !== ex && r.action && r.action.type === 'DO_NOT_DECRYPT' && r.state !== 'DISABLED').sort((a, b) => a.order - b.order)[0];
+      const targetOrder = rules.length ? 1 : Infinity;
       const body = { name: N.ssl, description: 'Decrypt AI apps (ChatGPT, Microsoft 365 Copilot, Claude, Gemini…) so ZIA can chain them to AI Guard. Must stay above the Office 365 One Click rule. Created by the ZTP Policy Wizard.',
         state: 'ENABLED', rank: 7, roadWarriorForKerberos: false, destIpGroups: [{ id: group.id, name: group.name }],
         action: { type: 'DECRYPT', decryptSubActions: { serverCertificates: 'ALLOW', ocspCheck: true, blockSslTrafficWithNoSniEnabled: true, minClientTLSVersion: 'CLIENT_TLS_1_2', minServerTLSVersion: 'SERVER_TLS_1_2', blockUndecrypt: true, http2Enabled: false },
@@ -237,9 +252,9 @@ async function runAiGuard(client, input, { dryRun, logger } = {}) {
           }
           undo.push({ op: 'DELETE', path: `/api/v1/sslInspectionRules/${c.id}`, label: `SSL Inspection: ${N.ssl}` });
         }
-        rec({ category: 'SSL Inspection', name: N.ssl, action: 'CREATE', note: bypass ? `order ${order}, above "${bypass.name}"` : `order ${order}` });
+        rec({ category: 'SSL Inspection', name: N.ssl, action: 'CREATE', note: `order ${order}, above every Do Not Decrypt rule${bypass ? ` (including "${bypass.name}")` : ''}` });
       } else {
-        const above = !bypass || ex.order < bypass.order;
+        const above = !firstNoDecrypt || ex.order < firstNoDecrypt.order;
         const okBody = ex.action && ex.action.type === 'DECRYPT' && ex.state !== 'DISABLED' && (ex.destIpGroups || []).some(g => String(g.id) === String(group.id));
         if (above && okBody) rec({ category: 'SSL Inspection', name: N.ssl, action: 'NO_CHANGE' });
         else {
@@ -299,4 +314,4 @@ async function runAiGuard(client, input, { dryRun, logger } = {}) {
   return { ledger, warnings, followUps, undo, activated, gatewayMissing: !gateway, names: N, domains };
 }
 
-module.exports = { aiguardCall, AI_APPS, CLOUD_MICROSOFT, AI_GUARD_PROXY, GENAI_SKUS, names, domainsFor, validate, context, runAiGuard };
+module.exports = { aiguardCall, AI_APPS, CLOUD_MICROSOFT, AI_GUARD_PROXY, AIG_HOST, GENAI_SKUS, names, domainsFor, validate, context, runAiGuard };
