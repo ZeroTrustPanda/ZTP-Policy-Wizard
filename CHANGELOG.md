@@ -1,8 +1,11 @@
 # Changelog
 
-## v2.0.0 → v2.5.1 — 2026-10-19 to 2026-10-22
+## v2.0.0 → v2.5.2 — 2026-10-19 to 2026-10-22
 
-Release notes for the whole 2.x line: [docs/release-notes/v2.5.1.md](docs/release-notes/v2.5.1.md).
+Release notes for the whole 2.x line: [docs/release-notes/v2.5.2.md](docs/release-notes/v2.5.2.md).
+
+### 2.5.2
+- **Fix: Allow in ZIA now includes Claude (CLAUDE_AI, ANTHROPIC_AI), OpenAI, Grok AI and Glean.** On ZTH, `availableActions` returns an empty list for these apps, but ZIA accepts them with `ALLOW_AI_ML_WEB_USE` (verified live). An empty list is no longer treated as "no Allow"; an app is left out only when ZIA lists actions and Allow is not among them.
 
 ### 2.5.1
 - **AI compliance profile** for AI Guard: HIPAA, HITRUST, PCI DSS, GDPR, CJIS, FERPA, SOX, NIST 800-171, NIST 800-53 or General. The default comes from the POV baseline.
