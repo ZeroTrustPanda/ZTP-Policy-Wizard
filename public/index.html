@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ZeroTrustPanda ZS Policy Wizard v2.4.0 - Zscaler Template Policy Configuration</title>
+  <title>ZeroTrustPanda ZS Policy Wizard v2.5.0 - Zscaler Template Policy Configuration</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
   <style>
@@ -641,7 +641,7 @@
     // ========================
     // App Version
     // ========================
-    const APP_VERSION = '2.4.0';
+    const APP_VERSION = '2.5.0';
     const BUILD_DATE = '2026-03-30';
 
     // ========================
@@ -1121,6 +1121,7 @@
                     <summary style={{cursor:'pointer', fontWeight:600, fontSize:'14px'}}>Version history</summary>
                     <div style={{marginTop:'0.75rem', lineHeight:1.7}}>
                     <div style={{paddingLeft:'1rem', fontSize:'12px'}}>
+                      <div><strong>v2.5.0</strong> — AI Guard (needs ZIA; switching it on switches ZIA on): sends ChatGPT, Microsoft 365 Copilot, Claude, Gemini and other AI apps through ZIA inspection to AI Guard with proxy chaining, blocks QUIC, puts an Inspect rule above every SSL bypass (including Office 365 One Click), turns on Gen AI prompt capture when licensed and checks the AI Guard API. Reuses an AI Guard proxy and gateway already in ZIA. New light theme (dark is a toggle), an About page and product icons.</div>
                       <div><strong>v2.4.0</strong> — Active POVs: every POV is saved on this computer with its plan, the exact step you left off, what the wizard did (runs, restore points, drift), tests and customer success criteria, a timeline, notes and follow-ups. Resume any POV after signing in to its tenant (a POV never opens against a different tenant); credentials and other secrets are never saved. Saved templates, export / import, quiet-POV flag.</div>
                       <div><strong>v2.3.1</strong> — Private Access: application name, destinations and TCP / UDP ports are editable in the table, plus + Add application.</div>
                       <div><strong>v2.3.0</strong> — Guided POV on POV Start: readiness → Build the POV (ZIA / ZPA / ZDX) → customer intake (name, generated prefix, internal domain, preset, baseline) → Client Connector → Internet Access → Private Access → Digital Experience → one dry run and apply. Presets fill ZPA with a *.domain wildcard and common apps, and ZDX with apps for the market; Education preset. Readiness flags missing core licences. The prefix comes from the intake (no global prefix bar). One Bulk Rule Manager for ZIA, ZPA and ZDX.</div>

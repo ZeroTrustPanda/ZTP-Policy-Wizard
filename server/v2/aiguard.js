@@ -141,7 +141,7 @@ async function runAiGuard(client, input, { dryRun, logger } = {}) {
       else {
         const created = await client.apiCall('POST', '/api/v1/rootCertificates', { name: N.cert, cert: String(input.cert.pem).trim(), certTypes: ['PROXY_CHAINING'] });
         certRef = { id: created.id, name: N.cert };
-        undo.push({ op: 'DELETE', path: `/api/v1/rootCertificates/${created.id}`, label: `Root Certificate: ${N.cert}` });
+        undo.push({ op: 'DELETE', path: `/api/v1/rootCertificates/${created.id}?certTypes=PROXY_CHAINING`, label: `Root Certificate: ${N.cert}` });
         rec({ category: 'Root Certificate', name: N.cert, action: 'CREATE' });
       }
     }
