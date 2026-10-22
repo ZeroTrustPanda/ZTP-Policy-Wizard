@@ -125,16 +125,17 @@ async function ziaAllow(ctx) {
   const ids = (input.ziaAllow || []).filter(id => APP_MAP[id]);
   if (!ids.length) { rec({ category: 'Cloud App Control', name: N.allow, action: 'SKIPPED', note: 'no AI app picked for a ZIA allow' }); return; }
   const path = '/api/v1/webApplicationRules/AI_ML';
-  // ZIA refuses a rule whose action an app does not support (some AI apps list no granular actions): keep only apps that take Allow web use
+  // ZIA refuses a rule whose action an app does not support. availableActions is only trusted when it lists actions: on ZTH it returns []
+  // for CLAUDE_AI, ANTHROPIC_AI, OPENAI, GROK_AI and GLEAN_AI, yet all of them are accepted with ALLOW_AI_ML_WEB_USE (live, 2026-10-22).
   const cloudApps = [];
   const noAllow = [];
   for (const app of cloudAppsFor(ids)) {
     try {
       const acts = list(await client.apiCall('POST', `${path}/availableActions`, { cloudApps: [app], type: 'AI_ML' }));
-      if (acts.includes('ALLOW_AI_ML_WEB_USE')) cloudApps.push(app); else noAllow.push(app);
+      if (!acts.length || acts.includes('ALLOW_AI_ML_WEB_USE')) cloudApps.push(app); else noAllow.push(app);
     } catch (e) { cloudApps.push(app); }   // unknown: let the create decide
   }
-  if (noAllow.length) warnings.push(`ZIA has no "Allow web use" action for ${noAllow.join(', ')}, so they are left out of "${N.allow}". If a category-wide AI rule blocks or cautions them, add an exception in the ZIA portal.`);
+  if (noAllow.length) warnings.push(`ZIA lists no "Allow web use" action for ${noAllow.join(', ')}, so ${noAllow.length === 1 ? 'it is' : 'they are'} left out of "${N.allow}". If another AI rule blocks or cautions ${noAllow.length === 1 ? 'it' : 'them'}, add an exception in the ZIA portal.`);
   if (!cloudApps.length) { rec({ category: 'Cloud App Control', name: N.allow, action: 'SKIPPED', error: `None of the picked apps (${noAllow.join(', ')}) takes an Allow action in ZIA.` }); }
   else try {
     const rules = list(await client.apiCall('GET', path));
