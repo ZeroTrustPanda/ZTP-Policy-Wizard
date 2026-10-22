@@ -1,20 +1,20 @@
-# 🐼 ZeroTrustPanda — ZTP Policy Wizard v2.5.0
+# 🐼 ZeroTrustPanda — ZTP Policy Wizard v2.5.1
 
 Proof-of-value automation for Zscaler SEs: Zscaler Internet Access (ZIA), Zscaler Client Connector (ZCC), Zscaler Private Access (ZPA) and Zscaler Digital Experience (ZDX), all with one set of OneAPI (ZIdentity) client credentials.
 
-## ⬇️ Download v2.5.0 (nothing to install)
+## ⬇️ Download v2.5.1 (nothing to install)
 
 | Computer | Download (click to download) |
 |---|---|
-| **Mac with Apple silicon (M1–M4)** | [**ZTP-Wizard-2.5.0-macos-arm64.zip**](https://github.com/ZeroTrustPanda/ZTP-Policy-Wizard/raw/standalone/standalone/release/ZTP-Wizard-2.5.0-macos-arm64.zip) |
-| Windows 10/11 (64-bit) | [ZTP-Wizard-2.5.0-windows-x64.zip](https://github.com/ZeroTrustPanda/ZTP-Policy-Wizard/raw/standalone/standalone/release/ZTP-Wizard-2.5.0-windows-x64.zip) |
-| Intel Mac | [ZTP-Wizard-2.5.0-macos-x64.zip](https://github.com/ZeroTrustPanda/ZTP-Policy-Wizard/raw/standalone/standalone/release/ZTP-Wizard-2.5.0-macos-x64.zip) |
+| **Mac with Apple silicon (M1–M4)** | [**ZTP-Wizard-2.5.1-macos-arm64.zip**](https://github.com/ZeroTrustPanda/ZTP-Policy-Wizard/raw/standalone/standalone/release/ZTP-Wizard-2.5.1-macos-arm64.zip) |
+| Windows 10/11 (64-bit) | [ZTP-Wizard-2.5.1-windows-x64.zip](https://github.com/ZeroTrustPanda/ZTP-Policy-Wizard/raw/standalone/standalone/release/ZTP-Wizard-2.5.1-windows-x64.zip) |
+| Intel Mac | [ZTP-Wizard-2.5.1-macos-x64.zip](https://github.com/ZeroTrustPanda/ZTP-Policy-Wizard/raw/standalone/standalone/release/ZTP-Wizard-2.5.1-macos-x64.zip) |
 
 Unzip and double-click `ZTP-Wizard`. Your browser opens the wizard at `http://127.0.0.1:3000`, and your API credentials stay on your computer. The builds aren't code-signed yet. On a Mac, right-click → *Open* → *Open* the first time. On Windows, SmartScreen → *More info* → *Run anyway*.
 
-**Release notes (2.0 → 2.5.0):** [docs/release-notes/v2.5.0.md](docs/release-notes/v2.5.0.md) · **Change log:** [CHANGELOG.md](CHANGELOG.md) · **Releases:** [GitHub releases](https://github.com/ZeroTrustPanda/ZTP-Policy-Wizard/releases)
+**Release notes (2.0 → 2.5.1):** [docs/release-notes/v2.5.1.md](docs/release-notes/v2.5.1.md) · **Change log:** [CHANGELOG.md](CHANGELOG.md) · **Releases:** [GitHub releases](https://github.com/ZeroTrustPanda/ZTP-Policy-Wizard/releases)
 
-## What's in 2.x (2.0 → 2.5.0)
+## What's in 2.x (2.0 → 2.5.1)
 
 - **AI Guard (2.5):**
   - A fourth product toggle; it needs ZIA, so turning it on turns ZIA on.
@@ -22,6 +22,10 @@ Unzip and double-click `ZTP-Wizard`. Your browser opens the wizard at `http://12
   - Blocks QUIC, and puts an SSL Inspect rule above every bypass (including Office 365 One Click).
   - Turns on Gen AI prompt capture when licensed, and checks the AI Guard ("zguard") API.
   - Reuses an AI Guard proxy and gateway already in ZIA. The gateway itself is a portal step, because the API can't create it.
+
+- **AI compliance profile and Allow in ZIA (2.5.1):**
+  - A compliance profile (HIPAA, PCI, GDPR, …) becomes an AI Guard detection policy and control, in Monitor or Block mode.
+  - The AI apps you pick are allowed above ZIA Block / Caution / Isolate rules, so they reach AI Guard.
 
 - **Light theme, About page and icons (2.5):** green-on-white by default with a dark-mode toggle, an About page, and line icons.
 
@@ -71,7 +75,7 @@ Unzip and double-click `ZTP-Wizard`. Your browser opens the wizard at `http://12
   - A layout that fits any window size.
   - An update badge.
 
-The full feature list, by product and by version, is in the [release notes](docs/release-notes/v2.5.0.md).
+The full feature list, by product and by version, is in the [release notes](docs/release-notes/v2.5.1.md).
 
 ## 1.9 flows (still available)
 
@@ -265,6 +269,7 @@ The DLP module uses a **dictionary-first** approach:
 
 | Version | Changes |
 |---------|---------|
+| **2.5.1** | AI compliance profile → AI Guard detection policy + control (Monitor / Block); Allow in ZIA for the picked AI apps (Cloud App Control, URL Filtering when needed); Caution-AI targets AI_ML_APPS. |
 | **2.5.0** | AI Guard (needs ZIA): CA, proxy or reuse, wildcard AI app group, QUIC block, SSL Inspect at the top, prompt capture, Proxy Chaining forwarding, zguard API check; light theme with dark toggle; About page; line icons. |
 | **2.4.0** | Active POVs: saved workspaces per POV with resume, plan, runs / restore / drift, tests and success criteria, timeline, notes and follow-ups; tenant guard; no secrets saved; templates; export / import. |
 | **2.3.1** | ZPA application table editable (name, destinations, TCP / UDP ports) and + Add application. |

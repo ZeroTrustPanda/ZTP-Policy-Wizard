@@ -28,7 +28,7 @@ const { registerV2Routes } = require('./v2/routes');
 const { AuditLogger } = require('./audit-logger');
 
 const app = express();
-const APP_VERSION = '2.5.0';
+const APP_VERSION = '2.5.1';
 const PORT = process.env.ZTP_PORT || 3000;
 const HOST = process.env.ZTP_HOST || '0.0.0.0';
 const SESSION_TTL_MS = 60 * 60 * 1000;   // 1 hour

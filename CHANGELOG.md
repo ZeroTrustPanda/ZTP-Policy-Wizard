@@ -1,8 +1,26 @@
 # Changelog
 
-## v2.0.0 → v2.5.0 — 2026-10-19 to 2026-10-22
+## v2.0.0 → v2.5.1 — 2026-10-19 to 2026-10-22
 
-Release notes for the whole 2.x line: [docs/release-notes/v2.5.0.md](docs/release-notes/v2.5.0.md).
+Release notes for the whole 2.x line: [docs/release-notes/v2.5.1.md](docs/release-notes/v2.5.1.md).
+
+### 2.5.1
+- **AI compliance profile** for AI Guard: HIPAA, HITRUST, PCI DSS, GDPR, CJIS, FERPA, SOX, NIST 800-171, NIST 800-53 or General. The default comes from the POV baseline.
+  - It creates detection policy `<prefix>-AIG-Compliance` with prompt and response detectors and the profile's PII entities.
+  - It creates policy control `<prefix>-AIG-Compliance-Apps` for the LLM providers of the apps sent to AI Guard, placed after the existing controls.
+  - Monitor (the default) or Block per POV. Prompt injection, malicious URLs and hidden text are always blocked.
+- **Allow in ZIA:** you pick the AI apps to allow above Block / Caution / Isolate rules.
+  - `<prefix>-AIG-Allow-AI` (Cloud App Control, AI & ML, order 1). Apps are checked against ZIA's available actions first.
+  - When a URL rule would stop the apps, `<prefix>-AIG-Allow-URL` (a custom URL category and an Allow rule at order 1).
+  - The dry run names the rules it overrides for those apps.
+- **Fix:** the ZTH tier's `Caution-AI` URL rule targeted `OTHER_INFORMATION_TECHNOLOGY`, which also cautioned `*.cloud.microsoft`. It now targets `AI_ML_APPS`.
+- **Restore** handles AI Guard objects (`/aiguard/v1`) as well as ZIA ones.
+- **POV Tests:** added *AI compliance profile catches sensitive data* and *Sanctioned AI apps allowed*.
+- **Verified live on ZTH:**
+  - a policy create needs both detector lists
+  - accepted detectors and actions
+  - the order of policy controls
+  - the full create, re-run, Monitor → Block and cleanup cycle
 
 ### 2.5.0
 - **AI Guard** (a licensed SKU that needs ZIA):

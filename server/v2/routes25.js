@@ -7,6 +7,7 @@
 'use strict';
 const crypto = require('crypto');
 const ag = require('./aiguard');
+const AP = require('./aiguard-policy');
 const snapshots = require('./snapshots');
 
 function register(app, requireAuth, { v2, rememberPlan, checkPlan, countActions }) {
@@ -18,7 +19,9 @@ function register(app, requireAuth, { v2, rememberPlan, checkPlan, countActions 
     const c = b.cert || {};
     const cert = c.mode === 'existing' ? { mode: 'existing', id: c.id } : c.mode === 'upload' ? { mode: 'upload', pem: String(c.pem || '') } : {};
     return { prefix, apps: Array.isArray(b.apps) ? b.apps.filter(id => ag.AI_APPS.some(a => a.id === id)) : [], extraDomains: Array.isArray(b.extraDomains) ? b.extraDomains.slice(0, 50) : [],
-      includeCloudMicrosoft: !!b.includeCloudMicrosoft, cert, proxyHost: ag.AIG_HOST.test(String(b.proxyHost || '').trim()) ? String(b.proxyHost).trim().toLowerCase() : ag.AI_GUARD_PROXY.address, blockQuic: b.blockQuic !== false, sslInspect: b.sslInspect !== false, promptCapture: b.promptCapture !== false };
+      includeCloudMicrosoft: !!b.includeCloudMicrosoft, cert, proxyHost: ag.AIG_HOST.test(String(b.proxyHost || '').trim()) ? String(b.proxyHost).trim().toLowerCase() : ag.AI_GUARD_PROXY.address, blockQuic: b.blockQuic !== false, sslInspect: b.sslInspect !== false, promptCapture: b.promptCapture !== false,
+      ziaAllow: Array.isArray(b.ziaAllow) ? b.ziaAllow.filter(id => ag.AI_APPS.some(a => a.id === id)) : [],
+      compliance: b.compliance && (b.compliance.profile === 'NONE' || AP.PROFILES[b.compliance.profile]) ? { profile: b.compliance.profile, mode: b.compliance.mode === 'block' ? 'block' : 'monitor' } : null };
   }
   // the plan id covers the certificate by hash (the PEM itself is never logged or stored)
   const planKey = (i) => ({ ...i, cert: i.cert.mode === 'upload' ? { mode: 'upload', sha: crypto.createHash('sha256').update(i.cert.pem.trim()).digest('hex') } : i.cert });
@@ -28,7 +31,9 @@ function register(app, requireAuth, { v2, rememberPlan, checkPlan, countActions 
     try {
       const ctx = await ag.context(req.session.client);
       res.json({ ...ctx, apps: ag.AI_APPS.map(a => ({ id: a.id, name: a.name, domains: a.domains, prompt: !!a.prompt, default: !!a.default })), cloudMicrosoft: ag.CLOUD_MICROSOFT,
-        proxy: ag.AI_GUARD_PROXY, names: ag.names(v2(req.session).prefix || 'PREFIX') });
+        proxy: ag.AI_GUARD_PROXY, names: ag.names(v2(req.session).prefix || 'PREFIX'),
+        profiles: Object.entries(AP.PROFILES).map(([id, p]) => ({ id, name: p.name, why: p.why, block: p.block, detect: p.detect, deep: p.deep })),
+        appMap: Object.fromEntries(Object.entries(AP.APP_MAP).map(([id, m]) => [id, { cloudApps: m.cloudApps, providers: m.providers }])) });
     } catch (e) { res.status(502).json({ error: e.message }); }
   });
 
