@@ -1,8 +1,35 @@
 # Changelog
 
-## v2.0.0 → v2.4.0 — 2026-10-19 to 2026-10-21
+## v2.0.0 → v2.5.0 — 2026-10-19 to 2026-10-22
 
-Release notes for the whole 2.x line: [docs/release-notes/v2.4.0.md](docs/release-notes/v2.4.0.md).
+Release notes for the whole 2.x line: [docs/release-notes/v2.5.0.md](docs/release-notes/v2.5.0.md).
+
+### 2.5.0
+- **AI Guard** (a licensed SKU that needs ZIA):
+  - It is a fourth product on *Build the POV*. Turning it on turns ZIA on; ZIA can run without it.
+  - The guided step comes after Internet Access, and also has its own page under ZIA.
+- **Checks:**
+  - The AI Guard API is reachable (`GET /aiguard/v1/detections/policies`, the "zguard" check).
+  - The Gen AI Security subscription (`ZS_DP_GEN_AI`).
+  - The existing Proxy Chaining certificates, AI Guard proxies and gateways.
+- **Builds:**
+  - the AI Guard CA (upload a `.pem` or reuse)
+  - the proxy (`forward.prod.zsaiguard.net:9443` by default, `forward.zseclipse.net` accepted)
+  - a `DSTN_DOMAIN` wildcard group of the AI apps
+  - a QUIC Block/ICMP firewall rule
+  - an SSL **Inspect** rule at order 1, above every Do Not Decrypt rule (including *Office 365 One Click*)
+  - Gen AI prompt capture for the chosen apps
+  - a Proxy Chaining forwarding rule to the gateway
+- **Manual gateway step:** proxy gateways are read-only in the API, so the gateway is shown as a *Manual step* with the portal settings, and the forwarding rule follows on the next run.
+- **Reuse:** if ZIA already has an AI Guard proxy and gateway, choosing its certificate reuses them.
+- **Records and follow-ups:**
+  - Runs, the summary report, POV Tests (chain, Copilot, QUIC) and Restore include AI Guard.
+  - The uploaded certificate is never logged and is kept in the POV only as "uploaded".
+  - Follow-ups added: AI Guard portal settings, WebSocket inspection for Copilot, `NODE_EXTRA_CA_CERTS` for Claude Code.
+- **Light theme:** green on white is the default; dark mode is a toggle in the sidebar.
+- **About page:** the tool, the author (Steven Hajny, Zscaler Distinguished Sales Engineer, linkedin.com/in/stevenzhajny) and the version history.
+- **Line icons** replace the emoji in the sidebar and on the product cards.
+- **New API:** `GET /api/v2/aiguard/context`, `POST /api/v2/aiguard/plan`, `POST /api/v2/aiguard/apply`.
 
 ### 2.4.0
 - **Active POVs** (sidebar): each POV is a local folder (`ZTP-Wizard/povs/<id>/pov.json`). It holds:

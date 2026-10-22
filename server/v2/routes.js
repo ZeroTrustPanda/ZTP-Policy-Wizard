@@ -294,6 +294,7 @@ function registerV2Routes(app, requireAuth) {
     res.json(report);
   });
   require('./routes22').register(app, requireAuth, { v2, rememberPlan, checkPlan, zpaOf, countActions, runZia, runZpa });
+  require('./routes25').register(app, requireAuth, { v2, rememberPlan, checkPlan, countActions });
   app.get('/api/v2/runs', requireAuth, (req, res) => {
     const s = v2(req.session);
     res.json({ prefix: s.prefix || null, zia: s.runs.zia.length, zcc: s.runs.zcc.length, zpa: s.runs.zpa.length });
