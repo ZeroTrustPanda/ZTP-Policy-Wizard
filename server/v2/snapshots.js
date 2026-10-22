@@ -47,7 +47,8 @@ async function restore(id, { client, zpa, dryRun, logger }) {
     const label = st.label || st.path;
     if (dryRun) { results.push({ label, action: st.op === 'DELETE' ? 'DELETE' : 'PUT BACK' }); continue; }
     try {
-      if (snap.product === 'zia') {
+      if (st.api === 'aiguard') await require('./aiguard').aiguardCall(client, st.op, st.path, st.op === 'PUT' ? st.body : undefined);
+      else if (snap.product === 'zia') {
         try { await client.apiCall(st.op, st.path, st.op === 'PUT' ? st.body : null); }
         catch (e) {
           // some settings fields sit behind tenant feature flags (seen on ATP): put the rest back without them

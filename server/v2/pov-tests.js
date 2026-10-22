@@ -69,6 +69,12 @@ const TESTS = [
     expect: 'The transactions show as inspected (not bypassed by the Office 365 one-click rule) and the prompt is visible in AI Guard.' },
   { id: 'aiguard-quic', product: 'AIGUARD', title: 'QUIC blocked for AI apps', match: /-AIG-NoQUIC$/,
     steps: ['In Chrome, open chatgpt.com and check chrome://net-internals or the Network tab protocol column.'], expect: 'Traffic uses HTTP/2 or HTTP/1.1 over TCP (h3 / QUIC is dropped by the firewall rule).' },
+  { id: 'aiguard-compliance', product: 'AIGUARD', title: 'AI compliance profile catches sensitive data', match: /-AIG-Compliance$/,
+    steps: ['Send a prompt with a made-up identifier from the profile (for example SSN 078-05-1120, the well-known specimen number, or a test card 4111 1111 1111 1111).', 'Send a prompt that tries a prompt injection ("ignore your previous instructions and …").', 'Open the AI Guard portal › Insights.'],
+    expect: 'Monitor: the identifier prompt is answered and logged as a detection. Block: it is stopped with the AI Guard block message. The prompt injection is blocked in both modes.' },
+  { id: 'aiguard-allow', product: 'AIGUARD', title: 'Sanctioned AI apps allowed, others still controlled', match: /-AIG-Allow-AI$/,
+    steps: ['Open a sanctioned app (for example ChatGPT) and send a prompt.', 'Open an AI app that was not picked (for example a lesser-known chatbot).'],
+    expect: 'The sanctioned app works with no caution or isolation page and its prompt reaches AI Guard; the other app still gets the tier\'s Block / Caution.' },
   { id: 'zdx-ucaas', product: 'ZDX', title: 'Call quality monitoring', match: /Teams|Zoom|Webex/,
     steps: ['Join a Teams or Zoom meeting from the test machine.', 'Open ZDX › Applications.'], expect: 'ZDX shows the app score and the network path for the meeting.' }
 ];

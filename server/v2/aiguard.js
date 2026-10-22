@@ -8,6 +8,7 @@
  * Same dry-run / apply contract as the other products: the ledger lists Create / Update / No change, undo is recorded.
  */
 'use strict';
+const AP = require('./aiguard-policy');
 const list = (r) => (Array.isArray(r) ? r : (r && (r.list || r.items || r.content)) || []);
 
 const AI_GUARD_PROXY = { address: 'forward.prod.zsaiguard.net', port: 9443 };
@@ -35,7 +36,8 @@ const GENAI_SKUS = ['ZS_DP_GEN_AI'];
 const nm = (prefix, suffix) => `${String(prefix).slice(0, 31 - suffix.length - 1)}-${suffix}`;
 const names = (prefix) => ({
   cert: nm(prefix, 'AIG-CA'), proxy: nm(prefix, 'AIG-Proxy'), gateway: nm(prefix, 'AIG-Gateway'), group: nm(prefix, 'AIG-Apps'),
-  quic: nm(prefix, 'AIG-NoQUIC'), ssl: nm(prefix, 'AIG-Inspect'), fwd: nm(prefix, 'AIG-Forward')
+  quic: nm(prefix, 'AIG-NoQUIC'), ssl: nm(prefix, 'AIG-Inspect'), fwd: nm(prefix, 'AIG-Forward'),
+  allow: nm(prefix, 'AIG-Allow-AI'), allowUrl: nm(prefix, 'AIG-Allow-URL'), policy: nm(prefix, 'AIG-Compliance'), policyRule: nm(prefix, 'AIG-Compliance-Apps')
 });
 
 function domainsFor(input) {
@@ -306,7 +308,17 @@ async function runAiGuard(client, input, { dryRun, logger } = {}) {
     } catch (e) { rec({ category: 'Forwarding Control', name: N.fwd, action: 'FAILED', error: e.message }); }
   } else rec({ category: 'Forwarding Control', name: N.fwd, action: 'SKIPPED', error: gateway ? 'Needs the destination group.' : `Waiting for the proxy gateway "${N.gateway}" (manual step).` });
 
-  followUps.push('In the AI Guard portal: Tenant Settings › Security › Store Prompts/Responses on; Tenant Settings › Integrations › ZIA User and Group Sync and ZIA Domain Sync on; then add a detection policy and a policy control (Policy › Configurations, Policy › Controls).');
+  // 9. ZIA allow for the sanctioned AI apps (so they reach AI Guard instead of being blocked, cautioned or isolated)
+  await AP.ziaAllow({ client, input, dryRun, rec, undo, warnings, N, list, apps: AI_APPS });
+  // 10. AI Guard: the compliance profile as a detection policy, matched to the picked apps' LLM providers
+  if (input.compliance && input.compliance.profile !== 'NONE') {
+    try { await aiguardCall(client, 'GET', '/aiguard/v1/detections/policies'); await AP.aiguardPolicy({ client, input, dryRun, rec, undo, warnings, N, aiguardCall }); }
+    catch (e) { rec({ category: 'AI Guard Policy', name: N.policy, action: 'FAILED', error: `The AI Guard API is not reachable with this API client: ${e.message}` }); }
+  } else rec({ category: 'AI Guard Policy', name: N.policy, action: 'SKIPPED', note: 'no compliance profile chosen' });
+
+  followUps.push(input.compliance && input.compliance.profile !== 'NONE'
+    ? `In the AI Guard portal: Tenant Settings › Security › Store Prompts/Responses on; Tenant Settings › Integrations › ZIA User and Group Sync and ZIA Domain Sync on. Review "${N.policy}" (Policy › Configurations) and "${N.policyRule}" (Policy › Controls).`
+    : 'In the AI Guard portal: Tenant Settings › Security › Store Prompts/Responses on; Tenant Settings › Integrations › ZIA User and Group Sync and ZIA Domain Sync on; then add a detection policy and a policy control (Policy › Configurations, Policy › Controls).');
   if (input.includeCloudMicrosoft) warnings.push('All of .cloud.microsoft is sent through inspection and AI Guard. Microsoft asks for this domain to be allowed in full for Copilot; other Microsoft 365 apps also use it, so test Outlook and Teams after applying.');
   if (domains.some(d => /anthropic|claude/.test(d))) followUps.push('Claude Code on devices without the Zscaler root CA in the system store: set NODE_EXTRA_CA_CERTS to the Zscaler root certificate in ~/.claude/settings.json (env), or use the native installer.');
 
