@@ -460,6 +460,115 @@
     .guide-pill.cur { background:var(--accent-blue); color:#fff; border-color:var(--accent-blue); }
     .guide-pill.seen { background:var(--accent-green-dim); color:var(--accent-green); }
     .guide-num { display:inline-flex; width:18px; height:18px; border-radius:50%; align-items:center; justify-content:center; font-size:10px; background:rgba(255,255,255,0.15); }
+    /* ===== v2.5 light theme ("Forest") =====
+       Neutral, slightly green-cool canvas; white surfaces; one brand green for actions and selection;
+       status colours kept distinct from the brand (info = slate blue, warning = ochre, danger = brick).
+       Text contrast: ink 15.9:1, secondary 7.6:1, muted 4.7:1 on white (WCAG AA for body text). */
+    :root[data-theme="light"] {
+      --bg-primary: #F2F5F3;
+      --bg-secondary: #FFFFFF;
+      --bg-card: #FFFFFF;
+      --bg-card-hover: #F5F8F6;
+      --bg-input: #FFFFFF;
+      --bg-subtle: #F6F8F7;
+      --border: #DCE3DE;
+      --border-strong: #C5D0C9;
+      --border-focus: #1F7A4D;
+      --text-primary: #13231B;
+      --text-secondary: #45564D;
+      --text-muted: #66766D;
+      --accent-blue: #1F7A4D;      /* brand: actions, selection, focus */
+      --accent-blue-dim: #E4F1EA;
+      --accent-green: #157347;     /* success */
+      --accent-green-dim: #E3F3EA;
+      --accent-amber: #8A5300;
+      --accent-amber-dim: #FFF4DE;
+      --accent-red: #B42318;
+      --accent-red-dim: #FDEDEB;
+      --accent-purple: #5946B2;
+      --accent-cyan: #1F7A4D;
+      --brand-deep: #0F3B2A;
+      --shadow: 0 1px 2px rgba(19,35,27,.06), 0 6px 20px rgba(19,35,27,.06);
+    }
+    :root[data-theme="light"] body { background: var(--bg-primary); }
+    :root[data-theme="light"] .header { background: var(--brand-deep); border-bottom: 0; }
+    :root[data-theme="light"] .header-brand h1 { background: none; -webkit-text-fill-color: #FFFFFF; color: #FFFFFF; font-weight: 600; letter-spacing: 0; }
+    :root[data-theme="light"] .header-brand .logo { background: #FFFFFF; color: var(--brand-deep); }
+    :root[data-theme="light"] .header-brand .tag { background: rgba(255,255,255,.14); color: #D7EEDF; text-transform: none; letter-spacing: 0; }
+    :root[data-theme="light"] .header .btn-ghost { color: #E6F3EB; border-color: rgba(255,255,255,.28); background: transparent; }
+    :root[data-theme="light"] .header .btn-ghost:hover:not(:disabled) { background: rgba(255,255,255,.10); color: #FFFFFF; }
+    :root[data-theme="light"] .auth-badge.connected { background: rgba(255,255,255,.14); color: #E6F3EB; }
+    :root[data-theme="light"] .auth-badge.connected .dot { background: #5FD394; }
+    :root[data-theme="light"] .auth-badge.disconnected { background: rgba(255,255,255,.14); color: #FFD9D4; }
+    :root[data-theme="light"] .sidebar { background: #FFFFFF; border-right: 1px solid var(--border); }
+    :root[data-theme="light"] .sidebar-item { color: var(--text-secondary); }
+    :root[data-theme="light"] .sidebar-item:hover { background: var(--bg-subtle); color: var(--text-primary); }
+    :root[data-theme="light"] .sidebar-item.active { background: var(--accent-blue-dim); color: #145A39; box-shadow: inset 3px 0 0 var(--accent-blue); }
+    :root[data-theme="light"] .sidebar-item .step-num, :root[data-theme="light"] .sidebar-item.active .step-num, :root[data-theme="light"] .sidebar-item.completed .step-num { background: transparent; border: 0; color: var(--text-muted); width: 20px; }
+    :root[data-theme="light"] .sidebar-item.active .step-num { color: var(--accent-blue); }
+    :root[data-theme="light"] .sidebar-section-title { text-transform: none; letter-spacing: 0; font-size: 11px; }
+    :root[data-theme="light"] .card { box-shadow: var(--shadow); border-color: var(--border); }
+    :root[data-theme="light"] .card .card { box-shadow: none; background: var(--bg-subtle); }
+    :root[data-theme="light"] .card-header h2 { color: var(--text-primary); letter-spacing: -0.01em; }
+    :root[data-theme="light"] input[type="text"], :root[data-theme="light"] input[type="password"], :root[data-theme="light"] input[type="date"],
+    :root[data-theme="light"] select, :root[data-theme="light"] textarea { border-color: var(--border-strong); color: var(--text-primary); }
+    :root[data-theme="light"] input:focus, :root[data-theme="light"] select:focus, :root[data-theme="light"] textarea:focus { border-color: var(--border-focus); box-shadow: 0 0 0 3px rgba(31,122,77,.16); }
+    :root[data-theme="light"] input[type="date"] { color-scheme: light; }
+    :root[data-theme="light"] .btn-primary:hover:not(:disabled) { background: #18663F; }
+    :root[data-theme="light"] .btn-success { background: #157347; }
+    :root[data-theme="light"] .btn-success:hover:not(:disabled) { background: #115E3A; }
+    :root[data-theme="light"] .btn-danger:hover:not(:disabled) { background: #951C13; }
+    :root[data-theme="light"] .btn-ghost { background: #FFFFFF; border-color: var(--border-strong); color: var(--text-primary); }
+    :root[data-theme="light"] .btn-ghost:hover:not(:disabled) { background: var(--bg-subtle); }
+    :root[data-theme="light"] .tier-card { background: #FFFFFF; border-color: var(--border); }
+    :root[data-theme="light"] .tier-card:hover { border-color: var(--border-strong); }
+    :root[data-theme="light"] .tier-card.selected { background: #F1F8F4; border-color: var(--accent-blue); }
+    :root[data-theme="light"] .toggle-item { background: #FFFFFF; }
+    :root[data-theme="light"] .toggle-switch { background: #C9D3CD; border-color: #C9D3CD; }
+    :root[data-theme="light"] .toggle-switch.active { background: var(--accent-blue); border-color: var(--accent-blue); }
+    :root[data-theme="light"] .toggle-switch .toggle-knob { box-shadow: 0 1px 2px rgba(0,0,0,.2); }
+    :root[data-theme="light"] .diff-table th { background: var(--bg-subtle); color: var(--text-secondary); text-transform: none; letter-spacing: 0; font-size: 12px; }
+    :root[data-theme="light"] .diff-table tr:hover { background: #F8FBF9; }
+    :root[data-theme="light"] .badge { text-transform: none; letter-spacing: 0; border-radius: 999px; padding: 2px 9px; }
+    :root[data-theme="light"] .badge-update { background: #E9F0F8; color: #24527F; }
+    :root[data-theme="light"] .badge-category { background: #EFEDFA; color: #4B3BA0; }
+    :root[data-theme="light"] .alert { color: var(--text-primary); }
+    :root[data-theme="light"] .alert-info { background: #EEF3F8; border: 1px solid #D2DEEA; color: #1F3B57; }
+    :root[data-theme="light"] .alert-warning { background: #FFF6E6; border: 1px solid #F0D9A8; color: #6B4100; }
+    :root[data-theme="light"] .alert-success { background: #EAF6EF; border: 1px solid #BFE1CC; color: #145A39; }
+    :root[data-theme="light"] .alert-danger { background: #FDEEEC; border: 1px solid #F3C6C0; color: #8F1D14; }
+    :root[data-theme="light"] .explainer { background: var(--bg-subtle); border-left-color: var(--accent-blue); }
+    :root[data-theme="light"] .explainer strong { color: #145A39; }
+    :root[data-theme="light"] .ab-group, :root[data-theme="light"] .ab-row { background: #FFFFFF; }
+    :root[data-theme="light"] .ab-seg button.on-allow { color: #FFFFFF; }
+    :root[data-theme="light"] .guide-stepper { background: var(--bg-primary); }
+    :root[data-theme="light"] .guide-pill { background: #FFFFFF; border-color: var(--border); color: var(--text-secondary); }
+    :root[data-theme="light"] .guide-pill.cur { background: var(--accent-blue); border-color: var(--accent-blue); color: #FFFFFF; }
+    :root[data-theme="light"] .guide-pill.seen { background: var(--accent-blue-dim); border-color: #C3E0CF; color: #145A39; }
+    :root[data-theme="light"] .guide-num { background: rgba(19,35,27,.08); }
+    :root[data-theme="light"] .guide-pill.cur .guide-num { background: rgba(255,255,255,.22); }
+    :root[data-theme="light"] code { background: #EEF3F0; color: #1D3A2B; padding: 1px 5px; border-radius: 4px; }
+    :root[data-theme="light"] ::-webkit-scrollbar-track { background: var(--bg-primary); }
+    :root[data-theme="light"] ::-webkit-scrollbar-thumb { background: #C5D0C9; }
+    :root[data-theme="light"] .catalog-compliance-tag, :root[data-theme="light"] .catalog-rule-action.INSPECT, :root[data-theme="light"] .catalog-rule-action.DECRYPT { background: #E4F1EA; color: #145A39; }
+    .sidebar { position: sticky; top: 64px; align-self: flex-start; height: calc(100vh - 64px); overflow-y: auto; }
+    @media (max-width: 900px) { .sidebar { position: static; height: auto; } }
+    .product-icon { width: 40px; height: 40px; border-radius: 10px; display: flex; align-items: center; justify-content: center; background: var(--accent-blue-dim); color: var(--accent-blue); margin-bottom: 12px; }
+    .theme-toggle { display: inline-flex; border: 1px solid var(--border); border-radius: 999px; overflow: hidden; }
+    .theme-toggle button { background: transparent; border: 0; color: inherit; font: inherit; font-size: 12px; padding: 4px 10px; cursor: pointer; }
+    .theme-toggle button.on { background: var(--accent-blue); color: #FFFFFF; }
+    :root[data-theme="light"] .theme-toggle { border-color: rgba(255,255,255,.28); color: #E6F3EB; }
+    :root[data-theme="light"] .theme-toggle button.on { background: #FFFFFF; color: var(--brand-deep); }
+    /* About */
+    .about-grid { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); gap: 1.5rem; }
+    @media (max-width: 900px) { .about-grid { grid-template-columns: 1fr; } }
+    .about-lede { font-size: 17px; line-height: 1.6; color: var(--text-primary); max-width: 62ch; }
+    .about-person { display: flex; gap: 14px; align-items: flex-start; }
+    .about-mono { width: 52px; height: 52px; border-radius: 50%; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 18px; background: var(--accent-blue-dim); color: var(--accent-blue); }
+    .about-list { list-style: none; padding: 0; margin: 0; }
+    .about-list li { padding: 10px 0; border-top: 1px solid var(--border); font-size: 14px; }
+    .about-list li strong { display: block; font-weight: 600; }
+    .about-list li span { color: var(--text-secondary); font-size: 13px; }
   </style>
 </head>
 <body>
@@ -583,6 +692,46 @@
     // ========================
     // Main App
     // ========================
+    // v2.5: one line-icon set (24px grid, 1.75 stroke, round caps; drawn for this app) instead of emoji
+    const ICON_PATHS = {
+      start: 'M5 12h11M12 6l6 6-6 6M4 5v14',
+      povs: 'M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z',
+      plus: 'M12 5v14M5 12h14',
+      templates: 'M8 4h9a2 2 0 0 1 2 2v12M5 8h9a2 2 0 0 1 2 2v9a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1z',
+      zcc: 'M8 3h8a1 1 0 0 1 1 1v16a1 1 0 0 1-1 1H8a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1zM11 18h2',
+      zia: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM3 12h18M12 3c2.5 2.4 3.8 5.4 3.8 9s-1.3 6.6-3.8 9c-2.5-2.4-3.8-5.4-3.8-9S9.5 5.4 12 3z',
+      zpa: 'M6 11h12v9H6zM8.5 11V8a3.5 3.5 0 0 1 7 0v3M12 15v2',
+      zdx: 'M3 12h4l3-7 4 14 3-7h4',
+      aiguard: 'M12 3l7 3v5c0 4.5-3 8.3-7 10-4-1.7-7-5.5-7-10V6zM9.5 12l1.8 1.8L15 10',
+      tests: 'M9 3h6M10 3v6l-5 9a2 2 0 0 0 1.7 3h10.6a2 2 0 0 0 1.7-3l-5-9V3M7.5 15h9',
+      restore: 'M4 12a8 8 0 1 0 2.3-5.7M4 4v4h4M12 8v4l3 2',
+      report: 'M7 3h7l4 4v13a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1zM14 3v4h4M9 12h6M9 16h6',
+      bulk: 'M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3',
+      catalog: 'M4 5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2zM4 21V5M8 7h7',
+      about: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM12 11v6M12 7.5v.5',
+      connected: 'M5 12l4.5 4.5L19 7',
+      connect: 'M9 7V3M15 7V3M7 7h10v4a5 5 0 0 1-10 0zM12 16v5',
+      chevron: 'M9 6l6 6-6 6'
+    };
+    function Icon({ name, size = 16, style }) {
+      return (
+        <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ flexShrink: 0, ...(style || {}) }}>
+          <path d={ICON_PATHS[name] || ICON_PATHS.about} />
+        </svg>
+      );
+    }
+
+    function ThemeToggle() {
+      const [theme, setTheme] = useState(() => document.documentElement.dataset.theme || 'light');
+      const pick = (t) => { document.documentElement.dataset.theme = t; setTheme(t); try { localStorage.setItem('zpw.theme', t); } catch (e) {} };
+      return (
+        <div className="theme-toggle" role="group" aria-label="Colour theme" data-themetoggle>
+          <button className={theme === 'light' ? 'on' : ''} aria-pressed={theme === 'light'} onClick={() => pick('light')} data-theme-light>Light</button>
+          <button className={theme === 'dark' ? 'on' : ''} aria-pressed={theme === 'dark'} onClick={() => pick('dark')} data-theme-dark>Dark</button>
+        </div>
+      );
+    }
+
     function App() {
       // Navigation: activeModule = 'zia-wizard' | 'zia-bulk' | 'zcc' | 'about' | null
       const [activeModule, setActiveModule] = useState(null);
@@ -752,6 +901,7 @@
               <UpdateBadge />
             </div>
             <div className="header-right">
+              <ThemeToggle />
               <div className={`auth-badge ${auth.connected ? 'connected' : 'disconnected'}`}>
                 <span className="dot"></span>
                 {auth.connected ? `${auth.mode?.toUpperCase()} · ${auth.cloud}` : 'Not Connected'}
@@ -769,13 +919,13 @@
               <div className="sidebar-section">
                 <div className="sidebar-item" style={{opacity: auth.connected ? 0.5 : 1}}
                   onClick={() => { if (!auth.connected) { setActiveModule(null); setStep('connect'); }}}>
-                  <span className="step-num">{auth.connected ? '✓' : '🔌'}</span>
+                  <span className="step-num"><Icon name={auth.connected ? 'connected' : 'connect'} size={14} /></span>
                   {auth.connected ? 'Connected' : 'Connect'}
                 </div>
               </div>
               <div className="sidebar-section" data-activepovs>
                 <div className="sidebar-item" data-nav="povs" onClick={() => setPovsOpen(!povsOpen)} style={{cursor:'pointer', fontWeight:600}}>
-                  <span className="step-num">📂</span> Active POVs <span className="badge badge-category" style={{marginLeft:'auto'}}>{povList.filter(x => x.status !== 'closed').length}</span> <span style={{fontSize:'10px'}}>{povsOpen ? '▾' : '▸'}</span>
+                  <span className="step-num"><Icon name="povs" size={14} /></span> Active POVs <span className="badge badge-category" style={{marginLeft:'auto'}}>{povList.filter(x => x.status !== 'closed').length}</span> <span style={{fontSize:'10px'}}>{povsOpen ? '▾' : '▸'}</span>
                 </div>
                 {povsOpen && povList.filter(x => x.status !== 'closed').map(x => (
                   <div key={x.id} className={`sidebar-item ${activeModule === 'pov-home' && povHomeId === x.id ? 'active' : ''}`} data-povitem={x.id} onClick={() => openPovHome(x.id)}
@@ -788,24 +938,25 @@
                   </div>
                 ))}
                 {povsOpen && povList.some(x => x.status === 'closed') && <div className="form-hint" style={{paddingLeft:'1.6rem', fontSize:'10px'}}>{povList.filter(x => x.status === 'closed').map(x => <a key={x.id} href="#" onClick={e => { e.preventDefault(); openPovHome(x.id); }} style={{marginRight:'6px', color:'var(--text-muted)'}}>{x.customerName} (closed)</a>)}</div>}
-                {povsOpen && auth.connected && <div className="sidebar-item" data-nav="newpov" onClick={() => newPov(null)} style={{paddingLeft:'1.6rem', fontSize:'12px', cursor:'pointer'}}>＋ New POV</div>}
-                {povsOpen && <div className={`sidebar-item ${activeModule === 'pov-templates' ? 'active' : ''}`} data-nav="povtemplates" onClick={() => switchModule('pov-templates')} style={{paddingLeft:'1.6rem', fontSize:'12px', cursor:'pointer'}}>📑 Templates</div>}
+                {povsOpen && auth.connected && <div className="sidebar-item" data-nav="newpov" onClick={() => newPov(null)} style={{paddingLeft:'1.6rem', fontSize:'12px', cursor:'pointer'}}><Icon name="plus" size={14} /> New POV</div>}
+                {povsOpen && <div className={`sidebar-item ${activeModule === 'pov-templates' ? 'active' : ''}`} data-nav="povtemplates" onClick={() => switchModule('pov-templates')} style={{paddingLeft:'1.6rem', fontSize:'12px', cursor:'pointer'}}><Icon name="templates" size={14} /> Templates</div>}
               </div>
               {auth.connected && (
                 <div className="sidebar-section">
                   <div className={`sidebar-item ${activeModule === 'start' ? 'active' : ''}`} data-nav="start"
                     onClick={() => switchModule('start')} style={{cursor:'pointer', fontWeight:600}}>
-                    <span className="step-num">🚀</span> POV Start{activePov ? <span className="form-hint" style={{margin:'0 0 0 6px', fontWeight:400, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}>· {activePov.customerName}</span> : ''}
+                    <span className="step-num"><Icon name="start" size={14} /></span>
+                    <span style={{minWidth:0}}><span style={{display:'block'}}>POV Start</span>{activePov ? <span style={{display:'block', fontSize:'11px', fontWeight:400, color:'var(--text-muted)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}} data-startpov>{activePov.customerName}</span> : null}</span>
                   </div>
                   <div className="sidebar-section-title">Modules</div>
                   <div className={`sidebar-item ${zccExpanded ? 'active' : ''}`} data-nav="zcc-top"
                     onClick={() => switchModule('zcc')} style={{cursor:'pointer', fontWeight: zccExpanded ? 600 : 400}}>
-                    <span className="step-num">📱</span> Zscaler Client Connector
+                    <span className="step-num"><Icon name="zcc" size={14} /></span> Zscaler Client Connector
                   </div>
                   {zccExpanded && (<>{sub('zcc', '🧭', 'Profiles')}{sub('zcc-devices', '💻', 'Devices & Install')}</>)}
                   <div className={`sidebar-item ${ziaExpanded ? 'active' : ''}`} data-nav="zia-top"
                     onClick={() => switchModule('zia-pov')} style={{cursor:'pointer', fontWeight: ziaExpanded ? 600 : 400}}>
-                    <span className="step-num">🌐</span> Zscaler Internet Access
+                    <span className="step-num"><Icon name="zia" size={14} /></span> Zscaler Internet Access
                   </div>
                   {ziaExpanded && (<>
                     {sub('zia-pov', '🧭', 'Policy Wizard')}
@@ -828,23 +979,23 @@
                   </>)}
                   <div className={`sidebar-item ${zpaExpanded ? 'active' : ''}`} data-nav="zpa-top"
                     onClick={() => switchModule('zpa')} style={{cursor:'pointer', fontWeight: zpaExpanded ? 600 : 400}}>
-                    <span className="step-num">🔒</span> Zscaler Private Access
+                    <span className="step-num"><Icon name="zpa" size={14} /></span> Zscaler Private Access
                   </div>
                   <div className={`sidebar-item ${zdxExpanded ? 'active' : ''}`} data-nav="zdx-top"
                     onClick={() => switchModule('zdx')} style={{cursor:'pointer', fontWeight: zdxExpanded ? 600 : 400}}>
-                    <span className="step-num">📈</span> Zscaler Digital Experience
+                    <span className="step-num"><Icon name="zdx" size={14} /></span> Zscaler Digital Experience
                   </div>
                   <div className={`sidebar-item ${activeModule === 'tests' ? 'active' : ''}`} data-nav="tests"
                     onClick={() => switchModule('tests')} style={{cursor:'pointer', marginTop:'0.5rem'}}>
-                    <span className="step-num">🧪</span> POV Tests
+                    <span className="step-num"><Icon name="tests" size={14} /></span> POV Tests
                   </div>
                   <div className={`sidebar-item ${activeModule === 'restore' ? 'active' : ''}`} data-nav="restore"
                     onClick={() => switchModule('restore')} style={{cursor:'pointer'}}>
-                    <span className="step-num">🛟</span> Restore & Drift
+                    <span className="step-num"><Icon name="restore" size={14} /></span> Restore & Drift
                   </div>
                   <div className={`sidebar-item ${activeModule === 'report' ? 'active' : ''}`} data-nav="report"
                     onClick={() => switchModule('report')} style={{cursor:'pointer'}}>
-                    <span className="step-num">🧾</span> Summary Report
+                    <span className="step-num"><Icon name="report" size={14} /></span> Summary Report
                   </div>
                 </div>
               )}
@@ -852,16 +1003,16 @@
                 {auth.connected && (
                   <div className={`sidebar-item ${activeModule === 'bulk' ? 'active' : ''}`} data-nav="bulk"
                     onClick={() => switchModule('bulk')} style={{cursor:'pointer', fontSize:'12px'}}>
-                    <span className="step-num" style={{fontSize:'10px'}}>🗑️</span> Bulk Rule Manager
+                    <span className="step-num"><Icon name="bulk" size={14} /></span> Bulk Rule Manager
                   </div>
                 )}
                 <div className={`sidebar-item ${activeModule === 'catalog' ? 'active' : ''}`}
                   onClick={() => switchModule('catalog')} style={{cursor:'pointer', fontSize:'12px'}}>
-                  <span className="step-num" style={{fontSize:'10px'}}>📖</span> Policy Catalog
+                  <span className="step-num"><Icon name="catalog" size={14} /></span> Policy Catalog
                 </div>
                 <div className={`sidebar-item ${activeModule === 'about' ? 'active' : ''}`}
                   onClick={() => switchModule('about')} style={{cursor:'pointer', fontSize:'12px'}}>
-                  <span className="step-num" style={{fontSize:'10px'}}>ℹ️</span> About
+                  <span className="step-num"><Icon name="about" size={14} /></span> About
                 </div>
               </div>
             </nav>
@@ -930,35 +1081,42 @@
               )}
               {showCatalog && (<CatalogStep />)}
               {showAbout && (
-                <div className="card">
-                  <div className="card-header"><h2>🐼 ZeroTrustPanda ZS Policy Wizard</h2><p>Automated Zscaler policy configuration for healthcare and enterprise.</p></div>
-                  <div style={{fontSize:'13px', color:'var(--text-secondary)', lineHeight:'1.8'}}>
-                    <h3 style={{fontSize:'15px', color:'var(--accent-cyan)', margin:'1rem 0 0.5rem'}}>What This Wizard Does</h3>
-                    <p>Automates Zscaler security policy deployment based on industry best practices and compliance frameworks. Select a tier, choose compliance, deploy a complete policy set in minutes.</p>
-                    <h3 style={{fontSize:'15px', color:'var(--accent-cyan)', margin:'1.5rem 0 0.5rem'}}>ZIA Security Tier Wizard</h3>
-                    <p>Deploys policies across 7 areas (4 tiers: Strict, Balanced, Permissive, Zero Trust Hospital):</p>
-                    <div style={{paddingLeft:'1rem'}}>
-                      <div>• <strong>URL Filtering</strong> — Block legal liability, security risk, bandwidth/productivity categories</div>
-                      <div>• <strong>Cloud Firewall</strong> — Network application controls (WEBSEARCH, WEB, ENTERPRISE, P2P, etc.)</div>
-                      <div>• <strong>SSL/TLS Inspection</strong> — Decrypt/bypass with health, finance, government exemptions</div>
-                      <div>• <strong>Cloud Sandbox</strong> — Quarantine Office/PDF, scan executables, AI Instant Verdict</div>
-                      <div>• <strong>DNS Security</strong> — Block malicious DNS categories and 21+ DNS tunnel types</div>
-                      <div>• <strong>File Type Control</strong> — Block database uploads, password-protected archives, scripts</div>
-                      <div>• <strong>Cloud App Control</strong> — Restrict DoH, file sharing, webmail, streaming, IM, AI/ML</div>
+                <div data-about>
+                  <div className="card">
+                    <div className="about-grid">
+                      <div>
+                        <h2 style={{fontSize:'24px', fontWeight:600, margin:'0 0 0.5rem', letterSpacing:'-0.01em'}}>ZeroTrustPanda Policy Wizard</h2>
+                        <p className="about-lede">Starts a Zscaler proof of value with the customer's use cases instead of a blank tenant. In one guided session it builds best-practice policy across Client Connector, Internet Access, Private Access, Digital Experience and AI Guard, shows every change in a dry run first, and keeps track of each POV until it closes.</p>
+                        <ul className="about-list" style={{marginTop:'1.25rem'}}>
+                          <li><strong>Guided POV</strong><span>Tenant readiness and licensing, scope, customer intake, then each product in order, with one dry run and one apply.</span></li>
+                          <li><strong>Safe by design</strong><span>Nothing changes without a dry run of exactly the same choices. Re-runs update instead of duplicating, every apply can be restored, and credentials and other secrets are never saved.</span></li>
+                          <li><strong>Active POVs</strong><span>Each POV keeps its plan, where you left off, what was applied, tests, success criteria, dates and notes.</span></li>
+                          <li><strong>Built for the call</strong><span>Presets by vertical, POV test runbook, prove-it lookups, DLP test files and a summary report for the customer.</span></li>
+                        </ul>
+                      </div>
+                      <div>
+                        <div className="card" style={{margin:0}} data-aboutauthor>
+                          <div className="about-person">
+                            <div className="about-mono" aria-hidden="true">SH</div>
+                            <div>
+                              <div style={{fontWeight:600, fontSize:'16px'}}>Steven Hajny</div>
+                              <div className="form-hint" style={{marginTop:0}}>Distinguished Solutions Engineer, Healthcare · Zscaler</div>
+                            </div>
+                          </div>
+                          <p style={{fontSize:'14px', color:'var(--text-secondary)', margin:'0.9rem 0 0'}}>Steven helps hospitals and health systems adopt zero trust, and created the Zero Trust Hospital framework. He built ZeroTrustPanda to take the repetitive setup out of POVs, so the first call is spent on Epic, imaging and clinical workflows rather than on clicking through consoles.</p>
+                          <p className="form-hint" style={{margin:'0.9rem 0 0'}}>An independent project. It is not an official Zscaler product and is not supported by Zscaler.</p>
+                        </div>
+                        <div className="card" style={{margin:'1rem 0 0'}}>
+                          <div style={{fontSize:'13px', color:'var(--text-secondary)'}}>Version <strong style={{color:'var(--text-primary)'}}>{APP_VERSION}</strong></div>
+                          <div style={{fontSize:'13px', color:'var(--text-secondary)', marginTop:'4px'}}>Compliance baselines: HIPAA, HITRUST CSF, NIST 800-53, NIST 800-171, PCI DSS, CJIS, SOX, FERPA, GDPR</div>
+                          <div style={{fontSize:'13px', marginTop:'8px'}}><a href="https://github.com/ZeroTrustPanda/ZTP-Policy-Wizard" target="_blank" rel="noreferrer" style={{color:'var(--accent-blue)'}}>Source and release notes on GitHub</a></div>
+                        </div>
+                      </div>
                     </div>
-                    <h3 style={{fontSize:'15px', color:'var(--accent-cyan)', margin:'1.5rem 0 0.5rem'}}>Rules, isolation and certificates (v1.9.0)</h3>
-                    <p>Switch any rule off before it is created, set URL rules to Isolate with the isolation profile you pick, and choose the interception certificate for new Inspect rules. Save the whole configuration as a framework file and load it in another tenant, or capture a tenant's current policies as a framework.</p>
-                    <h3 style={{fontSize:'15px', color:'var(--accent-cyan)', margin:'1.5rem 0 0.5rem'}}>SSL Certificate Manager</h3>
-                    <p>See which certificate every SSL Inspect rule signs with, and move rules off the Zscaler default certificate onto your imported intermediate CA (or back) in one change.</p>
-                    <h3 style={{fontSize:'15px', color:'var(--accent-cyan)', margin:'1.5rem 0 0.5rem'}}>Bulk Rule Manager</h3>
-                    <p>View and delete rules across all ZIA policy categories for cleanup after testing.</p>
-                    <h3 style={{fontSize:'15px', color:'var(--accent-cyan)', margin:'1.5rem 0 0.5rem'}}>Mobile Admin Portal (ZCC)</h3>
-                    <p>Create ZCC Forwarding Profiles and Windows / macOS App Profiles from templates. Read supported; write requires ZCC API write permissions.</p>
-                    <h3 style={{fontSize:'15px', color:'var(--accent-cyan)', margin:'1.5rem 0 0.5rem'}}>Digital Experience (ZDX)</h3>
-                    <p>Set up ZDX Web and CloudPath probes for predefined and custom apps following the Zscaler POV best practice guide, and manage existing apps and probes. Requires the ZDX scope on the API client.</p>
-                    <h3 style={{fontSize:'15px', color:'var(--accent-cyan)', margin:'1.5rem 0 0.5rem'}}>Compliance</h3>
-                    <p>HIPAA, HITRUST CSF, NIST 800-53, NIST 800-171, PCI-DSS, CJIS, SOX, FERPA, GDPR</p>
-                    <h3 style={{fontSize:'15px', color:'var(--accent-cyan)', margin:'1.5rem 0 0.5rem'}}>Version History</h3>
+                  </div>
+                  <details className="card" data-abouthistory>
+                    <summary style={{cursor:'pointer', fontWeight:600, fontSize:'14px'}}>Version history</summary>
+                    <div style={{marginTop:'0.75rem', lineHeight:1.7}}>
                     <div style={{paddingLeft:'1rem', fontSize:'12px'}}>
                       <div><strong>v2.4.0</strong> — Active POVs: every POV is saved on this computer with its plan, the exact step you left off, what the wizard did (runs, restore points, drift), tests and customer success criteria, a timeline, notes and follow-ups. Resume any POV after signing in to its tenant (a POV never opens against a different tenant); credentials and other secrets are never saved. Saved templates, export / import, quiet-POV flag.</div>
                       <div><strong>v2.3.1</strong> — Private Access: application name, destinations and TCP / UDP ports are editable in the table, plus + Add application.</div>
@@ -982,7 +1140,8 @@
                       <div><strong>v1.2.x</strong> — Sandbox, DNS, File Type, Cloud App Control, Bulk Rule Manager</div>
                       <div><strong>v1.0-1.1</strong> — URL Filtering, Firewall, SSL, Malware Protection, Error boundary</div>
                     </div>
-                  </div>
+                    </div>
+                  </details>
                 </div>
               )}
               {showZiaWizard && step === 'tier' && (<FrameworkPanel setConfig={setConfig} setError={setError} auth={auth}
@@ -1827,11 +1986,12 @@
     };
 
     // v2.3 guided POV: Readiness → Build the POV (scope) → Customer intake → Client Connector → Internet Access → Private Access → Digital Experience → Dry run & apply
-    const GUIDE_DEFAULT = { customerName: '', prefix: '', prefixEdited: false, domain: '', presetId: 'HEALTHCARE', baseline: 'HIPAA', scope: { zia: true, zpa: true, zdx: true } };
+    const GUIDE_DEFAULT = { customerName: '', prefix: '', prefixEdited: false, domain: '', presetId: 'HEALTHCARE', baseline: 'HIPAA', scope: { zia: true, zpa: true, zdx: true, aiguard: false } };
     const GUIDE_PRODUCTS = [
       { id: 'zia', icon: '🌐', name: 'Zscaler Internet Access', desc: 'URL filtering, cloud app control, SSL inspection, threat protection, DLP, firewall and DNS policies from a baseline framework.' },
       { id: 'zpa', icon: '🔒', name: 'Zscaler Private Access', desc: 'App Connector group and provisioning key, application segments for the internal domain and common apps, access / timeout / inspection / isolation policies.' },
-      { id: 'zdx', icon: '📈', name: 'Zscaler Digital Experience', desc: 'Web and CloudPath probes for Microsoft 365, UCaaS and the SaaS apps common to the customer\'s market.' }
+      { id: 'zdx', icon: '📈', name: 'Zscaler Digital Experience', desc: 'Web and CloudPath probes for Microsoft 365, UCaaS and the SaaS apps common to the customer\'s market.' },
+      { id: 'aiguard', icon: '🛡️', name: 'AI Guard', desc: 'Runtime protection for AI apps (ChatGPT, Microsoft 365 Copilot, Claude, Gemini and more): ZIA inspects their traffic and chains it to AI Guard for prompt and response detection. Needs Internet Access.', needs: 'zia' }
     ];
 
     function GuideStepper({ stages, stage, visited, go }) {
@@ -1851,7 +2011,14 @@
     }
 
     function ScopePanel({ g, setG, onNext, onBack }) {
-      const toggle = (id) => setG(prev => ({ ...prev, scope: { ...prev.scope, [id]: !prev.scope[id] } }));
+      // AI Guard rides on ZIA: turning it on turns ZIA on; turning ZIA off turns AI Guard off
+      const toggle = (id) => setG(prev => {
+        const on = !prev.scope[id];
+        const scope = { ...prev.scope, [id]: on };
+        if (id === 'aiguard' && on) scope.zia = true;
+        if (id === 'zia' && !on) scope.aiguard = false;
+        return { ...prev, scope };
+      });
       const any = Object.values(g.scope).some(Boolean);
       return (
         <div className="card" data-guide="scope">
@@ -1860,9 +2027,10 @@
             {GUIDE_PRODUCTS.map(p => (
               <div key={p.id} className={`tier-card ${g.scope[p.id] ? 'selected' : ''}`} onClick={() => toggle(p.id)} data-scopeproduct={p.id} style={{textAlign:'left', position:'relative'}}>
                 <div style={{position:'absolute', top:'12px', right:'12px'}}><div className={`toggle-switch ${g.scope[p.id] ? 'active' : ''}`}><div className="toggle-knob"></div></div></div>
-                <div className="tier-icon">{p.icon}</div>
+                <div className="product-icon"><Icon name={p.id} size={22} /></div>
                 <div className="tier-name">{p.name}</div>
                 <div className="tier-desc">{p.desc}</div>
+                {p.needs && g.scope[p.id] && <div className="form-hint" style={{marginTop:'6px'}} data-needszia>Internet Access was turned on with it.</div>}
               </div>
             ))}
           </div>
@@ -2272,8 +2440,8 @@
       const archive = async () => { try { await api.call('DELETE', `/v2/povs/${id}`); if (onClosed) onClosed(id); } catch (e) { setError(e.message); } };
       const resume = async () => { setBusy(true); await onResume(p); setBusy(false); };
       const planRows = [
-        ['Products', ['zia', 'zpa', 'zdx'].filter(k => gg.scope && gg.scope[k]).map(k => PRODUCT[k]).join(', ') || '—'],
-        ['Preset', gg.presetId || '—'], ['Baseline (ZIA)', (gd.pov && gd.pov.baseline) || gg.baseline || '—'], ['Internal domain', gg.domain || '—'],
+        ['Products', ['zia', 'aiguard', 'zpa', 'zdx'].filter(k => gg.scope && gg.scope[k]).map(k => k === 'aiguard' ? 'AI Guard' : PRODUCT[k]).join(', ') || '—'],
+        ['Preset', ({ HEALTHCARE: 'Healthcare', GENERAL: 'General enterprise', FINANCE: 'Financial services', EDUCATION: 'Education', BLANK: 'Start empty' })[gg.presetId] || gg.presetId || '—'], ['Baseline (ZIA)', (gd.pov && gd.pov.baseline) || gg.baseline || '—'], ['Internal domain', gg.domain || '—'],
         ['Client Connector', Object.keys((gd.payloads && gd.payloads.zcc) || {}).map(k => k === 'macos' ? 'macOS' : 'Windows').join(' + ') || 'not set up yet'],
         ['Private Access', gd.payloads && gd.payloads.zpa ? (gd.payloads.zpa.apps ? `${gd.payloads.zpa.apps.length} application segments` : `wildcard ${gd.payloads.zpa.domains || ''}`) : 'not set up yet'],
         ['Digital Experience', gd.payloads && gd.payloads.zdx ? `${(gd.payloads.zdx.predefined || []).length + (gd.payloads.zdx.custom || []).length} apps` : 'not set up yet']
@@ -6253,6 +6421,8 @@
     // ========================
     // Render
     // ========================
+    // v2.5: light ("Forest") is the default; the dark theme stays one click away and is remembered per browser
+    try { document.documentElement.dataset.theme = localStorage.getItem('zpw.theme') || 'light'; } catch (e) { document.documentElement.dataset.theme = 'light'; }
     ReactDOM.render(
       React.createElement(ErrorBoundary, null, React.createElement(App)),
       document.getElementById('app')
