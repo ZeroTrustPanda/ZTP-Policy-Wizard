@@ -62,6 +62,27 @@ async function planZdx(zdx, input) {
     checks.push({ name: 'Something to do', status: 'fail', detail: 'Pick at least one predefined app or add a custom app.' });
   }
 
+  // v2.6.1: the ZDX tier (from a subscription, or picked by the SE). Unknown tier = nothing is held back.
+  const ENT = require('./v2/entitlements');
+  const tier = input && ENT.ZDX_TIERS[input.tier] ? input.tier : null;
+  if (tier) {
+    const t = ENT.ZDX_TIERS[tier];
+    const tb = ENT.zdxBlocked(tier, { templateId: input.templateId });
+    if (!t.configurable) checks.push({ name: `ZDX ${t.label}`, status: 'fail', detail: tb });
+    else {
+      if (tb && input.templateId) checks.push({ name: `Template on ZDX ${t.label}`, status: 'fail', detail: `${tb} Pick a template that fits the tier.` });
+      for (const p of predefinedIn) {
+        const why = ENT.zdxBlocked(tier, { provider: String(p.provider || '').toUpperCase() });
+        if (why) checks.push({ name: `${T.PREDEFINED_INFO[String(p.provider || '').toUpperCase()]?.label || p.provider}: Not licensed`, status: 'fail', detail: why });
+      }
+      if (t.microsoftOnly && customIn.length) checks.push({ name: 'Custom apps: Not licensed', status: 'fail', detail: 'ZDX M365 monitors Microsoft 365 apps only.' });
+      const std = T.getTemplate('POV_STANDARD');
+      if (t.limited && predefinedIn.length + customIn.length > std.predefined.length + std.custom.length) {
+        warnings.push(`More apps than the ZDX Standard template. ZDX Standard allows only a small number of probes, so ZDX may refuse the extra ones.`);
+      }
+    }
+  }
+
   const colPre = findCollection(collections, 'predefined');
   const colCus = findCollection(collections, 'custom');
   const missingCol = new Set();   // collections a new ZDX tenant doesn't have yet; created by a setup step
@@ -305,7 +326,16 @@ function registerZdxRoutes(app, requireAuth) {
           configuredHost: cfg?.host || null
         };
       });
-      res.json({ templates: T.getTemplateCatalog(), predefined, frequencies: T.PROBE_FREQUENCIES, protocols: T.CLOUDPATH_PROTOCOLS });
+      // v2.6.1: ZDX tier from the tenant subscriptions when listed; otherwise the SE picks it
+      const ENT = require('./v2/entitlements');
+      let detectedTier = null;
+      try {
+        const lic = req.session.v2 && req.session.v2.licensing;
+        if (lic && lic.editions && lic.editions.zdx) detectedTier = lic.editions.zdx;
+        else if (req.session.client) { const subs = await req.session.client.apiCall('GET', '/api/v1/subscriptions'); if (Array.isArray(subs)) detectedTier = ENT.zdxTierFromSubs(new Set(subs.filter(x => x && x.subscribed !== false).map(x => String(x.id)))); }
+      } catch (e) { /* unknown */ }
+      const tiers = Object.entries(ENT.ZDX_TIERS).map(([id, t]) => ({ id, label: t.label, configurable: t.configurable, ucaas: t.ucaas, limited: !!t.limited, microsoftOnly: !!t.microsoftOnly, templates: t.templates }));
+      res.json({ templates: T.getTemplateCatalog(), predefined, frequencies: T.PROBE_FREQUENCIES, protocols: T.CLOUDPATH_PROTOCOLS, tiers, detectedTier, ucaasProviders: ENT.UCAAS_PROVIDERS });
     } catch (e) { res.status(502).json({ error: e.message }); }
   });
 

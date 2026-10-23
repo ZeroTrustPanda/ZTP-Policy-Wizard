@@ -228,7 +228,8 @@ function urlRuleBody(rule, order, catIds) {
 function firewallBody(rule, order) {
   const b = { name: rule.name, description: rule.description || '', order, state: rule.state || 'ENABLED', rank: 7,
     action: rule.action === 'BLOCK_ICMP_UNREACHABLE' ? 'BLOCK_DROP' : rule.action, enableFullLogging: false };
-  for (const k of ['nwApplications', 'destPorts', 'protocols', 'destIpCategories', 'destCountries', 'sourceCountries']) if (rule[k] && (!Array.isArray(rule[k]) || rule[k].length)) b[k] = rule[k];
+  for (const k of ['nwApplications', 'nwServices', 'destPorts', 'protocols', 'destIpCategories', 'destCountries', 'sourceCountries']) if (rule[k] && (!Array.isArray(rule[k]) || rule[k].length)) b[k] = rule[k];
+  if (rule.standardFit) b.nwApplications = [];   // v2.6.1 Cloud Firewall Standard: matched by network services only (clears apps left from an earlier run)
   return b;
 }
 /** A rule with no category or app scope (urlCategories empty or ['ANY']) catches all remaining traffic. */
@@ -320,7 +321,37 @@ async function runZia(client, template, { dryRun, logger }) {
     await eng.upsert({ category: 'URL Filtering', name: r.name, listPath: '/api/v1/urlFilteringRules', createPath: '/api/v1/urlFilteringRules',
       updatePath: id => `/api/v1/urlFilteringRules/${id}`, orderPath: '/api/v1/urlFilteringRules', build: order => urlRuleBody(r, order, catIds) });
   }
+  // v2.6.1 Cloud Firewall Standard: rules matched by network services (names → ids); custom services are created when missing
+  const svcIds = {};
+  const fwStd = (P.firewallFiltering || []).filter(r => r.nwServiceNames || r.customServices);
+  if (fwStd.length) {
+    let svcs = [];
+    try { svcs = list(await client.apiCall('GET', '/api/v1/networkServices')); } catch (e) { eng.warnings.push(`Could not read network services: ${e.message}`); }
+    for (const s of svcs) svcIds[s.name] = { id: s.id };
+    const customs = new Map();
+    for (const r of fwStd) for (const c of r.customServices || []) customs.set(c.name, c);
+    for (const c of customs.values()) {
+      if (svcIds[c.name]) { eng.record({ category: 'Network Service', name: c.name, action: 'NO_CHANGE', id: svcIds[c.name].id }); continue; }
+      if (dryRun) { eng.record({ category: 'Network Service', name: c.name, action: 'CREATE' }); svcIds[c.name] = { id: 'new' }; continue; }
+      try {
+        const n = await client.apiCall('POST', '/api/v1/networkServices', { name: c.name, type: 'CUSTOM', description: 'Created by the Zscaler Policy Wizard (Cloud Firewall Standard)',
+          destTcpPorts: (c.tcp || []).map(p => ({ start: p })), destUdpPorts: (c.udp || []).map(p => ({ start: p })) });
+        svcIds[c.name] = { id: n.id }; eng.wrote = true;
+        eng.undo.push({ op: 'DELETE', path: `/api/v1/networkServices/${n.id}`, label: `Network Service: ${c.name}` });
+        eng.record({ category: 'Network Service', name: c.name, action: 'CREATE', id: n.id });
+      } catch (e) { eng.record({ category: 'Network Service', name: c.name, action: 'FAILED', error: e.message }); }
+    }
+    for (const r of fwStd) {
+      const names = [...(r.nwServiceNames || []), ...(r.customServices || []).map(c => c.name)];
+      const missing = names.filter(n => !svcIds[n]);
+      if (missing.length) eng.warnings.push(`${r.name}: network service(s) not found on this tenant: ${missing.join(', ')}.`);
+      r.nwServices = names.filter(n => svcIds[n] && svcIds[n].id !== 'new').map(n => ({ id: svcIds[n].id }));
+    }
+  }
   for (const r of P.firewallFiltering || []) {
+    if ((r.nwServiceNames || r.customServices) && !(r.nwServices || []).length && !dryRun) {
+      eng.record({ category: 'Cloud Firewall', name: r.name, action: 'SKIPPED', error: 'None of its network services could be found or created.' }); continue;
+    }
     await eng.upsert({ category: 'Cloud Firewall', name: r.name, listPath: '/api/v1/firewallFilteringRules', createPath: '/api/v1/firewallFilteringRules',
       updatePath: id => `/api/v1/firewallFilteringRules/${id}`, orderPath: '/api/v1/firewallFilteringRules', build: order => firewallBody(r, order) });
   }

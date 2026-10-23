@@ -72,7 +72,8 @@ function registerV2Routes(app, requireAuth) {
     if (!PREFIX_RE.test(prefix)) throw Object.assign(new Error('Set a global prefix first (1–20 letters, numbers, hyphens or underscores).'), { status: 400 });
     if (!b.baseline) throw Object.assign(new Error('Choose a baseline framework.'), { status: 400 });
     return { baseline: b.baseline, scope: normalizeScope(b.scope), prefix, disabledRules: b.disabledRules || {}, actionSettings: b.actionSettings || { policy: {}, rules: {} },
-      settingOverrides: b.settingOverrides || {}, cbiProfile: b.cbiProfile || null, sslCertificate: b.sslCertificate || null };
+      settingOverrides: b.settingOverrides || {}, cbiProfile: b.cbiProfile || null, sslCertificate: b.sslCertificate || null,
+      editions: ((v2(session).licensing || {}).editions) || null };
   }
 
   app.post('/api/v2/zia/generate', requireAuth, (req, res) => {
@@ -83,12 +84,12 @@ function registerV2Routes(app, requireAuth) {
   app.post('/api/v2/zia/plan', requireAuth, async (req, res) => {
     const { client, logger } = req.session;
     try {
+      let lic = v2(req.session).licensing;
+      if (!lic) { lic = await detectLicensing({ client, zccClient: req.session.zccClient }).catch(() => null); v2(req.session).licensing = lic; }
       const input = genInput(req.body, req.session);
       const template = fw.generate(input);
       const resolved = await resolveForTenant(client, template, { cbiProfile: input.cbiProfile });
       const run = await runZia(client, resolved.template, { dryRun: true, logger });
-      let lic = v2(req.session).licensing;
-      if (!lic) { lic = await detectLicensing({ client, zccClient: req.session.zccClient }).catch(() => null); v2(req.session).licensing = lic; }
       const planId = rememberPlan(req.session, 'zia', input);
       logger.log('V2_ZIA_DRY_RUN', { baseline: input.baseline, scope: input.scope, counts: countActions(run.ledger) });
       res.json({
