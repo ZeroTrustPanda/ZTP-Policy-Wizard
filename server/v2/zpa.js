@@ -623,65 +623,161 @@ function policyRuleDiff(want, existing) {
 }
 
 // ---------- bulk manager (BRM-01..05) ----------
-const DELETE_ORDER = ['praConsole', 'policyRule', 'appSegment', 'inspectionProfile', 'cbiProfile', 'serverGroup', 'segmentGroup', 'provisioningKey', 'connectorGroup'];
-const KIND_LABEL = { praConsole: 'PRA Console', policyRule: 'Policy Rule', appSegment: 'Application Segment', inspectionProfile: 'Inspection Profile', cbiProfile: 'Isolation Profile', serverGroup: 'Server Group',
-  segmentGroup: 'Segment Group', provisioningKey: 'Provisioning Key', connectorGroup: 'App Connector Group' };
-const POLICY_TYPES = ['ACCESS_POLICY', 'TIMEOUT_POLICY', 'INSPECTION_POLICY', 'ISOLATION_POLICY'];
+// v2.6: ZPA refuses to delete an object something else still uses, so deletes run strictly in this order (field-tested):
+//   take the app segment out of its segment group → access → app protection (inspection) → isolation policy rules →
+//   isolation profile → inspection profile → timeout policy rules → PRA console → app segment → segment group →
+//   server group → App Connector group → provisioning key.
+const DELETE_ORDER = ['detach', 'accessRule', 'inspectionRule', 'isolationRule', 'cbiProfile', 'inspectionProfile', 'timeoutRule',
+  'praConsole', 'appSegment', 'segmentGroup', 'serverGroup', 'connectorGroup', 'provisioningKey'];
+const KIND_LABEL = { detach: 'Remove from segment group', accessRule: 'Access Policy', inspectionRule: 'App Protection Policy', isolationRule: 'Isolation Policy',
+  timeoutRule: 'Timeout Policy', policyRule: 'Policy Rule', praConsole: 'PRA Console', appSegment: 'Application Segment', inspectionProfile: 'App Protection Profile',
+  cbiProfile: 'Isolation Profile', serverGroup: 'Server Group', segmentGroup: 'Segment Group', provisioningKey: 'Provisioning Key', connectorGroup: 'App Connector Group' };
+const RULE_KIND = { ACCESS_POLICY: 'accessRule', INSPECTION_POLICY: 'inspectionRule', ISOLATION_POLICY: 'isolationRule', TIMEOUT_POLICY: 'timeoutRule' };
+const POLICY_TYPES = Object.keys(RULE_KIND);
+const RULE_KINDS = Object.values(RULE_KIND);
+const ids = (l) => (l || []).map(x => String(x && typeof x === 'object' ? x.id : x)).filter(x => x && x !== 'undefined');
 
-async function listZpaObjects(zpa, prefix) {
-  const out = [];
+/**
+ * Every ZPA object that matters for deletes, wizard-made or not, with what it points at.
+ * Returns { all, byKey } where each object = { kind, id, name, mine, refs: {...} }.
+ */
+async function zpaGraph(zpa, prefix) {
+  const all = [], errors = [];
   const mine = (o) => !prefix || String(o.name || '').startsWith(prefix + '-');
-  for (const kind of DELETE_ORDER) {
+  const add = (kind, o, refs, extra = {}) => all.push({ kind, label: KIND_LABEL[kind], id: String(o.id), name: o.name, enabled: o.enabled !== false, mine: mine(o), refs, ...extra });
+  const base = await zpa.base();
+  for (const t of POLICY_TYPES) {
     try {
-      if (kind === 'policyRule') {
-        const base = await zpa.base();
-        for (const t of POLICY_TYPES) {
-          const set = await zpa.apiCall('GET', `${base}/policySet/policyType/${t}`).catch(() => null);
-          if (!set) continue;
-          for (const r of await policyRules(zpa, t)) if (mine(r)) out.push({ kind, label: KIND_LABEL[kind], id: `${set.id}:${r.id}`, name: r.name, enabled: true, detail: `${t.replace('_POLICY', '').toLowerCase()} policy` });
-        }
-        continue;
+      const set = await zpa.apiCall('GET', `${base}/policySet/policyType/${t}`).catch(() => null);
+      if (!set) continue;
+      for (const r of await policyRules(zpa, t)) {
+        const apps = (r.conditions || []).flatMap(c => (c.operands || []).filter(o => o.objectType === 'APP').flatMap(o => o.values || [o.rhs])).map(String);
+        add(RULE_KIND[t], { ...r, id: `${set.id}:${r.id}` }, { apps, isolationProfile: r.zpnIsolationProfileId ? String(r.zpnIsolationProfileId) : null, inspectionProfile: r.zpnInspectionProfileId ? String(r.zpnInspectionProfileId) : null },
+          { detail: `${t.replace('_POLICY', '').toLowerCase()} policy` });
       }
-      if (kind === 'cbiProfile') {
-        for (const o of list(await zpa.apiCall('GET', `/zpa/cbiconfig/cbi/api/customers/${await zpa.cid()}/profiles`))) if (mine(o)) out.push({ kind, label: KIND_LABEL[kind], id: String(o.id), name: o.name, enabled: true, detail: o.description || '' });
-        continue;
-      }
-      for (const o of await zpa.listAll(PATHS[kind])) {
-        if (!mine(o)) continue;
-        out.push({ kind, label: KIND_LABEL[kind], id: String(o.id), name: o.name, enabled: o.enabled, detail: kind === 'provisioningKey' ? `used ${o.usageCount || 0} of ${o.maxUsage}` : (o.description || '') });
-      }
-    } catch (e) { out.push({ kind, label: KIND_LABEL[kind], error: e.message }); }
+    } catch (e) { errors.push({ kind: RULE_KIND[t], label: KIND_LABEL[RULE_KIND[t]], error: e.message }); }
   }
-  return out;
+  // CBI profiles appear in ZPA as isolation profiles of the same name; rules point at the ZPA isolation profile id
+  let isoByName = {};
+  try { for (const o of await zpa.listAll('/isolation/profiles')) isoByName[o.name] = String(o.id); } catch (e) { /* older tenants: matched by name only */ }
+  try {
+    for (const o of list(await zpa.apiCall('GET', `/zpa/cbiconfig/cbi/api/customers/${await zpa.cid()}/profiles`))) add('cbiProfile', o, { zpnId: isoByName[o.name] || null }, { detail: o.description || '' });
+  } catch (e) { errors.push({ kind: 'cbiProfile', label: KIND_LABEL.cbiProfile, error: e.message }); }
+  const lists = { inspectionProfile: [], praConsole: [], appSegment: [], segmentGroup: [], serverGroup: [], connectorGroup: [], provisioningKey: [] };
+  for (const kind of Object.keys(lists)) {
+    try { lists[kind] = await zpa.listAll(PATHS[kind]); } catch (e) { errors.push({ kind, label: KIND_LABEL[kind], error: e.message }); }
+  }
+  for (const o of lists.inspectionProfile) add('inspectionProfile', o, {}, { detail: o.description || '' });
+  for (const o of lists.praConsole) add('praConsole', o, { praApp: o.praApplication ? String(o.praApplication.id) : null }, { detail: o.description || '' });
+  for (const o of lists.appSegment) add('appSegment', o, { segmentGroup: o.segmentGroupId ? String(o.segmentGroupId) : null, serverGroups: ids(o.serverGroups), praApps: ids(o.praApps) }, { detail: o.description || '', segmentGroupName: o.segmentGroupName || '' });
+  for (const o of lists.segmentGroup) add('segmentGroup', o, { apps: ids(o.applications) }, { detail: o.description || '' });
+  for (const o of lists.serverGroup) add('serverGroup', o, { connectorGroups: ids(o.appConnectorGroups) }, { detail: o.description || '' });
+  for (const o of lists.connectorGroup) add('connectorGroup', o, {}, { detail: o.description || '' });
+  for (const o of lists.provisioningKey) add('provisioningKey', o, { connectorGroup: o.zcomponentId ? String(o.zcomponentId) : null }, { detail: `used ${o.usageCount || 0} of ${o.maxUsage}` });
+  return { all, errors };
 }
 
-/** Delete selected objects in dependency order (BRM-04). dryRun returns the planned order only. */
-async function deleteZpaObjects(zpa, items, { dryRun, logger }) {
+/** Objects that must be deleted before x (ZPA refuses otherwise). */
+function blockersOf(x, all) {
+  const k = x.kind, id = x.id;
+  if (k === 'appSegment') return all.filter(o => (RULE_KINDS.includes(o.kind) && o.refs.apps.includes(id)) || (o.kind === 'praConsole' && o.refs.praApp && x.refs.praApps.includes(o.refs.praApp)));
+  if (k === 'segmentGroup') return all.filter(o => o.kind === 'appSegment' && o.refs.segmentGroup === id);
+  if (k === 'serverGroup') return all.filter(o => o.kind === 'appSegment' && o.refs.serverGroups.includes(id));
+  if (k === 'connectorGroup') return all.filter(o => o.kind === 'serverGroup' && o.refs.connectorGroups.includes(id));
+  if (k === 'cbiProfile') return all.filter(o => o.kind === 'isolationRule' && ((x.refs.zpnId && o.refs.isolationProfile === x.refs.zpnId)));
+  if (k === 'inspectionProfile') return all.filter(o => o.kind === 'inspectionRule' && o.refs.inspectionProfile === id);
+  return [];
+}
+
+async function listZpaObjects(zpa, prefix) {
+  const { all, errors } = await zpaGraph(zpa, prefix);
+  const out = [];
+  for (const kind of DELETE_ORDER) for (const o of all.filter(x => x.kind === kind && x.mine)) {
+    const usedBy = blockersOf(o, all).map(b => ({ kind: b.kind, label: b.label, id: b.id, name: b.name, mine: b.mine }));
+    out.push({ kind: o.kind, label: o.label, id: o.id, name: o.name, enabled: o.enabled, detail: o.detail || '', usedBy });
+  }
+  return [...out, ...errors];
+}
+
+/**
+ * Plan / run a delete of the selected objects, strictly in DELETE_ORDER.
+ * Anything still used by an object that is not selected is BLOCKED (with an issue saying what to select or remove first) and is not deleted.
+ * When a delete fails, everything that depended on it is SKIPPED instead of failing in turn.
+ * Returns { results, issues }.
+ */
+async function deleteZpaObjects(zpa, items, { dryRun, logger, prefix } = {}) {
   const base = await zpa.base();
-  const sorted = [...items].sort((a, b) => DELETE_ORDER.indexOf(a.kind) - DELETE_ORDER.indexOf(b.kind)).map(i => ({ ...i, label: KIND_LABEL[i.kind] || i.kind }));
-  const results = [];
-  for (const it of sorted) {
-    if (!PATHS[it.kind] && it.kind !== 'policyRule' && it.kind !== 'cbiProfile') { results.push({ ...it, action: 'FAILED', error: 'Unknown object type' }); continue; }
-    if (dryRun) { results.push({ ...it, action: 'DELETE' }); continue; }
-    try {
-      if (it.kind === 'cbiProfile') await zpa.apiCall('DELETE', `/zpa/cbiconfig/cbi/api/customers/${await zpa.cid()}/profiles/${it.id}`);
-      else if (it.kind === 'policyRule') {
-        const [setId, ruleId] = String(it.id).split(':');
-        await zpa.apiCall('DELETE', `${base}/policySet/${setId}/rule/${ruleId}`);
-      } else {
-        const q = it.kind === 'appSegment' ? '?forceDelete=true' : '';
-        await zpa.apiCall('DELETE', `${base}${PATHS[it.kind]}/${it.id}${q}`);
-      }
-      results.push({ ...it, action: 'DELETED' });
-      if (logger) logger.logPolicyApply(`ZPA ${KIND_LABEL[it.kind]}`, it.name, 'DELETE', { success: true, id: it.id });
-    } catch (e) {
-      results.push({ ...it, action: 'FAILED', error: e.message });
-      if (logger) logger.logPolicyApply(`ZPA ${KIND_LABEL[it.kind]}`, it.name, 'DELETE', { error: e.message });
+  const { all } = await zpaGraph(zpa, prefix);
+  const key = (o) => `${o.kind}:${o.id}`;
+  const chosen = new Set(items.map(key));
+  const sel = all.filter(o => chosen.has(key(o)));
+  const results = [], issues = [];
+  // what is held back: still used by something that is not being deleted
+  const blocked = new Map();
+  for (const o of sel) {
+    const open = blockersOf(o, all).filter(b => !chosen.has(key(b)));
+    if (open.length) {
+      blocked.set(key(o), open);
+      for (const b of open) issues.push({ object: `${o.label}: ${o.name}`, blockedBy: `${b.label}: ${b.name}`, kind: b.kind, id: b.id, selectable: b.mine,
+        fix: b.mine ? `Select ${b.label} "${b.name}" too; it is deleted first.` : `"${b.name}" was not created by the wizard. Remove it (or take ${o.name} out of it) in the ZPA portal first.` });
     }
   }
-  return results;
+  // a blocked object also holds back what it in turn needs gone (e.g. a blocked app segment keeps its segment group and server group in use)
+  let grew = true;
+  while (grew) {
+    grew = false;
+    for (const o of sel) {
+      if (blocked.has(key(o))) continue;
+      const via = blockersOf(o, all).filter(b => blocked.has(key(b)));
+      if (via.length) { blocked.set(key(o), via); grew = true; }
+    }
+  }
+  // steps: detach each app segment from its segment group first, then every object in order
+  const steps = [];
+  for (const o of sel.filter(x => x.kind === 'appSegment' && x.refs.segmentGroup && !blocked.has(key(x)))) {
+    const sg = all.find(g => g.kind === 'segmentGroup' && g.id === o.refs.segmentGroup);
+    steps.push({ kind: 'detach', label: KIND_LABEL.detach, id: `${o.refs.segmentGroup}:${o.id}`, name: `${o.name} from ${sg ? sg.name : 'its segment group'}`, app: o, groupId: o.refs.segmentGroup });
+  }
+  for (const kind of DELETE_ORDER.slice(1)) for (const o of sel.filter(x => x.kind === kind)) steps.push({ kind: o.kind, label: o.label, id: o.id, name: o.name, obj: o });
+  const failed = new Set();
+  for (const st of steps) {
+    const row = { kind: st.kind, label: st.label, id: st.id, name: st.name };
+    if (st.kind !== 'detach' && blocked.has(key(st.obj))) {
+      const b = blocked.get(key(st.obj));
+      results.push({ ...row, action: 'BLOCKED', error: `Still used by ${b.map(x => `${x.label} "${x.name}"`).join(', ')}.` });
+      continue;
+    }
+    const needs = st.kind === 'detach' ? [] : blockersOf(st.obj, all).filter(b => failed.has(key(b)));
+    if (needs.length) { results.push({ ...row, action: 'SKIPPED', error: `Not deleted because ${needs.map(x => `${x.label} "${x.name}"`).join(', ')} could not be deleted first.` }); failed.add(key(st.obj)); continue; }
+    if (dryRun) { results.push({ ...row, action: st.kind === 'detach' ? 'DETACH' : 'DELETE' }); continue; }
+    try {
+      if (st.kind === 'detach') {
+        const g = await zpa.apiCall('GET', `${base}${PATHS.segmentGroup}/${st.groupId}`);
+        const apps = (g.applications || []).filter(a => String(a.id) !== String(st.app.id));
+        if (apps.length !== (g.applications || []).length) await zpa.apiCall('PUT', `${base}${PATHS.segmentGroup}/${st.groupId}`, { ...g, applications: apps.map(a => ({ id: String(a.id) })) });
+        results.push({ ...row, action: 'DETACHED' });
+      } else {
+        if (st.kind === 'cbiProfile') await zpa.apiCall('DELETE', `/zpa/cbiconfig/cbi/api/customers/${await zpa.cid()}/profiles/${st.id}`);
+        else if (RULE_KINDS.includes(st.kind)) { const [setId, ruleId] = String(st.id).split(':'); await zpa.apiCall('DELETE', `${base}/policySet/${setId}/rule/${ruleId}`); }
+        else await zpa.apiCall('DELETE', `${base}${PATHS[st.kind]}/${st.id}${st.kind === 'appSegment' ? '?forceDelete=true' : ''}`);
+        results.push({ ...row, action: 'DELETED' });
+      }
+      if (logger) logger.logPolicyApply(`ZPA ${st.label}`, st.name, st.kind === 'detach' ? 'DETACH' : 'DELETE', { success: true, id: st.id });
+    } catch (e) {
+      // Already gone: ZPA deletes a provisioning key together with its App Connector group (seen live on ZTH).
+      if (st.kind !== 'detach' && /resource\.not\.found|404/.test(String(e.message))) {
+        results.push({ ...row, action: 'DELETED', note: st.kind === 'provisioningKey' ? 'Already removed by ZPA with its App Connector group.' : 'Already gone.' });
+        if (logger) logger.logPolicyApply(`ZPA ${st.label}`, st.name, 'DELETE', { success: true, id: st.id, note: 'already gone' });
+        continue;
+      }
+      if (st.kind !== 'detach') failed.add(key(st.obj));
+      results.push({ ...row, action: 'FAILED', error: e.message });
+      if (logger) logger.logPolicyApply(`ZPA ${st.label}`, st.name, 'DELETE', { error: e.message });
+    }
+  }
+  return { results, issues };
 }
 
 module.exports = {
   parseBulkCsv, validateBulkApps, segmentName, ZPAClient, runZpa, validateZpaInput, classifyEntry, splitEntries, parsePortRanges, APP_SEGMENT_DEFAULTS, SAN_JOSE, POLICY_DEFAULTS, ISOLATION_DEFAULTS, policyRuleDiff,
-  listZpaObjects, deleteZpaObjects, DELETE_ORDER, KIND_LABEL };
+  listZpaObjects, deleteZpaObjects, DELETE_ORDER, KIND_LABEL, zpaGraph, blockersOf };

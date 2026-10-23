@@ -1,6 +1,6 @@
 {
   "name": "ztp-policy-wizard",
-  "version": "2.5.2",
+  "version": "2.6.0",
   "description": "Zscaler Template Policy Wizard - ZIA Policy Configuration Tool",
   "main": "server/index.js",
   "scripts": {

@@ -1,8 +1,16 @@
 # Changelog
 
-## v2.0.0 → v2.5.2 — 2026-10-19 to 2026-10-22
+## v2.0.0 → v2.6.0 — 2026-10-19 to 2026-10-23
 
-Release notes for the whole 2.x line: [docs/release-notes/v2.5.2.md](docs/release-notes/v2.5.2.md).
+Release notes for the whole 2.x line: [docs/release-notes/v2.6.0.md](docs/release-notes/v2.6.0.md).
+
+### 2.6.0
+- **API keys per POV (memory only):** "Add key and switch" on each POV page, automatic tenant switch when a POV is opened, key count in the header, **Forget key**. Sessions expire after 12 hours idle instead of 1 hour after sign-in. Nothing is written to disk.
+- **Prove it** (`server/v2/prove.js`, `POST /api/v2/prove` with `type`, `GET /api/v2/prove/catalog`): URL filtering, threat, cloud apps, firewall (destination, port, protocol), DNS and DoH; built-in destinations plus your own; on every runbook test and on the POV page's new **Prove it & test kit** tab.
+- **Test kit** (`server/v2/test-kit.js`, `GET /api/v2/test-kit`, `GET /api/v2/test-kit/file/:id`): follows the POV scope (else what was created, else licences). DLP per vertical + generic PII, EICAR + AMTSO links, unique sandbox PDF.
+- **ZPA bulk delete:** new order (detach from segment group first; access → app protection → isolation policy → isolation profile → app protection profile → timeout → PRA console → app segment → segment group → server group → connector group → provisioning key), policy rules split by type, per-object "used by", unselected dependencies held back with "Select it too", knock-on skips.
+- **Readiness:** API permissions per product from the token's `service-info` claim and the ZIA / ZPA / ZCC role definitions (`server/v2/permissions.js`); SKU printout with CSV and print (`skuTable` in `licences.js`); edition detection hook for Sandbox / DLP Standard vs Advanced (SKU ids pending).
+- **Fixes:** the Active POVs list refreshes when you open it; link buttons are no longer underlined; the bulk manager's columns no longer wrap mid-word.
 
 ### 2.5.2
 - **Fix: Allow in ZIA now includes Claude (CLAUDE_AI, ANTHROPIC_AI), OpenAI, Grok AI and Glean.** On ZTH, `availableActions` returns an empty list for these apps, but ZIA accepts them with `ALLOW_AI_ML_WEB_USE` (verified live). An empty list is no longer treated as "no Allow"; an app is left out only when ZIA lists actions and Allow is not among them.

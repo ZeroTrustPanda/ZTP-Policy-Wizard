@@ -28,10 +28,10 @@ const { registerV2Routes } = require('./v2/routes');
 const { AuditLogger } = require('./audit-logger');
 
 const app = express();
-const APP_VERSION = '2.5.2';
+const APP_VERSION = '2.6.0';
 const PORT = process.env.ZTP_PORT || 3000;
 const HOST = process.env.ZTP_HOST || '0.0.0.0';
-const SESSION_TTL_MS = 60 * 60 * 1000;   // 1 hour
+const SESSION_TTL_MS = 12 * 60 * 60 * 1000;   // v2.6: 12 hours idle (several POV tenants stay signed in while the wizard runs)
 const MAX_SESSIONS = 50;                  // Max concurrent sessions
 
 // In-memory session store (per-session, never persisted)
@@ -42,7 +42,7 @@ setInterval(() => {
   const now = Date.now();
   let cleaned = 0;
   for (const [id, session] of sessions) {
-    if (now - session.createdAt > SESSION_TTL_MS) {
+    if (now - (session.lastActivity || session.createdAt) > SESSION_TTL_MS) {
       try { session.client.logout(); } catch(e) { /* ignore */ }
       sessions.delete(id);
       cleaned++;

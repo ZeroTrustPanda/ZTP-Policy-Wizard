@@ -221,10 +221,10 @@ function registerV2Routes(app, requireAuth) {
       if (refused.length) return res.status(400).json({ error: `Only objects named "${prefix}-…" can be deleted here. Not allowed: ${refused.length} item(s).` });
       const items = asked.map(k => { const o = allowed.get(k); return { kind: o.kind, id: o.id, name: o.name }; });
       if (!items.length) return res.status(400).json({ error: 'Select at least one object.' });
-      if (req.body.dryRun) return res.json({ planId: rememberPlan(req.session, 'zpa-del', items), results: await deleteZpaObjects(zpaOf(req.session), items, { dryRun: true }) });
+      if (req.body.dryRun) { const r = await deleteZpaObjects(zpaOf(req.session), items, { dryRun: true, prefix }); return res.json({ planId: rememberPlan(req.session, 'zpa-del', items), ...r }); }
       const bad = checkPlan(req.session, 'zpa-del', items, req.body.planId);
       if (bad) return res.status(409).json({ error: bad });
-      res.json({ results: await deleteZpaObjects(zpaOf(req.session), items, { dryRun: false, logger: req.session.logger }) });
+      res.json(await deleteZpaObjects(zpaOf(req.session), items, { dryRun: false, logger: req.session.logger, prefix }));
     } catch (e) { res.status(502).json({ error: e.message }); }
   });
 
