@@ -8,6 +8,9 @@ const https = require('https');
 const { readiness } = require('./readiness');
 const intake = require('./intake');
 const tests = require('./pov-tests');
+const prove = require('./prove');
+const kit = require('./test-kit');
+const povs = require('./povs');
 const snapshots = require('./snapshots');
 const install = require('../zcc-install');
 const { gate } = require('../rate-limit');
@@ -38,7 +41,11 @@ function register(app, requireAuth, { v2, rememberPlan, checkPlan, zpaOf, countA
   app.get('/api/v2/readiness', requireAuth, async (req, res) => {
     const s = req.session;
     try {
-      const r = await readiness({ client: s.client, zccClient: s.zccClient, zdxClient: s.zdxClient, zpa: s.client.authMode === 'oneapi' ? zpaOf(s) : null, licensing: v2(s).licensing });
+      const st = v2(s);
+      const q = req.query || {};
+      const wants = q.products ? Object.fromEntries(['zia', 'zpa', 'zcc', 'zdx', 'aiguard'].map(k => [k, String(q.products).split(',').includes(k)]))
+        : (st.intake && st.intake.products) ? { zcc: true, ...st.intake.products } : null;
+      const r = await readiness({ client: s.client, zccClient: s.zccClient, zdxClient: s.zdxClient, zpa: s.client.authMode === 'oneapi' ? zpaOf(s) : null, licensing: st.licensing, wants });
       s.logger.log('V2_READINESS', r.counts);
       res.json(r);
     } catch (e) { res.status(502).json({ error: e.message }); }
@@ -76,14 +83,46 @@ function register(app, requireAuth, { v2, rememberPlan, checkPlan, zpaOf, countA
     else s.testResults[req.params.id] = { status, note: String((req.body || {}).note || '').slice(0, 500), at: new Date().toISOString() };
     res.json({ ok: true, result: s.testResults[req.params.id] || null });
   });
+  // v2.6: Prove it for every policy type (URL filtering, threat, cloud apps, firewall, DNS); built-in destinations + your own
+  app.get('/api/v2/prove/catalog', (req, res) => res.json({ catalog: prove.CATALOG }));
   app.post('/api/v2/prove', requireAuth, async (req, res) => {
     try {
-      const url = String((req.body || {}).url || '').trim().slice(0, 500);
-      const [match, ins] = await Promise.all([tests.proveUrl(req.session.client, url), tests.insights(req.session.client)]);
-      res.json({ ...match, insights: ins });
+      const b = req.body || {};
+      const type = b.type || 'url';
+      const target = String(b.target || b.url || '').trim().slice(0, 500);
+      const [match, ins] = await Promise.all([prove.prove(req.session.client, { type, target, appType: b.appType ? String(b.appType) : null, doh: !!b.doh }), tests.insights(req.session.client)]);
+      res.json({ ...match, host: match.target, insights: ins });
     } catch (e) { res.status(e.status || 502).json({ error: e.message }); }
   });
   app.get('/api/v2/dlp-kit', (req, res) => res.json({ files: tests.dlpKit() }));
+
+  // v2.6: the test kit follows the POV: only what it covers (DLP for its vertical + generic PII, malware, sandbox)
+  const kitInputs = async (req) => {
+    const st = req.session && req.session.v2;
+    let pov = null;
+    const id = String(req.query.povId || (st && st.povId) || '');
+    if (id) { try { pov = povs.load(id); } catch (e) { pov = null; } }
+    const gd = (pov && pov.guide) || {};
+    let subs = st && st.subsCache;
+    if (!subs && req.session && req.session.client) {
+      try { subs = list(await req.session.client.apiCall('GET', '/api/v1/subscriptions')).filter(x => x.subscribed !== false).map(x => String(x.id)); if (st) st.subsCache = subs; } catch (e) { subs = null; }
+    }
+    return { ziaScope: (gd.pov && gd.pov.scope) || null, products: (gd.g && gd.g.scope) || null, presetId: (gd.g && gd.g.presetId) || (st && st.intake && st.intake.presetId) || null,
+      runs: (pov && pov.runs) || (st && st.runs) || {}, subs };
+  };
+  const softAuth = (req, res, next) => { if (!req.headers['x-session-id']) return next(); const soft = { status: () => ({ json: () => next() }) }; return requireAuth(req, soft, next); };
+  app.get('/api/v2/test-kit', softAuth, async (req, res) => {
+    try { res.json(kit.catalog(await kitInputs(req))); } catch (e) { res.status(500).json({ error: e.message }); }
+  });
+  app.get('/api/v2/test-kit/file/:id', (req, res) => {
+    try {
+      const f = kit.file(req.params.id);
+      res.setHeader('Content-Type', f.type);
+      res.setHeader('Content-Disposition', `attachment; filename="${f.name}"`);
+      res.setHeader('Cache-Control', 'no-store');
+      res.send(f.encoding === 'base64' ? Buffer.from(f.content, 'base64') : f.content);
+    } catch (e) { res.status(e.status || 500).json({ error: e.message }); }
+  });
 
   // ---------- Client Connector devices, one-time passwords, install builder (10) ----------
   app.get('/api/v2/zcc/devices', requireAuth, async (req, res) => {

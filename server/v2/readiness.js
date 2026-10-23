@@ -4,7 +4,8 @@
  * One failing area never stops the others; the Client Connector check costs one ZCC call (rate-limited API).
  */
 'use strict';
-const { licenceChecks } = require('./licences');
+const { licenceChecks, skuTable } = require('./licences');
+const { permissions } = require('./permissions');
 const list = (r) => (Array.isArray(r) ? r : (r && (r.list || r.items)) || []);
 
 async function safe(checks, area, name, fn) {
@@ -12,9 +13,12 @@ async function safe(checks, area, name, fn) {
   catch (e) { checks.push({ area, name, status: e.rateLimitedUntil ? 'info' : 'warn', detail: e.rateLimitedUntil ? `Skipped: ${e.message}` : `Could not check: ${String(e.message).slice(0, 200)}` }); }
 }
 
-async function readiness({ client, zccClient, zdxClient, zpa, licensing }) {
+async function readiness({ client, zccClient, zdxClient, zpa, licensing, wants }) {
   const checks = [];
-  let licenceSummary = null;
+  let licenceSummary = null, skus = null, perms = null;
+  // ---------- API access first (v2.6): what this API client may do, per product, against what the POV needs ----------
+  try { perms = await permissions({ client, zpa, zccClient, wants }); checks.push(...perms.checks); }
+  catch (e) { checks.push({ area: 'API access', name: 'Permissions', status: 'warn', detail: `Could not check the API client's permissions: ${String(e.message).slice(0, 200)}` }); }
   // ---------- ZIA ----------
   await safe(checks, 'ZIA', 'Pending changes', async () => {
     const st = await client.apiCall('GET', '/api/v1/status');
@@ -51,6 +55,7 @@ async function readiness({ client, zccClient, zdxClient, zpa, licensing }) {
     const lic = licenceChecks(raw, { zpaCustomer });
     checks.push(...lic.checks);
     licenceSummary = lic.summary;
+    skus = skuTable(raw, { products: perms ? perms.products : [] });
   }
 
   // ---------- ZPA ----------
@@ -94,7 +99,7 @@ async function readiness({ client, zccClient, zdxClient, zpa, licensing }) {
   });
 
   const counts = checks.reduce((c, x) => { c[x.status] = (c[x.status] || 0) + 1; return c; }, {});
-  return { checks, counts, licences: licenceSummary, at: new Date().toISOString() };
+  return { checks, counts, licences: licenceSummary, skus, permissions: perms ? perms.products : null, at: new Date().toISOString() };
 }
 
 module.exports = { readiness };

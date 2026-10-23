@@ -93,7 +93,12 @@ async function detectLicensing({ client, zccClient }) {
       if (info && info.dlpEnabled !== undefined) endpointDlpEnabledInZcc = String(info.dlpEnabled) === '1' || info.dlpEnabled === true;
     } catch (e) { /* unknown */ }
   }
-  return { items, endpointDlpEnabledInZcc, subscriptions: subs };
+  // v2.6: standard vs advanced editions. With the advanced edition licensed, the standard choice is hidden (and the reverse is shown as is).
+  const editions = subs ? require('./licences').editions(subs.map(String)) : {};
+  if (editions.sandbox === 'advanced') items.sandboxStandard = { licensed: true, hidden: true, reason: 'Sandbox Advanced is licensed, so Advanced is used.' };
+  if (editions.sandbox === 'advanced') items.sandboxAdvanced = { licensed: true, reason: 'Sandbox Advanced is licensed.' };
+  if (editions.sandbox === 'standard') items.sandboxAdvanced = { licensed: false, reason: 'Only Sandbox Standard is licensed on this tenant.' };
+  return { items, endpointDlpEnabledInZcc, subscriptions: subs, editions };
 }
 
 /** Warnings shown on the dry run and in the report (VAL-03). */

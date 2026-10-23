@@ -34,11 +34,13 @@ const TESTS = [
   { id: 'quic', product: 'ZIA', title: 'QUIC blocked (traffic stays inspectable)', match: /-Block-QUIC/,
     steps: ['Open https://www.youtube.com in Chrome and check chrome://net-internals/#quic.'], expect: 'Sessions fall back to TCP/HTTP2; no QUIC sessions to Google.' },
   { id: 'sandbox', product: 'ZIA', title: 'Cloud Sandbox quarantine', match: /-Sandbox-|-SBX-/,
-    steps: ['Download an unknown Office or PDF file from the web (for example a new PDF from a file-sharing site).'], expect: 'First download is held (Quarantine & Isolate shows the file in isolation) until the sandbox verdict; known-bad files are blocked.' },
+    steps: ['In the test kit, download the unique sandbox PDF (a new, never-seen file every time).', 'Upload it to a file share (OneDrive, Box or Google Drive), then download it again from there through ZIA.', 'Open Sandbox in ZIA Insights for the report.'],
+    expect: 'The first download is held (quarantine) until the sandbox verdict, then allowed as benign; the sandbox report shows the analysis. Known-bad files are blocked outright.' },
   { id: 'malware', product: 'ZIA', title: 'Known malware blocked', match: /Advanced Threat|ATP/i,
-    steps: ['Download the EICAR test file: https://secure.eicar.org/eicar.com.txt'], expect: 'Blocked by malware protection.' },
+    steps: ['Open the EICAR links in the test kit: eicar.com, eicar.com.txt, eicar_com.zip and eicar_com2.zip (a zip in a zip).', 'Open the AMTSO malware, drive-by and phishing checks from the test kit.'],
+    expect: 'Every EICAR download is blocked by malware protection, zipped ones too, and the AMTSO checks are blocked by Advanced Threat Protection; each block page names the policy.' },
   { id: 'dlp', product: 'ZIA', title: 'DLP blocks sensitive data uploads', match: /-DLP-/,
-    steps: ['Download the DLP test kit from this page.', 'Upload one of the files (or paste its text) to a test site such as https://dlptest.com/http-post/.'], expect: 'The upload is blocked and the DLP incident names the engine (PHI, PCI or SSN).' },
+    steps: ['Download the DLP file for the customer\'s vertical (and the generic PII file) from the test kit.', 'Upload it (or paste a few lines) to https://dlptest.com/http-post/ through ZIA.'], expect: 'Block mode: the upload is blocked and the DLP incident names the engine and dictionary. Monitor mode: it goes through and the incident is logged.' },
   { id: 'cac-fileshare', product: 'ZIA', title: 'File sharing: view but no upload', match: /-CAC-FileShare-ViewOnly/,
     steps: ['Open Google Drive or Dropbox and browse files.', 'Try to upload a file.'], expect: 'Viewing works; the upload is blocked.' },
   { id: 'cac-social', product: 'ZIA', title: 'Social media: view but no posting', match: /-CAC-(Social-ViewNoPost|LinkedIn-ReadOnly)/,
@@ -79,6 +81,19 @@ const TESTS = [
     steps: ['Join a Teams or Zoom meeting from the test machine.', 'Open ZDX › Applications.'], expect: 'ZDX shows the app score and the network path for the meeting.' }
 ];
 
+// v2.6: the Prove it each test opens with (type + default destination); the dropdown offers the rest of that type's list
+const PROVE = {
+  'url-block': { type: 'url', target: 'https://www.bet365.com/' }, 'url-caution': { type: 'url', target: 'https://www.netflix.com/' },
+  'url-isolate': { type: 'url', target: 'https://hide.me/en/proxy' }, 'ssl-inspect': { type: 'url', target: 'https://www.chase.com/' }, 'ssl-tls': { type: 'url', target: 'https://tls-v1-1.badssl.com:1011/' },
+  doh: { type: 'dns', target: 'cloudflare-dns.com', doh: true }, resolver: { type: 'dns', target: 'www.zscaler.com' }, 'dns-tunnel': { type: 'dns', target: 'thepiratebay.org' },
+  geo: { type: 'firewall', target: '202.108.22.5:22/tcp' }, quic: { type: 'firewall', target: 'www.youtube.com:443/udp' },
+  sandbox: { type: 'threat', target: 'https://www.amtso.org/feature-settings-check-download-of-malware/' }, malware: { type: 'threat', target: 'https://secure.eicar.org/eicar.com.txt' },
+  'cac-fileshare': { type: 'cloudApp', target: 'DROPBOX', appType: 'FILE_SHARE' }, 'cac-social': { type: 'cloudApp', target: 'LINKEDIN', appType: 'SOCIAL_NETWORKING' },
+  'cac-genai': { type: 'cloudApp', target: 'CHATGPT_AI', appType: 'AI_ML' }, ftc: { type: 'threat', target: 'https://secure.eicar.org/eicar_com.zip' },
+  'aiguard-allow': { type: 'cloudApp', target: 'CHATGPT_AI', appType: 'AI_ML' }, 'aiguard-chain': { type: 'url', target: 'https://claude.ai/' }, 'aiguard-copilot': { type: 'url', target: 'https://copilot.microsoft.com/' },
+  'aiguard-quic': { type: 'firewall', target: 'chatgpt.com:443/udp' }
+};
+
 /** Tests for what actually ran in this session (rows from every run's ledger). */
 function runbook(runs, results = {}) {
   const rows = [];
@@ -88,7 +103,8 @@ function runbook(runs, results = {}) {
   for (const t of TESTS) {
     const hits = rows.filter(r => r.product === t.product && (t.match.test(r.name || '') || t.match.test(r.category || '')));
     if (!hits.length) continue;
-    out.push({ id: t.id, product: t.product, title: t.title, steps: t.steps, expect: t.expect, prove: t.prove || null,
+    const pv = PROVE[t.id] || (t.prove ? { type: 'url', target: t.prove } : null);
+    out.push({ id: t.id, product: t.product, title: t.title, steps: t.steps, expect: t.expect, prove: pv,
       objects: [...new Set(hits.map(h => h.name))].slice(0, 6), result: results[t.id] || null });
   }
   return out;
@@ -153,4 +169,4 @@ function dlpKit() {
   ];
 }
 
-module.exports = { TESTS, runbook, proveUrl, insights, dlpKit };
+module.exports = { TESTS, PROVE, runbook, proveUrl, insights, dlpKit };
