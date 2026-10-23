@@ -76,6 +76,6 @@ module.exports = {
     }
   },
   bulk: {
-    zpaOrder: 'Deletes run in dependency order: application segment → server group → segment group → provisioning key → App Connector Group.'
+    zpaOrder: 'Deletes run in the order ZPA requires: take the app out of its segment group → access → app protection → isolation policy → isolation profile → app protection profile → timeout policy → PRA console → app segment → segment group → server group → App Connector group → provisioning key. Anything still used by an object you did not select is flagged and held back.'
   }
 };

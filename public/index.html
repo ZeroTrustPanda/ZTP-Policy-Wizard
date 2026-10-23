@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ZeroTrustPanda ZS Policy Wizard v2.5.2 - Zscaler Template Policy Configuration</title>
+  <title>ZeroTrustPanda ZS Policy Wizard v2.6.0 - Zscaler Template Policy Configuration</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
   <style>
@@ -220,6 +220,7 @@
 
     /* Compliance Grid */
     .compliance-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 1rem 0; }
+    a.btn, a.btn:hover { text-decoration: none; }
     .compliance-chip {
       padding: 8px 12px;
       background: var(--bg-input);
@@ -642,8 +643,23 @@
     // ========================
     // App Version
     // ========================
-    const APP_VERSION = '2.5.2';
+    const APP_VERSION = '2.6.0';
     const BUILD_DATE = '2026-03-30';
+
+    // ========================
+    // v2.6: tenant keys in memory. One signed-in session per tenant, kept by the wizard's server process while it runs.
+    // The browser holds only the session handles (never a client secret); closing the wizard forgets them all.
+    // ========================
+    const wallet = {
+      items: (() => { try { return JSON.parse(sessionStorage.getItem('zpw.wallet') || '{}'); } catch (e) { return {}; } })(),
+      key: (t) => `${String((t && t.vanity) || '').toLowerCase()}@${String((t && t.cloud) || 'production').toLowerCase()}`,
+      get(t) { return t ? this.items[this.key(t)] || null : null; },
+      put(t, sessionId) { this.items[this.key(t)] = { sessionId, vanity: String(t.vanity || '').toLowerCase(), cloud: t.cloud || 'production', at: Date.now() }; this.save(); },
+      drop(t) { delete this.items[this.key(t)]; this.save(); },
+      dropSession(sid) { for (const [k, v] of Object.entries(this.items)) if (v.sessionId === sid) delete this.items[k]; this.save(); },
+      list() { return Object.values(this.items); },
+      save() { try { sessionStorage.setItem('zpw.wallet', JSON.stringify(this.items)); } catch (e) { /* memory only */ } }
+    };
 
     // ========================
     // API Helper
@@ -796,7 +812,7 @@
         api.call('GET', '/v2/povs/active').then(r => { setSessionTenant(r.tenant); if (r.pov) setActivePov(r.pov); }).catch(() => {});
         if (globalPrefix) api.call('POST', '/v2/prefix', { prefix: globalPrefix }).catch(() => {});
         api.call('GET', '/v2/licensing').then(setLicensing).catch(() => setLicensing({ items: {}, endpointDlpEnabledInZcc: null }));
-      }, [auth.connected]);
+      }, [auth.connected, auth.sid]);
 
       const markComplete = (s) => setCompletedSteps(prev => new Set([...prev, s]));
 
@@ -838,7 +854,40 @@
         else if (mod === 'catalog') setStep('catalog');
       };
 
-      const openPovHome = (id) => { setPovHomeId(id); switchModule('pov-home'); };
+      /** Make the tenant's in-memory session the active one. false when there is none (or it has expired). */
+      const useTenant = async (t) => {
+        const w = wallet.get(t);
+        if (!w) return false;
+        if (api.sessionId === w.sessionId && auth.connected) return true;
+        const prev = api.sessionId;
+        api.sessionId = w.sessionId;
+        try { const st = await api.call('GET', '/auth/status'); if (!st.authenticated) throw new Error('expired'); }
+        catch (e) { wallet.drop(t); api.sessionId = prev; return false; }
+        setAuth({ connected: true, mode: 'oneapi', cloud: w.vanity, sid: w.sessionId });
+        return true;
+      };
+      /** A new API key for a POV's tenant, typed on the POV page: signs in, keeps it in memory, switches to it. */
+      const addKeyFor = async (p, form) => {
+        const result = await api.call('POST', '/auth/oneapi', { clientId: form.clientId, clientSecret: form.clientSecret, vanityDomain: p.tenant.vanity, cloud: form.cloud || (p.tenant.cloud !== 'production' ? p.tenant.cloud : undefined) });
+        wallet.put(p.tenant, result.sessionId);
+        api.sessionId = result.sessionId;
+        setAuth({ connected: true, mode: 'oneapi', cloud: p.tenant.vanity, sid: result.sessionId });
+        markComplete('connect');
+        refreshPovs();
+      };
+      const forgetKey = async (t) => {
+        const w = wallet.get(t); if (!w) return;
+        const prev = api.sessionId; api.sessionId = w.sessionId;
+        try { await api.call('POST', '/auth/logout'); } catch (e) { /* already gone */ }
+        wallet.drop(t);
+        if (prev === w.sessionId) { api.sessionId = null; setAuth({ connected: false }); } else api.sessionId = prev;
+      };
+      /** Opening a POV switches to its tenant when that tenant's key is in memory (no sign-in again). */
+      const openPovHome = async (id) => {
+        const x = povList.find(v => v.id === id);
+        if (x && x.tenant && !(auth.connected && sameTenant(x.tenant, sessionTenant))) await useTenant(x.tenant);
+        setPovHomeId(id); switchModule('pov-home');
+      };
       /** Open a POV in this session and continue the guided flow exactly where it was left. */
       const resumePov = async (p) => {
         setError(null);
@@ -905,11 +954,12 @@
               <ThemeToggle />
               <div className={`auth-badge ${auth.connected ? 'connected' : 'disconnected'}`}>
                 <span className="dot"></span>
-                {auth.connected ? `${auth.mode?.toUpperCase()} · ${auth.cloud}` : 'Not Connected'}
+                {auth.connected ? `${auth.mode?.toUpperCase()} · ${auth.cloud}` : 'Not Connected'}{wallet.list().length > (auth.connected ? 1 : 0) ? <span data-walletcount style={{marginLeft:'6px', opacity:0.8}}>· {wallet.list().length} key{wallet.list().length === 1 ? '' : 's'} in memory</span> : null}
               </div>
               {auth.connected && (
                 <button className="btn btn-ghost btn-sm" onClick={async () => {
                   try { await api.call('POST', '/auth/logout'); } catch(e) {}
+                  wallet.dropSession(api.sessionId);
                   api.sessionId = null; setAuth({ connected: false }); setActiveModule(null); setCompletedSteps(new Set()); setActivePov(null); goTo('connect');
                 }}>Disconnect</button>
               )}
@@ -925,7 +975,7 @@
                 </div>
               </div>
               <div className="sidebar-section" data-activepovs>
-                <div className="sidebar-item" data-nav="povs" onClick={() => setPovsOpen(!povsOpen)} style={{cursor:'pointer', fontWeight:600}}>
+                <div className="sidebar-item" data-nav="povs" onClick={() => { setPovsOpen(!povsOpen); refreshPovs(); }} style={{cursor:'pointer', fontWeight:600}}>
                   <span className="step-num"><Icon name="povs" size={14} /></span> Active POVs <span className="badge badge-category" style={{marginLeft:'auto'}}>{povList.filter(x => x.status !== 'closed').length}</span> <span style={{fontSize:'10px'}}>{povsOpen ? '▾' : '▸'}</span>
                 </div>
                 {povsOpen && povList.filter(x => x.status !== 'closed').map(x => (
@@ -1035,7 +1085,7 @@
               {auth.connected && <RateLimitBar />}
               {auth.connected && meta && <div style={{display: activeModule === 'start' ? 'block' : 'none'}}><PovGuide key={guideKey} meta={meta} auth={auth} prefix={globalPrefix} setPrefix={setGlobalPrefix} licensing={licensing} pov={pov} setPov={setPov} setError={setError} onReport={() => switchModule('report')}
                 activePov={activePov} resume={guideResume} template={guideTemplate} onPovCreated={(pv) => { setActivePov(pv); refreshPovs(); }} onPovChanged={() => refreshPovs()} /></div>}
-              {activeModule === 'pov-home' && povHomeId && <PovHome id={povHomeId} auth={auth} sessionTenant={sessionTenant} activePov={activePov} onResume={resumePov} onConnectFor={connectFor}
+              {activeModule === 'pov-home' && povHomeId && <PovHome id={povHomeId} auth={auth} sessionTenant={sessionTenant} activePov={activePov} onResume={resumePov} onConnectFor={connectFor} onUseTenant={useTenant} onAddKey={addKeyFor} onForgetKey={forgetKey}
                 onClosed={(id) => { if (activePov && activePov.id === id) setActivePov(null); refreshPovs(); setPovHomeId(null); setActiveModule(auth.connected ? 'start' : null); setStep(auth.connected ? 'start' : 'connect'); }}
                 onChanged={refreshPovs} onGo={switchModule} setError={setError} />}
               {auth.connected && activeModule === 'aiguard' && globalPrefix && <AiGuardStep prefix={globalPrefix} setError={setError} onReport={() => switchModule('report')} />}
@@ -1122,6 +1172,7 @@
                     <summary style={{cursor:'pointer', fontWeight:600, fontSize:'14px'}}>Version history</summary>
                     <div style={{marginTop:'0.75rem', lineHeight:1.7}}>
                     <div style={{paddingLeft:'1rem', fontSize:'12px'}}>
+                      <div><strong>v2.6.0</strong> — Several POVs at once: each POV page takes its tenant's API key (kept in memory only) and opening a POV switches tenant. Prove it for every kind of web test (URL filtering, threat, cloud apps, firewall, DNS) with built-in test destinations or your own, on every runbook test and on each POV page. Test kit that follows the POV: DLP CSVs only when DLP is in scope, for its vertical (Healthcare, Finance, Education, Public sector) plus generic PII; EICAR and AMTSO threat tests; a unique sandbox file. ZPA bulk delete in the order ZPA requires, with unselected dependencies flagged. Readiness: API permissions per product (what is missing and where to fix it) and a printout of every tenant SKU.</div>
                       <div><strong>v2.5.2</strong> — Allow in ZIA now includes Claude, Anthropic, OpenAI, Grok and Glean: ZIA's action lookup lists nothing for them, but it accepts them in an Allow rule.</div>
                       <div><strong>v2.5.1</strong> — AI Guard compliance profile: HIPAA, HITRUST, PCI, GDPR, CJIS, FERPA, SOX, NIST 800-171 / 800-53 or General, Monitor or Block per POV, created as an AI Guard detection policy and applied to the AI apps' providers. Allow in ZIA: pick the AI apps to allow above Block / Caution / Isolate rules (Cloud App Control, plus URL Filtering when a URL rule would stop them). The ZTH tier's Caution-AI rule now targets AI &amp; ML Applications instead of Other Information Technology.</div>
                       <div><strong>v2.5.0</strong> — AI Guard (needs ZIA; switching it on switches ZIA on): sends ChatGPT, Microsoft 365 Copilot, Claude, Gemini and other AI apps through ZIA inspection to AI Guard with proxy chaining, blocks QUIC, puts an Inspect rule above every SSL bypass (including Office 365 One Click), turns on Gen AI prompt capture when licensed and checks the AI Guard API. Reuses an AI Guard proxy and gateway already in ZIA. New light theme (dark is a toggle), an About page and product icons.</div>
@@ -1232,10 +1283,15 @@
         if (!licensing || !licensing.items) return;
         const blocked = Object.entries(licensing.items).filter(([, v]) => v.licensed === false).map(([k]) => k);
         if (blocked.some(k => scope[k])) setPov(prev => pruneToScope(prev, { ...(prev.scope || scope), ...Object.fromEntries(blocked.map(k => [k, false])) }));
+        // v2.6: a hidden standard edition (the advanced one is licensed) moves its choice to the advanced edition
+        const UPGRADE = { sandboxStandard: 'sandboxAdvanced' };
+        const hid = Object.entries(licensing.items).filter(([k, v]) => v.hidden && scope[k] && UPGRADE[k]).map(([k]) => k);
+        if (hid.length) setPov(prev => pruneToScope(prev, { ...(prev.scope || scope), ...Object.fromEntries(hid.flatMap(k => [[k, false], [UPGRADE[k], true]])) }));
       }, [licensing, pov.scope]);
       const rows = (keys) => keys.map(key => {
         const item = meta.scopeItems.find(i => i.key === key);
         const l = lic(key);
+        if (l && l.hidden) return null;   // v2.6: the advanced edition is licensed, so the standard one is not offered
         const blocked = l && l.licensed === false;
         const on = !!scope[key] && !blocked;
         return (
@@ -1976,6 +2032,41 @@
                 </tr>
               )))}
             </tbody></table>
+            {r.permissions && <details className="card" style={{marginTop:'1rem', padding:'0.75rem 1rem'}} open={r.permissions.some(x => x.status === 'fail' || x.status === 'warn')} data-permissions>
+              <summary style={{cursor:'pointer', fontWeight:600}}>API permissions by product ({r.permissions.filter(x => x.access).length} of {r.permissions.length} products reachable)</summary>
+              <table className="diff-table" style={{marginTop:'0.5rem'}}>
+                <thead><tr><th>Product</th><th>API access</th><th>Role</th><th>Missing or read-only</th></tr></thead>
+                <tbody>{r.permissions.map(x => (
+                  <tr key={x.product} data-perm={x.product}>
+                    <td>{STATUS_ICON[x.status]} {x.label}{x.needed ? '' : <span className="form-hint" style={{marginLeft:'4px'}}>(not in this POV)</span>}</td>
+                    <td>{x.access ? 'Yes' : <strong style={{color: x.needed ? 'var(--accent-red)' : undefined}}>No</strong>}</td>
+                    <td>{x.role || '—'}</td>
+                    <td style={{fontSize:'12px'}}>{[...x.missing, ...x.readOnly].length ? <>
+                      {x.missing.map(m => <div key={m.perm}>✕ <code>{m.perm}</code> — {m.for}{m.optional ? ' (optional)' : ''}</div>)}
+                      {x.readOnly.map(m => <div key={m.perm}>◐ <code>{m.perm}</code> read-only — {m.for}{m.optional ? ' (optional)' : ''}</div>)}
+                    </> : x.access ? 'None' : '—'}{x.fix && <div className="form-hint" style={{margin:'2px 0 0'}}>→ {x.fix}</div>}</td>
+                  </tr>))}</tbody>
+              </table>
+            </details>}
+            {r.skus && <details className="card" style={{marginTop:'0.75rem', padding:'0.75rem 1rem'}} data-skus>
+              <summary style={{cursor:'pointer', fontWeight:600}}>Licences on this tenant ({r.skus.active} active SKUs){r.skus.editions && r.skus.editions.sandbox ? ` · Sandbox ${r.skus.editions.sandbox}` : ''}{r.skus.editions && r.skus.editions.dlp ? ` · DLP ${r.skus.editions.dlp}` : ''}</summary>
+              <div style={{display:'flex', gap:'6px', margin:'0.5rem 0'}}>
+                <button className="btn btn-ghost btn-sm" onClick={() => download('tenant-licences.csv', ['Area,SKU,Name,Status,Ends,What it is,Unlocks in the wizard', ...r.skus.rows.map(x => [x.area, x.id, x.name, x.status, x.endsOn || '', x.what, x.unlocks].map(v => `"${String(v).replace(/"/g, '""')}"`).join(','))].join('\r\n') + '\r\n', 'text/csv')} data-skucsv>⬇ CSV</button>
+                <button className="btn btn-ghost btn-sm" onClick={() => { const w = window.open('', '_blank'); if (!w) return; w.document.write(`<html><head><title>Tenant licences</title><style>body{font:13px system-ui;margin:24px}table{border-collapse:collapse;width:100%}td,th{border:1px solid #ccc;padding:4px 6px;text-align:left}</style></head><body><h2>Tenant licences</h2><table><tr><th>Area</th><th>SKU</th><th>Name</th><th>Status</th><th>Ends</th><th>What it is</th><th>Unlocks</th></tr>${r.skus.rows.map(x => `<tr><td>${x.area}</td><td>${x.id}</td><td>${x.name}</td><td>${x.status}</td><td>${x.endsOn || ''}</td><td>${x.what}</td><td>${x.unlocks}</td></tr>`).join('')}</table></body></html>`); w.document.close(); w.print(); }} data-skuprint>🖨 Print</button>
+              </div>
+              <table className="diff-table">
+                <thead><tr><th>Area</th><th>SKU</th><th>Status</th><th>What it is</th><th>Unlocks in the wizard</th></tr></thead>
+                <tbody>{r.skus.rows.map(x => (
+                  <tr key={x.id} data-sku={x.id} style={{opacity: x.active ? 1 : 0.55}}>
+                    <td>{x.area}</td><td><code>{x.id}</code>{x.name && x.name !== x.id && <div className="form-hint" style={{margin:0}}>{x.name}</div>}</td>
+                    <td style={{fontSize:'12px'}}>{x.status}{x.endsOn ? ` · ends ${x.endsOn}` : ''}{x.endingSoon ? ' ⚠' : ''}</td>
+                    <td style={{fontSize:'12px'}}>{x.what}{!x.confirmed && <span className="form-hint" style={{marginLeft:'4px'}}>(to confirm)</span>}</td>
+                    <td style={{fontSize:'12px'}}>{x.unlocks}</td>
+                  </tr>))}
+                  {(r.skus.viaToken || []).map(x => <tr key={x.product}><td>{x.label}</td><td colSpan={4} style={{fontSize:'12px'}}>Not in the ZIA subscription list; {x.access ? `the API client can use it (role "${x.role}").` : 'the API client has no access to it.'}</td></tr>)}
+                </tbody>
+              </table>
+            </details>}
           </>)}
         </div>
       );
@@ -2429,7 +2520,9 @@
       };
     }
 
-    function PovHome({ id, auth, sessionTenant, activePov, onResume, onConnectFor, onClosed, onChanged, onGo, setError }) {
+    function PovHome({ id, auth, sessionTenant, activePov, onResume, onConnectFor, onUseTenant, onAddKey, onForgetKey, onClosed, onChanged, onGo, setError }) {
+      const [keyForm, setKeyForm] = useState({ clientId: '', clientSecret: '' });
+      const [keyBusy, setKeyBusy] = useState(false);
       const [data, setData] = useState(null);
       const [tab, setTab] = useState('overview');
       const [noteText, setNoteText] = useState('');
@@ -2478,11 +2571,21 @@
             </div>
             {sum.quiet && <div className="alert alert-warning" style={{marginTop:'0.75rem'}} data-povquiet><span>⏰ No activity for {sum.daysQuiet} days.{sum.next ? ` Next: ${sum.next.label} on ${sum.next.date}.` : ''}</span></div>}
             <div style={{marginTop:'0.75rem'}} data-povresume>
-              {!auth.connected ? (
-                <div className="alert alert-info"><span>Sign in to <strong>{tenantLabel}</strong> to resume this POV. Credentials are never saved with a POV.
-                  <button className="btn btn-primary btn-sm" style={{marginLeft:'8px'}} onClick={() => onConnectFor(p)} data-povconnect>Sign in to {p.tenant && p.tenant.vanity}</button></span></div>
+              {!tenantOk && wallet.get(p.tenant) ? (
+                <div className="alert alert-info" data-povswitch><span>The API key for <strong>{tenantLabel}</strong> is in memory.
+                  <button className="btn btn-primary btn-sm" style={{marginLeft:'8px'}} onClick={async () => { if (!(await onUseTenant(p.tenant))) setError(`The session for ${tenantLabel} has expired; add the API key again.`); }} data-povswitchbtn>Switch to {p.tenant && p.tenant.vanity}</button></span></div>
               ) : !tenantOk ? (
-                <div className="alert alert-danger" data-povmismatch><span>⛔ You are signed in to <strong>{sessionTenant && sessionTenant.vanity}</strong>, but this POV belongs to <strong>{tenantLabel}</strong>. Disconnect and sign in to the POV's tenant to resume it; nothing will be written to the wrong tenant.</span></div>
+                <div className="alert alert-info" style={{display:'block'}} data-povaddkey>
+                  <div style={{marginBottom:'6px'}}><strong>API key for {tenantLabel}</strong>{auth.connected && sessionTenant ? <span> (you are working in <strong>{sessionTenant.vanity}</strong>; both stay signed in)</span> : null}. Kept in memory while the wizard runs, never saved with the POV or on disk.</div>
+                  <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(200px, 1fr))', gap:'8px', alignItems:'end'}}>
+                    <div><label className="form-label">Client ID</label><input type="text" value={keyForm.clientId} onChange={e => setKeyForm({ ...keyForm, clientId: e.target.value.trim() })} autoComplete="off" data-povkeyid /></div>
+                    <div><label className="form-label">Client secret</label><input type="password" value={keyForm.clientSecret} onChange={e => setKeyForm({ ...keyForm, clientSecret: e.target.value })} autoComplete="new-password" data-povkeysecret /></div>
+                    <div><button className="btn btn-primary" disabled={keyBusy || !keyForm.clientId || !keyForm.clientSecret} onClick={async () => {
+                      setKeyBusy(true); setError(null);
+                      try { await onAddKey(p, keyForm); setKeyForm({ clientId: '', clientSecret: '' }); } catch (e) { setError(e.message); }
+                      setKeyBusy(false); }} data-povkeyadd>{keyBusy ? <span className="spinner"></span> : 'Add key and switch'}</button></div>
+                  </div>
+                </div>
               ) : (
                 <div style={{display:'flex', gap:'8px', alignItems:'center', flexWrap:'wrap'}}>
                   <button className="btn btn-primary" onClick={resume} disabled={busy} data-povresumebtn>{busy ? <span className="spinner"></span> : '▶'} {isActive ? 'Continue' : 'Resume'}{gd.stageLabel ? `: ${gd.stageLabel}` : ''}</button>
@@ -2490,16 +2593,35 @@
                   {isActive && <button className="btn btn-ghost btn-sm" onClick={() => onGo('restore')}>Restore & drift</button>}
                   {isActive && <button className="btn btn-ghost btn-sm" onClick={() => onGo('tests')}>POV tests</button>}
                   {isActive && <button className="btn btn-ghost btn-sm" onClick={() => onGo('report')}>Summary report</button>}
+                  <button className="btn btn-ghost btn-sm" style={{marginLeft:'auto'}} onClick={() => onForgetKey(p.tenant)} title="Sign out of this tenant and drop its API key from memory" data-povforget>Forget key</button>
                 </div>
               )}
             </div>
           </div>
 
           <div style={{display:'flex', gap:'6px', flexWrap:'wrap', marginBottom:'1rem'}}>
-            {[['overview', 'Overview'], ['runs', `What the tool did (${runsFlat.length})`], ['tests', `Tests & success criteria (${sum.tests.pass}/${sum.tests.total})`], ['timeline', `Timeline & notes`]].map(([k, l]) => (
+            {[['overview', 'Overview'], ['runs', `What the tool did (${runsFlat.length})`], ['tests', `Tests & success criteria (${sum.tests.pass}/${sum.tests.total})`], ['prove', 'Prove it & test kit'], ['timeline', `Timeline & notes`]].map(([k, l]) => (
               <button key={k} className={`btn btn-sm ${tab === k ? 'btn-primary' : 'btn-ghost'}`} onClick={() => setTab(k)} data-povtab={k}>{l}</button>
             ))}
           </div>
+
+          {tab === 'prove' && (
+            <div data-povprove>
+              <div className="card">
+                <div className="card-header"><h2>Prove it</h2><p>Show the customer what Internet Access does with a destination: URL filtering, threat protection, cloud apps, firewall and DNS. Built-in test destinations or your own.</p></div>
+                {!tenantOk && <div className="alert alert-info"><span>Connect to <strong>{tenantLabel}</strong> (above) to run Prove it against this POV's tenant.</span></div>}
+                <ProveIt initial={{ type: 'url' }} connected={tenantOk} setError={setError} />
+                {(data.tests || []).filter(t => t.prove).length > 0 && <>
+                  <h3 style={{fontSize:'14px', margin:'1rem 0 0.4rem'}}>For each test in this POV's runbook</h3>
+                  {(data.tests || []).filter(t => t.prove).map(t => <div key={t.id} className="ab-row" style={{display:'block'}} data-povtestprove={t.id}><div className="ab-row-name" style={{marginBottom:'4px'}}><span className="badge badge-category">{t.product}</span> {t.title}</div><ProveIt initial={t.prove} compact connected={tenantOk} setError={setError} /></div>)}
+                </>}
+              </div>
+              <div className="card">
+                <div className="card-header"><h2>Test kit</h2><p>Only what this POV covers: DLP files for its vertical plus generic PII, EICAR and AMTSO threat tests, and a unique sandbox file.</p></div>
+                <TestKit povId={p.id} setError={setError} />
+              </div>
+            </div>
+          )}
 
           {tab === 'overview' && (
             <div className="card" data-povoverview>
@@ -2840,6 +2962,91 @@
     }
 
     // ---------- POV tests (7, 8, 9) ----------
+    // ---------- v2.6: Prove it (every policy type) and the POV test kit ----------
+    let PROVE_CATALOG = null;
+    const PROVE_TYPES = [['url', 'URL filtering'], ['threat', 'Threat protection'], ['cloudApp', 'Cloud apps'], ['firewall', 'Firewall'], ['dns', 'DNS control']];
+    const PROVE_PH = { url: 'https://www.example.com', threat: 'https://… (a file or page)', cloudApp: 'App name, e.g. CHATGPT_AI', firewall: '203.0.113.10:22/tcp', dns: 'example.com' };
+    function ProveResult({ r }) {
+      if (!r) return null;
+      return (
+        <table className="diff-table" style={{marginTop:'0.6rem'}} data-proof><tbody>
+          <tr><td style={{width:'170px'}}>Destination</td><td><code>{r.target}</code>{r.doh ? ' (DNS over HTTPS)' : ''}{r.appType ? <span className="form-hint" style={{marginLeft:'6px'}}>{r.appType}</span> : null}</td></tr>
+          <tr><td>Result</td><td style={{fontWeight:600}} data-proofverdict>{r.verdict}</td></tr>
+          {r.categories && <tr><td>Categories</td><td>{r.categories.join(', ') || '—'}{(r.securityAlerts || []).length > 0 && <span className="badge badge-risk" style={{marginLeft:'6px'}}>Security alert: {r.securityAlerts.join(', ')}</span>}</td></tr>}
+          <tr><td>First matching rule</td><td>{r.match ? <><code>{r.match.name}</code> (order {r.match.order}) → {r.match.actions ? r.match.actions.join(', ') : <ActionBadge action={r.match.action} />}
+            {(r.match.conditions || []).length > 0 && <div className="form-hint">{r.match.conditions.join('; ')}</div>}{r.match.note && <div className="form-hint">{r.match.note}</div>}</> : 'None; the default rule applies.'}</td></tr>
+          {(r.alsoChecked || []).length > 0 && <tr><td>Next in line</td><td style={{fontSize:'12px'}}>{r.alsoChecked.map(x => <div key={x.name}><code>{x.name}</code> → {x.actions ? x.actions.join(', ') : x.action}</div>)}</td></tr>}
+          {r.atp && <tr><td>Threat protection</td><td style={{fontSize:'12px'}}>{Object.entries(r.atp).map(([k, v]) => `${k.replace(/Blocked$/, '')}: ${v === true ? 'block' : v === false ? 'off' : v}`).join(' · ')}</td></tr>}
+          {(r.sandbox || []).length > 0 && <tr><td>Sandbox rules</td><td style={{fontSize:'12px'}}>{r.sandbox.map(x => <div key={x.name}><code>{x.name}</code> → {x.ba || x.action}{x.firstTime ? ` (first time: ${x.firstTime})` : ''}</div>)}</td></tr>}
+          <tr><td>Last hour (Z-Insights)</td><td style={{fontSize:'12px'}}>{r.insights && (r.insights.webThreats || r.insights.firewallActions) ? <>
+            {r.insights.webThreats && <div>Web threats: {r.insights.webThreats.length ? r.insights.webThreats.map(x => `${x.name} ${x.total}`).join(', ') : 'none'}</div>}
+            {r.insights.firewallActions && <div>Firewall actions: {r.insights.firewallActions.length ? r.insights.firewallActions.map(x => `${x.name} ${x.total}`).join(', ') : 'none'}</div>}</> : 'Not available for this API client.'}</td></tr>
+        </tbody></table>
+      );
+    }
+    /** initial: { type, target, appType?, doh? } · compact: one row inside a test · connected: false shows why it is off */
+    function ProveIt({ initial, compact, connected = true, setError }) {
+      const [cat, setCat] = useState(PROVE_CATALOG);
+      const [type, setType] = useState((initial && initial.type) || 'url');
+      const [choice, setChoice] = useState(initial && initial.target ? initial.target : '');
+      const [custom, setCustom] = useState('');
+      const [res, setRes] = useState(null);
+      const [busy, setBusy] = useState(false);
+      useEffect(() => { if (!PROVE_CATALOG) api.call('GET', '/v2/prove/catalog').then(r => { PROVE_CATALOG = r.catalog; setCat(r.catalog); }).catch(() => {}); }, []);
+      const items = (cat && cat[type] && cat[type].items) || [];
+      const sel = items.find(i => i.target === choice);
+      const run = async () => {
+        const target = choice === '__own' ? custom.trim() : choice;
+        if (!target) return;
+        setBusy(true); setRes(null);
+        try { setRes(await api.call('POST', '/v2/prove', { type, target, appType: sel ? sel.type : (initial && initial.type === type ? initial.appType : undefined), doh: sel ? !!sel.doh : (type === 'dns' && initial && initial.doh) })); }
+        catch (e) { setError && setError(e.message); }
+        setBusy(false);
+      };
+      return (
+        <div data-proveit={type}>
+          <div style={{display:'flex', gap:'6px', flexWrap:'wrap', alignItems:'center'}}>
+            {!compact && <select value={type} onChange={e => { setType(e.target.value); setChoice(''); setRes(null); }} style={{width:'auto'}} data-provetype>{PROVE_TYPES.map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select>}
+            <select value={choice} onChange={e => { setChoice(e.target.value); setRes(null); }} style={{flex:1, minWidth:'200px', fontSize: compact ? '12px' : undefined}} data-provechoice>
+              <option value="">{cat ? `Pick a ${(cat[type] && cat[type].label || '').toLowerCase()} destination…` : 'Loading…'}</option>
+              {items.map(i => <option key={i.target} value={i.target}>{i.label}</option>)}
+              {initial && initial.target && !items.some(i => i.target === initial.target) && <option value={initial.target}>{initial.target}</option>}
+              <option value="__own">Your own…</option>
+            </select>
+            {choice === '__own' && <input type="text" value={custom} onChange={e => setCustom(e.target.value)} placeholder={PROVE_PH[type]} style={{flex:1, minWidth:'180px'}} data-proveown />}
+            <button className={`btn ${compact ? 'btn-ghost btn-sm' : 'btn-primary'}`} onClick={run} disabled={busy || !connected || !(choice && (choice !== '__own' || custom.trim()))} title={connected ? '' : 'Connect to the POV tenant first'} data-provebtn>{busy ? <span className="spinner"></span> : '🔎 Prove it'}</button>
+          </div>
+          {!compact && cat && cat[type] && <div className="form-hint">{cat[type].hint} The check is simplified: users, groups, locations and time windows are not evaluated. The exact transaction is in ZIA Insights › Logs.</div>}
+          <ProveResult r={res} />
+        </div>
+      );
+    }
+    /** The test kit for a POV (or the POV open in this session): only what the POV covers. */
+    function TestKit({ povId, setError }) {
+      const [kit, setKit] = useState(null);
+      useEffect(() => { setKit(null); api.call('GET', `/v2/test-kit${povId ? `?povId=${encodeURIComponent(povId)}` : ''}`).then(setKit).catch(e => setError && setError(e.message)); }, [povId]);
+      if (!kit) return <div className="form-hint"><span className="spinner"></span> Loading the test kit…</div>;
+      const fileLink = (f) => <a className="btn btn-ghost btn-sm" href={`/api/v2/test-kit/file/${f.id}`} download={f.name} data-kitfile={f.id}>⬇ Download</a>;
+      return (
+        <div data-testkit>
+          {!kit.sections.length && <div className="alert alert-info"><span>This POV has no DLP, malware or sandbox tests in scope, so there is nothing to download.</span></div>}
+          {kit.sections.map(sec => (
+            <div key={sec.id} style={{marginBottom:'1rem'}} data-kitsection={sec.id}>
+              <h3 style={{fontSize:'14px', margin:'0 0 0.3rem'}}>{sec.title}</h3>
+              <div className="form-hint" style={{marginTop:0}}>{sec.how}</div>
+              {(sec.files || []).filter(f => f.primary !== false).map(f => <div key={f.id} className="toggle-item"><div><strong style={{fontSize:'13px'}}>{f.label}</strong><div className="form-hint">{f.why}</div></div>{fileLink(f)}</div>)}
+              {(sec.files || []).some(f => f.primary === false) && <details style={{marginTop:'4px'}}><summary className="form-hint" style={{cursor:'pointer'}}>Other verticals</summary>
+                {sec.files.filter(f => f.primary === false).map(f => <div key={f.id} className="toggle-item"><div><strong style={{fontSize:'13px'}}>{f.label}</strong><div className="form-hint">{f.why}</div></div>{fileLink(f)}</div>)}</details>}
+              {(sec.links || []).length > 0 && [...new Set(sec.links.map(l => l.group))].map(g => (
+                <div key={g} style={{marginTop:'4px'}}><div className="form-hint" style={{fontWeight:600}}>{g}</div>
+                  <div style={{display:'flex', flexWrap:'wrap', gap:'6px'}}>{sec.links.filter(l => l.group === g).map(l => <a key={l.url} className="btn btn-ghost btn-sm" href={l.url} target="_blank" rel="noopener noreferrer" data-kitlink={l.url}>{l.label} ↗</a>)}</div></div>))}
+            </div>
+          ))}
+          {kit.hidden.length > 0 && <div className="form-hint" data-kithidden>Not shown: {kit.hidden.join(', ')}.{kit.basis === 'licences' ? ' (No POV scope yet, so this follows the tenant licences.)' : ''}</div>}
+        </div>
+      );
+    }
+
     function PovTests({ setError }) {
       const [tests, setTests] = useState(null);
       const [notes, setNotes] = useState({});
@@ -2848,7 +3055,7 @@
       const [busy, setBusy] = useState(false);
       const [kit, setKit] = useState(null);
       const load = () => api.call('GET', '/v2/tests').then(r => setTests(r.tests)).catch(e => setError(e.message));
-      useEffect(() => { load(); api.call('GET', '/v2/dlp-kit').then(r => setKit(r.files)).catch(() => {}); }, []);
+      useEffect(() => { load(); }, []);
       const mark = async (t, status) => { await api.call('POST', `/v2/tests/${t.id}`, { status: t.result && t.result.status === status ? null : status, note: notes[t.id] !== undefined ? notes[t.id] : ((t.result && t.result.note) || '') }); load(); };
       const prove = async (u) => { setBusy(true); setProof(null); try { setProof(await api.call('POST', '/v2/prove', { url: u || url })); } catch (e) { setError(e.message); } setBusy(false); };
       const runbookMd = () => ['# POV test runbook', '', ...(tests || []).flatMap(t => [`## ${t.product}: ${t.title}`, '', ...t.steps.map((s, i) => `${i + 1}. ${s}`), '', `**Expected:** ${t.expect}`, '', `Result: ${t.result ? t.result.status : 'not run'}${t.result && t.result.note ? ` — ${t.result.note}` : ''}`, ''])].join('\n');
@@ -2879,40 +3086,19 @@
                       <button className={t.result && t.result.status === 'skip' ? 'on-default' : ''} onClick={() => mark(t, 'skip')}>Skip</button>
                     </div>
                     <input type="text" placeholder="Note (optional)" value={notes[t.id] !== undefined ? notes[t.id] : ((t.result && t.result.note) || '')} onChange={e => setNotes({ ...notes, [t.id]: e.target.value })} onBlur={() => t.result && mark({ ...t, result: null }, t.result.status)} style={{fontSize:'12px'}} />
-                    {t.prove && <button className="btn btn-ghost btn-sm" onClick={() => { setUrl(t.prove); prove(t.prove); }}>🔎 Prove it</button>}
                   </div>
                 </div>
+                {t.prove && <div style={{marginTop:'6px'}} data-testprove={t.id}><ProveIt initial={t.prove} compact setError={setError} /></div>}
               </div>
             ))}
           </div>
           <div className="card" data-prove>
-            <div className="card-header"><h2>Prove it</h2><p>What Internet Access does with a URL: its categories and the first URL Filtering rule that matches, plus the Z-Insights totals for the last hour. Zscaler does not give API clients the individual log lines, so open Web Insights › Logs in the ZIA portal to show the exact transaction.</p></div>
-            <div style={{display:'flex', gap:'6px'}}>
-              <input type="text" value={url} onChange={e => setUrl(e.target.value)} placeholder="https://www.example.com" data-proveurl />
-              <button className="btn btn-primary" onClick={() => prove()} disabled={busy || !url.trim()} data-provebtn>{busy ? <span className="spinner"></span> : 'Check'}</button>
-            </div>
-            {proof && (
-              <table className="diff-table" style={{marginTop:'0.75rem'}} data-proof><tbody>
-                <tr><td style={{width:'180px'}}>Host</td><td><code>{proof.host}</code></td></tr>
-                <tr><td>Categories</td><td>{proof.categories.join(', ') || '—'}{proof.securityAlert && <span className="badge badge-risk" style={{marginLeft:'6px'}}>Security alert</span>}</td></tr>
-                <tr><td>First matching rule</td><td>{proof.match ? <><code>{proof.match.name}</code> (order {proof.match.order}) → <ActionBadge action={proof.match.action} /></> : 'No URL Filtering rule matches; the default rule applies.'}{proof.note && <div className="form-hint">{proof.note}</div>}</td></tr>
-                <tr><td>Last hour (Z-Insights)</td><td style={{fontSize:'12px'}}>
-                  {proof.insights && (proof.insights.webThreats || proof.insights.firewallActions) ? <>
-                    {proof.insights.webThreats && <div>Web threats: {proof.insights.webThreats.length ? proof.insights.webThreats.map(x => `${x.name} ${x.total}`).join(', ') : 'none'}</div>}
-                    {proof.insights.firewallActions && <div>Firewall actions: {proof.insights.firewallActions.length ? proof.insights.firewallActions.map(x => `${x.name} ${x.total}`).join(', ') : 'none'}</div>}
-                  </> : 'Not available for this API client.'}
-                </td></tr>
-              </tbody></table>
-            )}
+            <div className="card-header"><h2>Prove it</h2><p>What Internet Access does with a destination, for every kind of test: URL filtering, threat protection, cloud apps, firewall and DNS. Pick a built-in test destination or type your own. Zscaler does not give API clients the individual log lines, so open Insights › Logs in the ZIA portal to show the exact transaction.</p></div>
+            <ProveIt initial={{ type: 'url' }} setError={setError} />
           </div>
           <div className="card" data-dlpkit>
-            <div className="card-header"><h2>DLP test kit</h2><p>Synthetic, clearly labelled test files that match the DLP rules (PHI with MRN / Medicare MBI / ICD-10, card-network test numbers, Social Security numbers). No real person's data. Upload one to a test site to trigger a block.</p></div>
-            {(kit || []).map(f => (
-              <div key={f.name} className="toggle-item">
-                <div><code>{f.name}</code><div className="form-hint">{f.description}</div></div>
-                <button className="btn btn-ghost btn-sm" onClick={() => download(f.name, f.content, f.type)} data-kitfile={f.name}>⬇ Download</button>
-              </div>
-            ))}
+            <div className="card-header"><h2>Test kit</h2><p>Only what this POV covers: DLP files for the customer's vertical plus generic PII, EICAR and AMTSO threat tests, and a unique sandbox file. Everything is synthetic and harmless.</p></div>
+            <TestKit setError={setError} />
           </div>
         </div>
       );
@@ -3099,13 +3285,13 @@
             <button className="btn btn-ghost btn-sm" onClick={() => setSel({})}>Clear</button>
           </div>
           {!items ? <div className="spinner"></div> : (
-            <table className="diff-table" data-bulklist>
-              <thead><tr><th></th><th>Type</th><th>Name</th><th>Detail</th></tr></thead>
+            <table className="diff-table" data-bulklist style={{tableLayout:'fixed', width:'100%'}}>
+              <thead><tr><th style={{width:'36px'}}></th><th style={{width:'190px'}}>Type</th><th style={{width:'34%'}}>Name</th><th>Detail</th></tr></thead>
               <tbody>
                 {items.map((i, idx) => i.error
                   ? <tr key={idx}><td></td><td>{i.label}</td><td colSpan={2} style={{color:'var(--accent-red)'}}>{i.error}</td></tr>
                   : <tr key={`${i.kind}:${i.id}`}><td><input type="checkbox" checked={!!sel[`${i.kind}:${i.id}`]} onChange={e => { setPlan(null); setSel({ ...sel, [`${i.kind}:${i.id}`]: e.target.checked }); }} /></td>
-                      <td>{i.label || (i.kind === 'app' ? 'Application' : 'Collection')}</td><td style={{fontFamily:'IBM Plex Mono, monospace', fontSize:'12px'}}>{i.name}</td><td style={{fontSize:'12px'}}>{i.detail}</td></tr>)}
+                      <td style={{whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis'}} title={i.label}>{i.label || (i.kind === 'app' ? 'Application' : 'Collection')}</td><td style={{fontFamily:'IBM Plex Mono, monospace', fontSize:'12px', overflowWrap:'anywhere'}}>{i.name}</td><td style={{fontSize:'12px'}}>{i.detail}{(i.usedBy || []).length > 0 && <div style={{color: i.usedBy.some(u => !sel[`${u.kind}:${u.id}`]) ? 'var(--accent-amber)' : 'var(--text-muted)', marginTop:'2px'}} data-bulkusedby>Used by {i.usedBy.map(u => `${u.label} ${u.name}`).join(', ')}{i.usedBy.some(u => !u.mine) ? ' (not created by the wizard)' : ''}</div>}</td></tr>)}
                 {!items.length && <tr><td colSpan={4} style={{color:'var(--text-muted)'}}>No matching objects.</td></tr>}
               </tbody>
             </table>
@@ -3113,12 +3299,16 @@
           {plan && (<>
             <div className="alert alert-warning" style={{display:'block', marginTop:'1rem'}} data-bulkplan>
               <strong>Preview — nothing deleted yet. Order:</strong>
-              <ol style={{margin:'6px 0 0 18px'}}>{plan.results.map((r, i) => <li key={i}>{r.label || r.kind}: {r.name}</li>)}</ol>
+              <ol style={{margin:'6px 0 0 18px'}}>{plan.results.map((r, i) => <li key={i} style={r.action === 'BLOCKED' ? {color:'var(--accent-red)'} : null} data-bulkstep={r.action}>{r.label || r.kind}: {r.name}{r.action === 'BLOCKED' ? ` — held back: ${r.error}` : ''}</li>)}</ol>
             </div>
-            <div className="toggle-item"><label onClick={() => setConfirmed(!confirmed)} style={{cursor:'pointer'}}>Permanently delete these {plan.results.length} object(s).</label>
+            {(plan.issues || []).length > 0 && <div className="alert alert-danger" style={{display:'block', marginTop:'0.5rem'}} data-bulkissues>
+              <strong>{plan.issues.length} dependenc{plan.issues.length === 1 ? 'y' : 'ies'} not selected.</strong> ZPA refuses to delete an object while something else still uses it, so these objects are held back:
+              <ul style={{margin:'6px 0 0 18px'}}>{plan.issues.map((x, i) => <li key={i}>{x.object} is used by <strong>{x.blockedBy}</strong>. {x.fix}{x.selectable && <button className="btn btn-ghost btn-sm" style={{marginLeft:'6px'}} onClick={() => { setPlan(null); setSel(v => ({ ...v, [`${x.kind}:${x.id}`]: true })); }} data-bulkselectdep>Select it too</button>}</li>)}</ul>
+            </div>}
+            <div className="toggle-item"><label onClick={() => setConfirmed(!confirmed)} style={{cursor:'pointer'}}>Permanently delete these {plan.results.filter(r => r.action === 'DELETE').length} object(s){plan.results.some(r => r.action === 'BLOCKED') ? ' (held-back objects are left in place)' : ''}.</label>
               <div className={`toggle-switch ${confirmed ? 'active' : ''}`} onClick={() => setConfirmed(!confirmed)} data-bulkconfirm><div className="toggle-knob"></div></div></div>
           </>)}
-          {done && <div className="alert alert-success" style={{display:'block', marginTop:'1rem'}} data-bulkdone>{done.results.map((r, i) => <div key={i}>{r.action === 'DELETED' ? '✓' : '✕'} {r.label || r.kind}: {r.name}{r.error ? ` — ${r.error}` : ''}</div>)}</div>}
+          {done && <div className="alert alert-success" style={{display:'block', marginTop:'1rem'}} data-bulkdone>{done.results.map((r, i) => <div key={i}>{r.action === 'DELETED' || r.action === 'DETACHED' ? '✓' : r.action === 'FAILED' ? '✕' : '⚠'} {r.label || r.kind}: {r.name}{r.action === 'DETACHED' ? ' (removed)' : ''}{r.note ? ` (${r.note})` : ''}{r.error ? ` — ${r.error}` : ''}</div>)}</div>}
           <div className="btn-group">
             <button className="btn btn-ghost" onClick={preview} disabled={!chosen.length || busy} data-bulkpreview>Preview delete ({chosen.length})</button>
             <button className="btn btn-danger" onClick={del} disabled={!plan || !confirmed || busy} data-bulkdelete>{busy ? <><span className="spinner"></span> Deleting…</> : 'Delete'}</button>
@@ -3171,7 +3361,8 @@
             vanityDomain: form.vanityDomain, cloud: form.cloud || undefined
           });
           api.sessionId = result.sessionId;
-          setAuth({ connected: true, mode: 'oneapi', cloud: form.vanityDomain });
+          wallet.put({ vanity: form.vanityDomain, cloud: form.cloud || 'production' }, result.sessionId);
+          setAuth({ connected: true, mode: 'oneapi', cloud: form.vanityDomain, sid: result.sessionId });
           onComplete();
         } catch (e) {
           setError(e.message);

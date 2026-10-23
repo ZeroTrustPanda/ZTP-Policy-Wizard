@@ -75,4 +75,81 @@ function licenceChecks(raw, { zpaCustomer, now = Date.now() } = {}) {
   return { checks, summary: { core: CAPABILITIES.filter(c => c.tier === 'core').length, missingCore: missingCore.map(c => c.key), missingRecommended: missingRec.map(c => c.key), present: present.length } };
 }
 
-module.exports = { CAPABILITIES, licenceChecks, hasCap };
+// ---------- v2.6: SKU printout (every SKU on the tenant, mapped to its product area and what it unlocks in the wizard) ----------
+// Draft mapping from the ZTH reference tenant (51 SKUs, Oct 2026); entries marked confirm:false still need SE confirmation.
+const SKU_MAP = {
+  URL_FILTER: { area: 'ZIA', what: 'URL Filtering', unlocks: 'URL Filtering rules' },
+  ZMAN_WEB_2_0: { area: 'ZIA', what: 'Cloud App Control', unlocks: 'Cloud App Control rules' },
+  ZIA_SSL: { area: 'ZIA', what: 'SSL Inspection', unlocks: 'SSL Inspection rules' },
+  ZSSL_PVT_CERT: { area: 'ZIA', what: 'Custom root certificate for SSL inspection', unlocks: 'Customer intermediate CA' },
+  ZIA_ATP: { area: 'ZIA', what: 'Advanced Threat Protection', unlocks: 'ATP settings, threat tests' },
+  AV_AS: { area: 'ZIA', what: 'Antivirus and anti-spam (malware protection)', unlocks: 'EICAR malware tests' },
+  ZSEC_WEB_ABA: { area: 'ZIA', what: 'Cloud Sandbox', unlocks: 'Sandbox rules, sandbox test file', confirm: false },
+  ZDLP_WEB: { area: 'ZIA', what: 'Web DLP', unlocks: 'DLP dictionaries, engines and rules; DLP test data', confirm: false },
+  Z_DLP_EDM: { area: 'ZIA', what: 'DLP Exact Data Match', unlocks: 'EDM (not configured by the wizard)' },
+  Z_DLP_IDM: { area: 'ZIA', what: 'DLP Indexed Document Match', unlocks: 'IDM (not configured by the wizard)' },
+  Z_CASB: { area: 'ZIA', what: 'CASB (out-of-band SaaS security)', unlocks: 'Cloud app controls' },
+  Z_FIREWALL_BASIC: { area: 'ZIA', what: 'Cloud Firewall (basic)', unlocks: 'Firewall rules' },
+  ZFW_NG_WITH_LOG: { area: 'ZIA', what: 'Advanced Cloud Firewall with full logging', unlocks: 'Firewall, geo-block and DNS rules' },
+  ZFW_STD_LOG: { area: 'ZIA', what: 'Standard firewall full logging', unlocks: 'Firewall logs' },
+  Z_FIREWALL_IPS: { area: 'ZIA', what: 'Cloud IPS', unlocks: 'IPS signatures' },
+  Z_DNS_ESS: { area: 'ZIA', what: 'DNS Security Essentials', unlocks: 'DNS Control rules' },
+  Z_DNS_ADVANCED: { area: 'ZIA', what: 'DNS Security Advanced', unlocks: 'DNS Control, DoH and tunnel rules' },
+  ZIA_BW_CTRL: { area: 'ZIA', what: 'Bandwidth Control', unlocks: '—' },
+  ZS_DP_GEN_AI: { area: 'ZIA', what: 'Gen AI Security', unlocks: 'AI prompt capture, AI Guard prompt capture' },
+  ZS_DECEPTION_STANDARD: { area: 'ZIA', what: 'Deception (standard)', unlocks: '—' },
+  Z_REPORTING: { area: 'ZIA', what: 'Basic reporting', unlocks: '—' },
+  Z_LOGFEED: { area: 'ZIA', what: 'NSS log feed (web)', unlocks: '—' },
+  Z_LOGFEED_FW: { area: 'ZIA', what: 'NSS log feed (firewall)', unlocks: '—' },
+  Z_CLOUD_NSS_WEB: { area: 'ZIA', what: 'Cloud NSS streaming (web)', unlocks: '—' },
+  Z_CLOUD_NSS_FW: { area: 'ZIA', what: 'Cloud NSS streaming (firewall)', unlocks: '—' },
+  Z_ICAP: { area: 'ZIA', what: 'ICAP (DLP to third-party DLP)', unlocks: '—' },
+  Z_CLOUD_ID_BROKER: { area: 'ZIA', what: 'Cloud identity broker', unlocks: '—' },
+  Z_MOBILE_SEC: { area: 'ZIA', what: 'Mobile security', unlocks: '—' },
+  Z_VPN_S2S: { area: 'ZIA', what: 'Site-to-site VPN', unlocks: '—' },
+  ZIA_ENC_VPN: { area: 'ZIA', what: 'Encrypted VPN', unlocks: '—' },
+  Z_API: { area: 'ZIA', what: 'Z-API', unlocks: 'API access' },
+  ZSCALER_CLIENT_CONNECTOR: { area: 'Client Connector', what: 'Zscaler Client Connector', unlocks: 'App and forwarding profiles, installs' },
+  ZS_SIPA: { area: 'ZPA', what: 'Source IP anchoring', unlocks: '—' },
+  ZIA_ISO_UNCAT: { area: 'Isolation', what: 'Isolation of Miscellaneous / Unknown', unlocks: 'Isolate Miscellaneous / Unknown rule' },
+  ZS_DP_ISO_SAAS_ADV_PLUS: { area: 'Isolation', what: 'Isolation for SaaS (Data Protection Advanced Plus)', unlocks: 'Isolate rules' },
+  ZIA_ISO_ADV_PLUS: { area: 'Isolation', what: 'Isolation Advanced Plus', unlocks: 'Isolate rules' },
+  ZIA_ISO_STD: { area: 'Isolation', what: 'Cloud Browser Isolation (standard)', unlocks: 'Isolate rules' },
+  ZIA_ISO_PROXY: { area: 'Isolation', what: 'Cloud Browser Isolation (proxy)', unlocks: 'Isolate rules', confirm: false },
+  ZEXT_BW_PREM: { area: 'Extranet', what: 'Extranet bandwidth (premium)', unlocks: '—', confirm: false },
+  ZS_EXT_LOCATIONS: { area: 'Extranet', what: 'Extranet locations', unlocks: '—' },
+  ZS_EXT_PARTNERS: { area: 'Extranet', what: 'Extranet partners', unlocks: '—' }
+};
+const skuInfo = (id) => SKU_MAP[id] || (/^ZIA_ISO_\d+$/.test(id) ? { area: 'Isolation', what: `Cloud Browser Isolation (${id.replace('ZIA_ISO_', '')} users)`, unlocks: 'Isolate rules' }
+  : /^BC_DEVICE_/.test(id) ? { area: 'Branch Connector', what: `Branch Connector: ${id.replace('BC_DEVICE_', '').toLowerCase().replace(/_/g, ' ')}`, unlocks: '—' } : { area: 'Other', what: '', unlocks: '—', confirm: false });
+
+/**
+ * Standard vs advanced editions: when the advanced edition is licensed, the standard choice is hidden in the scope screen.
+ * SKU ids to be confirmed with the SE team (see the 2.6 notes); an empty list means "not detectable from SKUs yet".
+ */
+// Until the SKU ids are confirmed nothing is hidden or blocked: ZSEC_WEB_ABA ("Cloud Sandbox" on ZTH) is not yet known to be either edition.
+const EDITIONS = {
+  sandbox: { advanced: [], standard: [] },
+  dlp: { advanced: [], standard: [] }
+};
+function editions(subs) {
+  const out = {};
+  for (const [k, e] of Object.entries(EDITIONS)) out[k] = e.advanced.some(s => subs.includes(s)) ? 'advanced' : e.standard.some(s => subs.includes(s)) ? 'standard' : null;
+  return out;
+}
+
+/** Every SKU on the tenant, grouped by area, plus products the API token can reach (ZPA / ZDX / AI Guard are not in /subscriptions). */
+function skuTable(raw, { products = [] } = {}) {
+  if (!Array.isArray(raw)) return null;
+  const now = Date.now();
+  const rows = raw.map(s => {
+    const id = String(s.id), info = skuInfo(id);
+    const end = s.endDate ? new Date(s.endDate * 1000) : null;
+    return { id, name: s.sku || id, status: s.status || '', active: s.subscribed !== false && !/EXPIRED|CANCEL/i.test(String(s.status || '')), endsOn: end ? end.toISOString().slice(0, 10) : null,
+      endingSoon: !!(end && end.getTime() > now && end.getTime() - now < 21 * 86400000), area: info.area, what: info.what || s.sku || '', unlocks: info.unlocks, confirmed: info.confirm !== false };
+  }).sort((a, b) => a.area.localeCompare(b.area) || a.id.localeCompare(b.id));
+  const viaToken = (products || []).filter(p => ['ZPA', 'ZDX', 'ZGUARD'].includes(p.product)).map(p => ({ product: p.product, label: p.label, access: p.access, role: p.role }));
+  return { rows, total: rows.length, active: rows.filter(r => r.active).length, editions: editions(rows.filter(r => r.active).map(r => r.id)), viaToken };
+}
+
+module.exports = { CAPABILITIES, licenceChecks, hasCap, SKU_MAP, EDITIONS, editions, skuTable };
