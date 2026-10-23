@@ -177,6 +177,9 @@ function build(opts, withChoices) {
     }
   }
 
+  // 5. v2.6.1: fit the firewall and DNS rules to the tenant's editions (opts.editions from the licensing check; unknown = keep all)
+  const licenceSkipped = fitToEditions(policies, opts.editions, prefix, notes);
+
   // DLP block: drop engines / dictionaries no remaining rule uses
   if (objects.dlpEngines.length) {
     const used = new Set((policies.dlp || []).map(r => r.engineRef && r.engineRef.custom).filter(Boolean));
@@ -194,6 +197,7 @@ function build(opts, withChoices) {
     actionChanges: (base.actionChanges || []).concat((policies.dlp || []).filter(r => r.userChoice && r.userChoice !== r.defaultAction)
       .map(r => ({ key: r.toggleKey, name: r.name, policyType: 'dlp', from: r.defaultAction, to: r.action, weakened: !!r.weakened }))),
     disabledItems: off,
+    licenceSkipped,
     generationNotes: notes
   };
 }
@@ -217,4 +221,44 @@ function buildCatalog(policies) {
   });
 }
 
-module.exports = { listBaselines, getBaseline, generate, inScopeTypes, POLICY_LABELS, SINGLETON_TYPES };
+/**
+ * Firewall Standard: application-based rules need Advanced Cloud Firewall. The geo-block and QUIC rules are rebuilt on
+ * network services (ports); the rest are left out and listed as not licensed. DNS tunnel rules need Advanced Cloud Firewall too.
+ * Returns [{ type, name, reason }] for the review page.
+ */
+const GEO_SERVICES = ['SSH', 'FTP', 'TELNET', 'SMB'];
+function fitToEditions(policies, ed, prefix, notes) {
+  const out = [];
+  if (!ed) return out;
+  if (ed.firewall === 'standard' && Array.isArray(policies.firewallFiltering)) {
+    const keep = [];
+    for (const r of policies.firewallFiltering) {
+      const apps = r.nwApplications || [];
+      const geo = (r.destCountries || []).length || (r.sourceCountries || []).length;
+      if (geo && apps.length) {
+        const { nwApplications, ...rest } = r;
+        keep.push({ ...rest, nwServiceNames: GEO_SERVICES, customServices: [{ name: `${prefix}-RDP`, tcp: [3389] }], standardFit: true,
+          description: `${r.description || ''} (Cloud Firewall Standard: matched by port: SSH, RDP, FTP, Telnet, SMB.)`.trim() });
+      } else if (apps.length === 1 && apps[0] === 'QUIC') {
+        const { nwApplications, ...rest } = r;
+        keep.push({ ...rest, nwServiceNames: ['QUIC'], standardFit: true });
+      } else out.push({ type: 'firewallFiltering', name: r.name, reason: 'Needs Advanced Cloud Firewall (not licensed)' });
+    }
+    policies.firewallFiltering = keep;
+    if (!keep.length) delete policies.firewallFiltering;
+    if (out.length) notes.push(`Cloud Firewall Standard: ${out.length} application-based rule(s) left out (not licensed); geo-blocking and QUIC use ports.`);
+  }
+  if (ed.dns && !ed.dnsTunnels && Array.isArray(policies.dnsSecurity)) {
+    const before = out.length;
+    policies.dnsSecurity = policies.dnsSecurity.filter(r => {
+      const tun = (r.applications || []).some(a => /^DNSTUN_/.test(a)) || /Tunnels/i.test(r.name);
+      if (tun) out.push({ type: 'dnsSecurity', name: r.name, reason: 'DNS tunnel detection needs Advanced Cloud Firewall (not licensed)' });
+      return !tun;
+    });
+    if (!policies.dnsSecurity.length) delete policies.dnsSecurity;
+    if (out.length > before) notes.push('DNS tunnel rules left out: DNS tunnel detection is not licensed.');
+  }
+  return out;
+}
+
+module.exports = { fitToEditions, listBaselines, getBaseline, generate, inScopeTypes, POLICY_LABELS, SINGLETON_TYPES };

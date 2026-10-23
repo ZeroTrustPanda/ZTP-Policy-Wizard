@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ZeroTrustPanda ZS Policy Wizard v2.6.0 - Zscaler Template Policy Configuration</title>
+  <title>ZeroTrustPanda ZS Policy Wizard v2.6.1 - Zscaler Template Policy Configuration</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
   <style>
@@ -643,7 +643,7 @@
     // ========================
     // App Version
     // ========================
-    const APP_VERSION = '2.6.0';
+    const APP_VERSION = '2.6.1';
     const BUILD_DATE = '2026-03-30';
 
     // ========================
@@ -1172,6 +1172,7 @@
                     <summary style={{cursor:'pointer', fontWeight:600, fontSize:'14px'}}>Version history</summary>
                     <div style={{marginTop:'0.75rem', lineHeight:1.7}}>
                     <div style={{paddingLeft:'1rem', fontSize:'12px'}}>
+                      <div><strong>v2.6.1</strong> — Licence-aware POVs: the core ZIA features are readiness prerequisites; the scope screen marks what the tenant is not licensed for (Sandbox Advanced, AI prompt capture, Advanced Cloud Firewall, DNS tunnel detection); with Cloud Firewall Standard the wizard builds only standard rules (geo-blocking and QUIC by port); ZDX has a tier choice that holds back templates and call-quality apps the tier does not include.</div>
                       <div><strong>v2.6.0</strong> — Several POVs at once: each POV page takes its tenant's API key (kept in memory only) and opening a POV switches tenant. Prove it for every kind of web test (URL filtering, threat, cloud apps, firewall, DNS) with built-in test destinations or your own, on every runbook test and on each POV page. Test kit that follows the POV: DLP CSVs only when DLP is in scope, for its vertical (Healthcare, Finance, Education, Public sector) plus generic PII; EICAR and AMTSO threat tests; a unique sandbox file. ZPA bulk delete in the order ZPA requires, with unselected dependencies flagged. Readiness: API permissions per product (what is missing and where to fix it) and a printout of every tenant SKU.</div>
                       <div><strong>v2.5.2</strong> — Allow in ZIA now includes Claude, Anthropic, OpenAI, Grok and Glean: ZIA's action lookup lists nothing for them, but it accepts them in an Allow rule.</div>
                       <div><strong>v2.5.1</strong> — AI Guard compliance profile: HIPAA, HITRUST, PCI, GDPR, CJIS, FERPA, SOX, NIST 800-171 / 800-53 or General, Monitor or Block per POV, created as an AI Guard detection policy and applied to the AI apps' providers. Allow in ZIA: pick the AI apps to allow above Block / Caution / Isolate rules (Cloud App Control, plus URL Filtering when a URL rule would stop them). The ZTH tier's Caution-AI rule now targets AI &amp; ML Applications instead of Other Information Technology.</div>
@@ -1302,6 +1303,10 @@
                 {l && l.licensed === null && <span className="badge badge-category" style={{marginLeft:'8px'}} title={l.reason}>Licence not confirmed</span>}
               </label>
               <div className="form-hint">{item.desc}</div>
+              {licensing && licensing.notes && licensing.notes[key] && !(blocked && key === 'sandboxAdvanced') && (
+                <div className="form-hint" data-editionnote={key} style={{color: licensing.notes[key].status === 'warn' ? 'var(--accent-amber)' : licensing.notes[key].status === 'pass' ? 'var(--accent-green)' : 'var(--text-muted)'}}>
+                  {licensing.notes[key].status === 'warn' ? '⚠ ' : licensing.notes[key].status === 'pass' ? '✓ ' : 'ℹ '}{licensing.notes[key].text}</div>
+              )}
               {key === 'endpointDlp' && on && licensing && licensing.endpointDlpEnabledInZcc !== true && (
                 <div className="alert alert-warning" style={{marginTop:'6px'}}><span>⚠ {licensing.endpointDlpEnabledInZcc === false ? meta.copy.scope.endpointPrereqDisabled : meta.copy.scope.endpointPrereq}</span></div>
               )}
@@ -1448,6 +1453,12 @@
             <p>Every rule the baseline creates for the features in scope, grouped by category. Switch rules on or off, and choose Allow or Block per category or per rule. A rule you change after using the category control keeps your choice until you use the category control again.</p></div>
           <div className="alert alert-info"><span>{total - off} of {total} rules and settings on · names start with <code>{prefix}-</code></span></div>
           {(tpl.generationNotes || []).length > 0 && <div className="alert alert-warning" style={{display:'block'}}>{tpl.generationNotes.map((n, i) => <div key={i}>⚠ {n}</div>)}</div>}
+          {(tpl.licenceSkipped || []).length > 0 && (
+            <details style={{margin:'0 0 0.75rem'}} data-licenceskipped>
+              <summary style={{cursor:'pointer', fontSize:'13px'}}>Not licensed on this tenant: {tpl.licenceSkipped.length} rule(s) left out</summary>
+              <ul style={{fontSize:'12px', margin:'6px 0 0 18px'}}>{tpl.licenceSkipped.map((r, i) => <li key={i}>{r.name}: <span className="badge badge-risk">Not licensed</span> {r.reason}</li>)}</ul>
+            </details>
+          )}
           <div style={{display:'flex', gap:'6px', marginBottom:'0.75rem', flexWrap:'wrap', alignItems:'center'}}>
             <button className="btn btn-ghost btn-sm" onClick={() => setAll(true)} data-globalselect>Select all</button>
             <button className="btn btn-ghost btn-sm" onClick={() => setAll(false)} data-globaldeselect>Deselect all</button>
@@ -5531,6 +5542,8 @@
       const [step, setStep] = useState('template');
       const [catalog, setCatalog] = useState(null);
       const [templateId, setTemplateId] = useState((guided && guided.saved && guided.saved.templateId) || 'POV_BEST_PRACTICE');
+      // v2.6.1: ZDX tier (from a subscription when the tenant lists one, else picked here); '' = not sure, nothing held back
+      const [tier, setTierState] = useState((guided && guided.saved && guided.saved.tier) || '');
       const [predef, setPredef] = useState({});   // provider -> { on, prefix, web, cloudpath }
       const [custom, setCustom] = useState([]);   // [{ name, url, cloudpath, frequency, protocol }]
       const [plan, setPlan] = useState(null);
@@ -5538,7 +5551,17 @@
       const [confirmed, setConfirmed] = useState(false);
       const [result, setResult] = useState(null);
 
-      const applyTemplate = (cat, id) => {
+      const tierOf = (cat, tid) => (cat && tid && cat.tiers ? cat.tiers.find(x => x.id === tid) : null);
+      const providerBlocked = (cat, tid, prov) => {
+        const ti = tierOf(cat, tid);
+        if (!ti) return null;
+        if (!ti.configurable) return `ZDX ${ti.label} has no configurable probes.`;
+        if (!ti.ucaas && (cat.ucaasProviders || []).includes(prov)) return 'Call-quality (UCaaS) monitoring needs ZDX Advanced.';
+        if (ti.microsoftOnly && !/^(MICROSOFT|SHAREPOINT|ONEDRIVE|OUTLOOK|EXCHANGE|OFFICE)/.test(prov)) return 'ZDX M365 monitors Microsoft 365 apps only.';
+        return null;
+      };
+      const templateBlocked = (cat, tid, id) => { const ti = tierOf(cat, tid); return ti && (!ti.configurable || !ti.templates.includes(id)); };
+      const applyTemplate = (cat, id, tid = tier) => {
         const t = cat.templates.find(x => x.id === id);
         const p = {};
         cat.predefined.forEach(a => { p[a.provider] = { on: false, prefix: a.prefix || '', web: true, cloudpath: true }; });
@@ -5551,11 +5574,13 @@
           seededZdx.current = true;
           Object.keys(p).forEach(k => { p[k] = { ...p[k], on: false }; });
           (sv.predefined || []).forEach(x => { if (p[x.provider]) p[x.provider] = { ...p[x.provider], on: true, prefix: x.prefix || p[x.provider].prefix, web: x.web !== false, cloudpath: !!x.cloudpath }; });
+          Object.keys(p).forEach(k => { if (providerBlocked(cat, tid, k)) p[k] = { ...p[k], on: false }; });
           setPredef(p);
           setCustom((sv.custom || []).map(c => ({ name: c.name, url: c.url, cloudpath: c.cloudpath !== false, frequency: c.frequency || 300, protocol: c.protocol || 'ADAPTIVE' })));
           setPlan(null);
           return;
         }
+        Object.keys(p).forEach(k => { if (providerBlocked(cat, tid, k)) p[k] = { ...p[k], on: false }; });
         setPredef(p);
         const extra = guided ? (guided.custom || []).filter(c => !t.custom.some(x => x.url === c.url)) : [];
         setCustom([...t.custom, ...extra].map(c => ({ name: c.name, url: c.url, cloudpath: c.cloudpath !== false, frequency: c.frequency || 300, protocol: c.protocol || 'ADAPTIVE' })));
@@ -5563,14 +5588,28 @@
       };
 
       useEffect(() => {
-        api.call('GET', '/zdx/catalog').then(c => { setCatalog(c); applyTemplate(c, (guided && guided.saved && guided.saved.templateId) || 'POV_BEST_PRACTICE'); })
+        api.call('GET', '/zdx/catalog').then(c => {
+          setCatalog(c);
+          const tid = (guided && guided.saved && guided.saved.tier) || c.detectedTier || '';
+          if (tid !== tier) setTierState(tid);
+          let id = (guided && guided.saved && guided.saved.templateId) || 'POV_BEST_PRACTICE';
+          if (templateBlocked(c, tid, id)) { const ti = tierOf(c, tid); id = (ti && ti.templates[0]) || 'BLANK'; setTemplateId(id); }
+          applyTemplate(c, id, tid);
+        })
           .catch(e => setError('Could not load ZDX: ' + e.message));
       }, []);
 
       const reached = ZDX_STEPS.findIndex(s => s.id === step);
       const chosenPredef = catalog ? catalog.predefined.filter(a => predef[a.provider]?.on) : [];
+      const setTier = (tid) => {
+        setTierState(tid); setPlan(null);
+        let id = templateId;
+        if (templateBlocked(catalog, tid, id)) { const ti = tierOf(catalog, tid); id = (ti && ti.templates[0]) || 'BLANK'; setTemplateId(id); applyTemplate(catalog, id, tid); return; }
+        setPredef(prev => Object.fromEntries(Object.entries(prev).map(([k, v]) => [k, providerBlocked(catalog, tid, k) ? { ...v, on: false } : v])));
+      };
+      const tierInfo = tierOf(catalog, tier);
       const payload = () => ({
-        templateId,
+        templateId, tier: tier || null,
         predefined: chosenPredef.map(a => ({ provider: a.provider, prefix: predef[a.provider].prefix, web: predef[a.provider].web, cloudpath: predef[a.provider].cloudpath })),
         custom: custom.map(c => ({ ...c, name: c.name.trim(), url: c.url.trim() }))
       });
@@ -5628,20 +5667,31 @@
           {step === 'template' && (
             <div>
               <div className="explainer"><strong>What ZDX probes are:</strong> Client Connector runs small synthetic tests from each user's device. A <strong>Web probe</strong> loads the app's page and measures availability and page fetch time. A <strong>CloudPath probe</strong> traces the network path hop by hop (device, Wi-Fi, ISP, Zscaler, app) so you can see where slowness comes from. Probes belong to an application: a <strong>predefined app</strong> is one Zscaler maintains probes for (Microsoft 365, Zoom, Okta…); a <strong>custom app</strong> is any URL you add.</div>
+              <div className="form-group" style={{maxWidth:'460px'}}>
+                <label className="form-label">ZDX tier on this tenant</label>
+                <select value={tier} onChange={e => setTier(e.target.value)} data-zdxtier>
+                  <option value="">Not sure (show everything)</option>
+                  {(catalog.tiers || []).map(t => <option key={t.id} value={t.id}>ZDX {t.label}</option>)}
+                </select>
+                <div className="form-hint">{catalog.detectedTier ? `Found in the tenant subscriptions: ZDX ${(tierOf(catalog, catalog.detectedTier) || {}).label}.` : 'The ZDX tier is not listed with the tenant subscriptions, so pick it here. Templates and apps the tier does not include are marked Not licensed.'}</div>
+              </div>
+              {tierInfo && !tierInfo.configurable && <div className="alert alert-warning" data-zdxlite><span>⚠ ZDX {tierInfo.label} has no configurable probes, so this step cannot add any. ZDX still shows its built-in data.</span></div>}
+              {tierInfo && tierInfo.limited && <div className="form-hint" style={{color:'var(--accent-amber)'}} data-zdxlimited>⚠ ZDX {tierInfo.label} allows only a small number of probes and no call-quality monitoring. The ZDX Standard POV template fits it.</div>}
               <div className="tier-grid">
-                {catalog.templates.map(t => (
-                  <div key={t.id} className={`tier-card ${templateId === t.id ? 'selected' : ''}`} data-zdxtemplate={t.id}
-                    onClick={() => { setTemplateId(t.id); applyTemplate(catalog, t.id); }}>
+                {catalog.templates.map(t => { const tb = templateBlocked(catalog, tier, t.id); return (
+                  <div key={t.id} className={`tier-card ${templateId === t.id ? 'selected' : ''}`} data-zdxtemplate={t.id} data-blocked={tb ? '1' : undefined}
+                    style={tb ? {opacity:0.55, cursor:'not-allowed'} : null}
+                    onClick={() => { if (tb) return; setTemplateId(t.id); applyTemplate(catalog, t.id); }}>
                     <div className="tier-icon">{t.icon}</div>
-                    <div className="tier-name">{t.name}</div>
+                    <div className="tier-name">{t.name}{tb && <span className="badge badge-risk" style={{marginLeft:'6px'}}>Not licensed</span>}</div>
                     <div className="tier-desc">{t.description}</div>
                     <div style={{fontSize:'11px', color:'var(--text-muted)', marginTop:'8px'}}>{t.predefined.length + t.custom.length} apps · Source: {t.source}</div>
                   </div>
-                ))}
+                ); })}
               </div>
               <div className="btn-group">
                 {guided ? <button className="btn btn-ghost" onClick={guided.onBack}>← Back</button> : <button className="btn btn-ghost" onClick={onExit}>← Digital Experience</button>}
-                <button className="btn btn-primary" onClick={() => setStep('apps')}>Applications & Probes →</button>
+                <button className="btn btn-primary" onClick={() => setStep('apps')} disabled={!!(tierInfo && !tierInfo.configurable)}>Applications & Probes →</button>
               </div>
             </div>
           )}
@@ -5653,11 +5703,12 @@
               <div className="toggle-group">
                 {catalog.predefined.map(a => {
                   const st = predef[a.provider] || {};
+                  const nl = providerBlocked(catalog, tier, a.provider);
                   return (
-                    <div className="toggle-item" key={a.provider} data-predef={a.provider} style={{alignItems:'flex-start'}}>
+                    <div className="toggle-item" key={a.provider} data-predef={a.provider} style={{alignItems:'flex-start', opacity: nl ? 0.55 : 1}} title={nl || ''}>
                       <div style={{flex:1}}>
-                        <label onClick={() => setP(a.provider, { on: !st.on })}>{a.label} <ZdxStateBadge p={a} /></label>
-                        <div className="form-hint">{a.description}</div>
+                        <label style={{cursor: nl ? 'not-allowed' : 'pointer'}} onClick={() => !nl && setP(a.provider, { on: !st.on })}>{a.label} <ZdxStateBadge p={a} />{nl && <span className="badge badge-risk" style={{marginLeft:'6px'}} data-zdxnl>Not licensed</span>}</label>
+                        <div className="form-hint">{nl ? nl : a.description}</div>
                         {st.on && (
                           <div style={{display:'flex', gap:'1rem', alignItems:'center', flexWrap:'wrap', marginTop:'0.5rem'}}>
                             {a.needsPrefix && !a.configured && (
@@ -5677,7 +5728,7 @@
                           </div>
                         )}
                       </div>
-                      <div className={`toggle-switch ${st.on ? 'active' : ''}`} onClick={() => setP(a.provider, { on: !st.on })}><div className="toggle-knob"></div></div>
+                      <div className={`toggle-switch ${st.on ? 'active' : ''}`} style={{cursor: nl ? 'not-allowed' : 'pointer'}} onClick={() => !nl && setP(a.provider, { on: !st.on })}><div className="toggle-knob"></div></div>
                     </div>
                   );
                 })}
