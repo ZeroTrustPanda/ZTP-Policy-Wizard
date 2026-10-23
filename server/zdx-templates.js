@@ -43,6 +43,13 @@ const TEMPLATES = {
       { provider: 'ZOOM', web: true, cloudpath: true }, { provider: 'WEBEX', web: true, cloudpath: true }],
     custom: [{ name: 'zscaler.com', url: 'https://zscaler.com/', web: true, cloudpath: true, frequency: 300, protocol: 'ADAPTIVE' }]
   },
+  POV_STANDARD: {
+    id: 'POV_STANDARD', name: 'ZDX Standard POV', icon: '✅',
+    description: 'For tenants on ZDX Standard: Microsoft Login (Zscaler predefined app) and zscaler.com (custom app), each with a Web probe and a CloudPath probe, for all users. Call-quality (UCaaS) monitoring needs ZDX Advanced.',
+    source: 'Zscaler POV best practice guide, fitted to ZDX Standard',
+    predefined: [{ provider: 'MICROSOFT_LOGIN', web: true, cloudpath: true }],
+    custom: [{ name: 'zscaler.com', url: 'https://zscaler.com/', web: true, cloudpath: true, frequency: 300, protocol: 'ADAPTIVE' }]
+  },
   BLANK: {
     id: 'BLANK', name: 'Start empty', icon: '📄',
     description: 'No apps selected. Pick predefined apps and add your own custom apps (for example an internal EHR or PACS URL) in the next steps.',

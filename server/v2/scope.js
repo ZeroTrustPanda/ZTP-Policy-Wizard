@@ -36,53 +36,31 @@ function normalizeScope(scope = {}) {
   return out;
 }
 
-/**
- * SKU ids from GET /zia/api/v1/subscriptions that unlock each scope item.
- * certain: absence of every SKU means "not licensed" (greyed out). Otherwise absence only gives a warning.
- */
-const LICENCE_MAP = {
-  dlpMonitor: { skus: ['ZDLP_WEB'], certain: true },
-  dlpBlock: { skus: ['ZDLP_WEB'], certain: true },
-  sandboxStandard: { skus: ['ZSEC_WEB_ABA', 'ZIA_SANDBOX', 'ZIA_ADV_SANDBOX'], certain: false },
-  sandboxAdvanced: { skus: ['ZSEC_WEB_ABA', 'ZIA_ADV_SANDBOX'], certain: false },
-  aiPromptCapture: { skus: ['ZS_DP_GEN_AI', 'ZS_DP_ISO_SAAS_ADV_PLUS', 'ZIA_GENAI'], certain: false },
-  urlFiltering: { skus: ['URL_FILTER'], certain: false },
-  cloudAppControl: { skus: ['ZMAN_WEB_2_0', 'Z_CASB'], certain: false },
-  advancedThreatProtection: { skus: ['ZIA_ATP'], certain: false },
-  firewallFiltering: { skus: ['Z_FIREWALL_BASIC', 'ZFW_NG_WITH_LOG', 'ZFW_STD_LOG'], certain: false },
-  dnsSecurity: { skus: ['Z_DNS_ESS', 'Z_DNS_ADVANCED', 'Z_FIREWALL_BASIC', 'ZFW_NG_WITH_LOG'], certain: false },
-  sslInspection: { skus: ['ZIA_SSL', 'ZSSL_PVT_CERT'], certain: false }
-};
+const ENT = require('./entitlements');
+// Kept for callers that list the unlocking subscriptions per scope item.
+const LICENCE_MAP = Object.fromEntries(Object.entries(ENT.SCOPE_SKUS).map(([k, skus]) => [k, { skus, certain: true }]));
 
 /**
- * Returns { items: { key: { licensed: true|false|null, reason } }, endpointDlpEnabledInZcc: true|false|null, subscriptions: [...ids] }.
- * licensed=false → grey out with "Not licensed on this tenant"; null → enabled with a non-blocking warning.
+ * Returns { items: { key: { licensed: true|false|null, hidden?, reason } }, endpointDlpEnabledInZcc, subscriptions, editions, notes }.
+ * licensed=false → greyed out with "Not licensed on this tenant"; null → subscriptions could not be read (enabled, with a warning).
  */
 async function detectLicensing({ client, zccClient }) {
-  const items = {};
   let subs = null;
   try {
     const r = await client.apiCall('GET', '/api/v1/subscriptions');
-    if (Array.isArray(r)) subs = r.filter(s => s && s.subscribed !== false && !/EXPIRED|CANCEL/i.test(String(s.status || ''))).map(s => s.id);
+    if (Array.isArray(r)) subs = r.filter(s => s && s.subscribed !== false && !/EXPIRED|CANCEL/i.test(String(s.status || ''))).map(s => String(s.id));
   } catch (e) { /* unknown */ }
+  const items = ENT.scopeLicensing(subs) || Object.fromEntries(SCOPE_ITEMS.filter(i => ENT.SCOPE_SKUS[i.key]).map(i => [i.key, { licensed: null, reason: COPY.scope.licenceUnknown }]));
 
-  for (const item of SCOPE_ITEMS) {
-    const map = LICENCE_MAP[item.key];
-    if (!map) continue;
-    if (!subs) { items[item.key] = { licensed: null, reason: COPY.scope.licenceUnknown }; continue; }
-    const hit = map.skus.find(s => subs.includes(s));
-    if (hit) items[item.key] = { licensed: true, reason: `Subscription ${hit}` };
-    else items[item.key] = map.certain ? { licensed: false, reason: COPY.scope.notLicensed } : { licensed: null, reason: COPY.scope.licenceUnknown };
-  }
-
-  // Endpoint DLP: the endpoint resource API answers 403 NOT_SUBSCRIBED when the SKU is missing (seen live)
-  try {
-    await client.apiCall('GET', '/api/v1/dlpEndpointResource/REMOVABLE_DRIVE_TRANSFER');
-    items.endpointDlp = { licensed: true, reason: 'Endpoint DLP API available' };
-  } catch (e) {
-    items.endpointDlp = /NOT_SUBSCRIBED|subscription/i.test(String(e.message))
-      ? { licensed: false, reason: COPY.scope.notLicensed }
-      : { licensed: null, reason: COPY.scope.licenceUnknown };
+  // Endpoint DLP: the subscription, or the endpoint resource API (403 NOT_SUBSCRIBED when the SKU is missing, seen live)
+  if (!(items.endpointDlp && items.endpointDlp.licensed)) {
+    try {
+      await client.apiCall('GET', '/api/v1/dlpEndpointResource/REMOVABLE_DRIVE_TRANSFER');
+      items.endpointDlp = { licensed: true, reason: 'Endpoint DLP API available' };
+    } catch (e) {
+      items.endpointDlp = /NOT_SUBSCRIBED|subscription/i.test(String(e.message)) ? { licensed: false, reason: COPY.scope.notLicensed }
+        : subs ? items.endpointDlp || { licensed: false, reason: COPY.scope.notLicensed } : { licensed: null, reason: COPY.scope.licenceUnknown };
+    }
   }
 
   // SCP-32: Endpoint DLP must be enabled in Mobile Admin first
@@ -93,12 +71,10 @@ async function detectLicensing({ client, zccClient }) {
       if (info && info.dlpEnabled !== undefined) endpointDlpEnabledInZcc = String(info.dlpEnabled) === '1' || info.dlpEnabled === true;
     } catch (e) { /* unknown */ }
   }
-  // v2.6: standard vs advanced editions. With the advanced edition licensed, the standard choice is hidden (and the reverse is shown as is).
-  const editions = subs ? require('./licences').editions(subs.map(String)) : {};
+  // Editions: with Sandbox Advanced licensed, the standard choice is hidden.
+  const editions = subs ? ENT.editions(subs) : {};
   if (editions.sandbox === 'advanced') items.sandboxStandard = { licensed: true, hidden: true, reason: 'Sandbox Advanced is licensed, so Advanced is used.' };
-  if (editions.sandbox === 'advanced') items.sandboxAdvanced = { licensed: true, reason: 'Sandbox Advanced is licensed.' };
-  if (editions.sandbox === 'standard') items.sandboxAdvanced = { licensed: false, reason: 'Only Sandbox Standard is licensed on this tenant.' };
-  return { items, endpointDlpEnabledInZcc, subscriptions: subs, editions };
+  return { items, endpointDlpEnabledInZcc, subscriptions: subs, editions, notes: subs ? ENT.editionNotes(editions) : {} };
 }
 
 /** Warnings shown on the dry run and in the report (VAL-03). */

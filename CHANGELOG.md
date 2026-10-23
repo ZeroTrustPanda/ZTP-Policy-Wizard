@@ -1,8 +1,17 @@
 # Changelog
 
-## v2.0.0 → v2.6.0 — 2026-10-19 to 2026-10-23
+## v2.0.0 → v2.6.1 — 2026-10-19 to 2026-10-23
 
-Release notes for the whole 2.x line: [docs/release-notes/v2.6.0.md](docs/release-notes/v2.6.0.md).
+Release notes for the whole 2.x line: [docs/release-notes/v2.6.1.md](docs/release-notes/v2.6.1.md).
+
+### 2.6.1
+- **Licence model** (`server/v2/entitlements.js`): subscriptions → scope licensed / not licensed, editions (firewall, DNS tunnels, sandbox, DLP, isolation, ZDX) and edition notes. Decisions only; no quantities.
+- **Readiness:** the core ZIA features (on by default in the scope) are prerequisites and fail when not licensed; edition lines for Cloud Firewall, DNS tunnel detection, Data Protection, Cloud Browser Isolation and the ZDX tier.
+- **Scope:** every item is Not licensed when its subscription is missing; Sandbox Advanced needs ZSEC_WEB_ABA_ADV (Sandbox Standard comes with ATP) and hides Standard when present; edition notes under the items.
+- **Cloud Firewall Standard** (`fitToEditions` in `frameworks.js`): geo-block and QUIC rebuilt on network services (prefixed RDP service created), application-based rules left out and listed (`licenceSkipped`); the engine resolves network service names and clears network applications on these rules.
+- **DNS:** tunnel rules need Advanced Cloud Firewall.
+- **ZDX:** tier choice (from a subscription when listed, else picked), ZDX Standard POV template, call-quality apps need Advanced, M365 Microsoft-only, Lite no probes; enforced in the dry run too.
+- **SKU printout:** labels for every known SKU.
 
 ### 2.6.0
 - **API keys per POV (memory only):** "Add key and switch" on each POV page, automatic tenant switch when a POV is opened, key count in the header, **Forget key**. Sessions expire after 12 hours idle instead of 1 hour after sign-in. Nothing is written to disk.

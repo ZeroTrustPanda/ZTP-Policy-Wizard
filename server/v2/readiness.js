@@ -52,8 +52,22 @@ async function readiness({ client, zccClient, zdxClient, zpa, licensing, wants }
     let raw = null, zpaCustomer = null;
     try { raw = await client.apiCall('GET', '/api/v1/subscriptions'); } catch (e) { raw = null; }
     if (zpa) { try { zpaCustomer = await zpa.apiCall('GET', await zpa.base()); } catch (e) { zpaCustomer = null; } }
+    const ENT = require('./entitlements');
+    const active = Array.isArray(raw) ? raw.filter(x => x && x.subscribed !== false && !/EXPIRED|CANCEL/i.test(String(x.status || ''))).map(x => String(x.id)) : null;
+    // v2.6.1: the core ZIA features (on by default in the scope) are prerequisites
+    if (active && (!wants || wants.zia !== false)) checks.push(...ENT.prereqChecks(active).checks);
     const lic = licenceChecks(raw, { zpaCustomer });
     checks.push(...lic.checks);
+    if (active) {
+      const ed = ENT.editions(active);
+      const labels = { firewallFiltering: 'Cloud Firewall edition', dnsSecurity: 'DNS tunnel detection', sandboxAdvanced: 'Sandbox edition', dlpMonitor: 'Data Protection edition', urlFiltering: 'Cloud Browser Isolation' };
+      for (const [k, n] of Object.entries(ENT.editionNotes(ed))) if (labels[k]) checks.push({ area: 'Licensing', name: labels[k], status: n.status, detail: n.text });
+      if (!wants || wants.zdx !== false) {
+        const t = ed.zdx && ENT.ZDX_TIERS[ed.zdx];
+        checks.push(t ? { area: 'Licensing', name: 'ZDX tier', status: t.configurable ? 'pass' : 'warn', detail: `ZDX ${t.label}${t.configurable ? '' : ': no configurable probes, so the ZDX step cannot add probes'}.` }
+          : { area: 'Licensing', name: 'ZDX tier', status: 'info', detail: 'The ZDX tier is not listed with the tenant subscriptions. Pick it in the ZDX step so the probe templates fit it.' });
+      }
+    }
     licenceSummary = lic.summary;
     skus = skuTable(raw, { products: perms ? perms.products : [] });
   }
