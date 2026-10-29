@@ -10,6 +10,7 @@ const intake = require('./intake');
 const tests = require('./pov-tests');
 const prove = require('./prove');
 const kit = require('./test-kit');
+const pack = require('./compliance-pack');
 const povs = require('./povs');
 const snapshots = require('./snapshots');
 const install = require('../zcc-install');
@@ -112,11 +113,52 @@ function register(app, requireAuth, { v2, rememberPlan, checkPlan, zpaOf, countA
   };
   const softAuth = (req, res, next) => { if (!req.headers['x-session-id']) return next(); const soft = { status: () => ({ json: () => next() }) }; return requireAuth(req, soft, next); };
   app.get('/api/v2/test-kit', softAuth, async (req, res) => {
-    try { res.json(kit.catalog(await kitInputs(req))); } catch (e) { res.status(500).json({ error: e.message }); }
+    try {
+      const inp = await kitInputs(req);
+      const out = kit.catalog(inp);
+      // v2.7: test files for the POV's compliance profile (one per DLP rule of the profile)
+      const pi = packInput(req);
+      if (pi && out.sections.some(x => x.id === 'dlp')) {
+        try { const l = pack.list(pi); out.profile = l.profile; out.sections.unshift({ id: 'profile', title: `${l.profile.name} test files`, how: 'One file per DLP rule of the compliance profile. Upload each to https://dlptest.com/http-post/ through ZIA: Block mode blocks it and the incident names the rule.', files: l.testFiles.map(f => ({ ...f, primary: true })) }); } catch (e) { /* unknown profile */ }
+      }
+      res.json(out);
+    } catch (e) { res.status(500).json({ error: e.message }); }
+  });
+
+  // ---------- v2.7 compliance pack: mapping report, policy export, test plan by control ----------
+  // Built from the POV's own choices (its guide) or, on the rules page before a POV is saved, from the posted choices.
+  function packInput(req) {
+    const st = req.session && req.session.v2;
+    const id = String(req.query.povId || (st && st.povId) || '');
+    let p = null;
+    if (id) { try { p = povs.load(id); } catch (e) { p = null; } }
+    const gd = (p && p.guide) || {};
+    const baseline = (gd.pov && gd.pov.baseline) || (gd.g && gd.g.baseline) || null;
+    if (!baseline) return null;
+    return { baseline, scope: (gd.pov && gd.pov.scope) || {}, prefix: (p && p.prefix) || (gd.g && gd.g.prefix) || 'POV', customerName: (p && p.customerName) || (gd.g && gd.g.customerName) || '',
+      disabledRules: (gd.pov && gd.pov.disabledRules) || {}, actionSettings: (gd.pov && gd.pov.actionSettings) || null, settingOverrides: (gd.pov && gd.pov.settingOverrides) || {},
+      products: (gd.g && gd.g.scope) || null, editions: (st && st.licensing && st.licensing.editions) || null };
+  }
+  const sendFile = (res, f) => { res.setHeader('Content-Type', f.type + (/^text|json/.test(f.type) ? '; charset=utf-8' : '')); res.setHeader('Content-Disposition', `attachment; filename="${f.name}"`); res.setHeader('Cache-Control', 'no-store'); res.send(f.content); };
+  app.get('/api/v2/compliance-pack', softAuth, (req, res) => {
+    try { const i = packInput(req); if (!i) return res.status(404).json({ error: 'This POV has no compliance profile yet (choose it on Customer intake).' }); res.json(pack.list(i)); }
+    catch (e) { res.status(e.status || 500).json({ error: e.message }); }
+  });
+  app.get('/api/v2/compliance-pack/file/:id', softAuth, (req, res) => {
+    try { const i = packInput(req); if (!i) return res.status(404).json({ error: 'This POV has no compliance profile yet.' }); sendFile(res, pack.build(req.params.id, i)); }
+    catch (e) { res.status(e.status || 500).json({ error: e.message }); }
+  });
+  app.post('/api/v2/compliance-pack/file/:id', requireAuth, (req, res) => {
+    try {
+      const b = req.body || {};
+      if (!b.baseline) return res.status(400).json({ error: 'baseline is required.' });
+      const st = req.session && req.session.v2;
+      sendFile(res, pack.build(req.params.id, { ...b, editions: (st && st.licensing && st.licensing.editions) || null }));
+    } catch (e) { res.status(e.status || 500).json({ error: e.message }); }
   });
   app.get('/api/v2/test-kit/file/:id', (req, res) => {
     try {
-      const f = kit.file(req.params.id);
+      const f = /^cp-/.test(req.params.id) ? pack.profileFile(req.params.id) : kit.file(req.params.id);
       res.setHeader('Content-Type', f.type);
       res.setHeader('Content-Disposition', `attachment; filename="${f.name}"`);
       res.setHeader('Cache-Control', 'no-store');

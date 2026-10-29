@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ZeroTrustPanda ZS Policy Wizard v2.6.1 - Zscaler Template Policy Configuration</title>
+  <title>ZeroTrustPanda ZS Policy Wizard v2.7.0 - Zscaler Template Policy Configuration</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
   <style>
@@ -643,7 +643,7 @@
     // ========================
     // App Version
     // ========================
-    const APP_VERSION = '2.6.1';
+    const APP_VERSION = '2.7.0';
     const BUILD_DATE = '2026-03-30';
 
     // ========================
@@ -1172,6 +1172,7 @@
                     <summary style={{cursor:'pointer', fontWeight:600, fontSize:'14px'}}>Version history</summary>
                     <div style={{marginTop:'0.75rem', lineHeight:1.7}}>
                     <div style={{paddingLeft:'1rem', fontSize:'12px'}}>
+                      <div><strong>v2.7.0</strong> — One compliance pane on Customer intake (Internet Access no longer asks again; AI Guard follows it). Federal vertical with FedRAMP Moderate and High, CMMC 2.0 Level 2, Federal Zero Trust (M-22-09, CISA ZTMM, TIC 3.0), IRS Pub 1075 and GovRAMP. Every rule and setting maps to the profile's controls or says why not (best practice, differentiating use case, operational, privacy). Compliance pack per POV: profile DLP test files, control mapping report, policy export and test plan by control.</div>
                       <div><strong>v2.6.1</strong> — Licence-aware POVs: the core ZIA features are readiness prerequisites; the scope screen marks what the tenant is not licensed for (Sandbox Advanced, AI prompt capture, Advanced Cloud Firewall, DNS tunnel detection); with Cloud Firewall Standard the wizard builds only standard rules (geo-blocking and QUIC by port); ZDX has a tier choice that holds back templates and call-quality apps the tier does not include.</div>
                       <div><strong>v2.6.0</strong> — Several POVs at once: each POV page takes its tenant's API key (kept in memory only) and opening a POV switches tenant. Prove it for every kind of web test (URL filtering, threat, cloud apps, firewall, DNS) with built-in test destinations or your own, on every runbook test and on each POV page. Test kit that follows the POV: DLP CSVs only when DLP is in scope, for its vertical (Healthcare, Finance, Education, Public sector) plus generic PII; EICAR and AMTSO threat tests; a unique sandbox file. ZPA bulk delete in the order ZPA requires, with unselected dependencies flagged. Readiness: API permissions per product (what is missing and where to fix it) and a printout of every tenant SKU.</div>
                       <div><strong>v2.5.2</strong> — Allow in ZIA now includes Claude, Anthropic, OpenAI, Grok and Glean: ZIA's action lookup lists nothing for them, but it accepts them in an Allow rule.</div>
@@ -1268,7 +1269,7 @@
     }
 
     // ---------- §1 Scope ----------
-    function ScopeStep({ meta, pov, setPov, licensing, onNext, onBack }) {
+    function ScopeStep({ meta, pov, setPov, licensing, onNext, onBack, nextLabel }) {
       const scope = pov.scope || Object.fromEntries(meta.scopeItems.map(i => [i.key, i.default]));
       const groupOf = (key) => Object.entries(meta.exclusiveGroups).find(([, keys]) => keys.includes(key));
       const lic = (key) => (licensing && licensing.items && licensing.items[key]) || null;
@@ -1331,7 +1332,7 @@
           {rows(['urlFiltering', 'cloudAppControl', 'fileTypeControl', 'advancedThreatProtection', 'firewallFiltering', 'dnsSecurity', 'sslInspection'])}
           <div className="btn-group">
             {onBack && <button className="btn btn-ghost" onClick={onBack}>← Back</button>}
-            <button className="btn btn-primary" onClick={onNext} disabled={!Object.values(scope).some(Boolean)} data-next>Next: Baseline Framework →</button>
+            <button className="btn btn-primary" onClick={onNext} disabled={!Object.values(scope).some(Boolean)} data-next>{nextLabel || 'Next: Baseline Framework →'}</button>
           </div>
         </div>
       );
@@ -1395,7 +1396,7 @@
     // ---------- §2.1 Rule review ----------
     // v2.4: switching POVs can briefly render the rules step with a reset (scope-less) selection; show nothing until it has one
     function PovRulesStep(props) { return props.pov && props.pov.scope ? <PovRulesStepInner {...props} /> : null; }
-    function PovRulesStepInner({ meta, pov, setPov, prefix, auth, setError, onNext, onBack, nextLabel }) {
+    function PovRulesStepInner({ meta, pov, setPov, prefix, auth, setError, onNext, onBack, nextLabel, backLabel }) {
       const [tpl, setTpl] = useState(null);
       const [open, setOpen] = useState({});
       const [q, setQ] = useState('');
@@ -1452,6 +1453,12 @@
           <div className="card-header"><h2>Rules — {tpl.metadata.baseline.name}</h2>
             <p>Every rule the baseline creates for the features in scope, grouped by category. Switch rules on or off, and choose Allow or Block per category or per rule. A rule you change after using the category control keeps your choice until you use the category control again.</p></div>
           <div className="alert alert-info"><span>{total - off} of {total} rules and settings on · names start with <code>{prefix}-</code></span></div>
+          {(() => { const items = tpl.catalog.flatMap(g => g.rules || g.settings); const mapped = items.filter(r => r.compliance && r.compliance.controls.length).length;
+            return <div className="form-hint" style={{marginTop:'-0.25rem', marginBottom:'0.75rem'}} data-compliancesummary>Compliance profile <strong>{tpl.metadata.baseline.name}</strong>{pov.fromIntake ? ' (chosen on Customer intake)' : ''}: {mapped} of {items.length} map to its controls; the rest show why (best practice, differentiating use case, operational, privacy). </div>; })()}
+          <div style={{display:'flex', gap:'6px', flexWrap:'wrap', marginBottom:'0.75rem'}} data-rulespack>
+            {[['mapping-html', '⬇ Control mapping report'], ['mapping-csv', 'CSV'], ['policy-json', '⬇ Policy export (JSON)'], ['policy-csv', 'CSV'], ['testplan-html', '⬇ Test plan by control'], ['testplan-csv', 'CSV']].map(([id, l]) =>
+              <button key={id} className="btn btn-ghost btn-sm" data-rulespackfile={id} onClick={() => downloadPack(id, { baseline: pov.baseline, scope: pov.scope, prefix, disabledRules: pov.disabledRules, actionSettings: pov.actionSettings, settingOverrides: pov.settingOverrides }).catch(e => setError(e.message))}>{l}</button>)}
+          </div>
           {(tpl.generationNotes || []).length > 0 && <div className="alert alert-warning" style={{display:'block'}}>{tpl.generationNotes.map((n, i) => <div key={i}>⚠ {n}</div>)}</div>}
           {(tpl.licenceSkipped || []).length > 0 && (
             <details style={{margin:'0 0 0.75rem'}} data-licenceskipped>
@@ -1486,7 +1493,7 @@
             return (
               <div className="ab-group" key={g.type} data-rulegroup={g.type}>
                 <div className="ab-group-header" onClick={() => setOpen({ ...open, [g.type]: !open[g.type] })}>
-                  <div><div className="ab-group-title">{isOpen ? '▾' : '▸'} {g.label}</div><div className="ab-group-sub">{onCount} of {all.length} on{(q || changedOnly) ? ` · ${items.length} shown` : ''}</div></div>
+                  <div><div className="ab-group-title">{isOpen ? '▾' : '▸'} {g.label}</div><div className="ab-group-sub">{onCount} of {all.length} on · {all.filter(r => r.compliance && r.compliance.controls.length).length} mapped to {tpl.metadata.baseline.name}{(q || changedOnly) ? ` · ${items.length} shown` : ''}</div></div>
                   <div style={{display:'flex', gap:'8px'}} onClick={e => e.stopPropagation()}>
                     <div className="ab-seg">
                       <button className={onCount === all.length ? 'on-default' : ''} onClick={() => setGroupOn(g, true)} data-allon>Select all</button>
@@ -1518,6 +1525,9 @@
                               {g.rules && <div className="ab-row-desc">Default: <strong>{r.defaultAction}</strong>{r.categoryCount !== undefined && <> · {r.categoryCount} categories</>}{r.allowOnly && ' · Allow only (monitor)'}</div>}
                               {g.settings && <div className="ab-row-desc">{g.type === 'aiPromptCapture' ? (isOff ? 'Capture off' : 'Capture on') : g.type === 'ucaas' ? (isOff ? 'Off' : 'Enabled') : isOff ? 'Left as the tenant has it' : `Set to ${settingValue(r) ? 'Block' : 'Allow'}`}</div>}
                               {r.locked && <div className="ab-row-desc">🔒 Required for baseline internet access</div>}
+                              {r.compliance && <div className="ab-row-desc" data-rulecompliance={r.key}>{r.compliance.controls.length
+                                ? <>Maps to {r.compliance.controls.map(c => <span key={c.id} className="badge badge-category" style={{marginRight:'4px'}} title={c.name} data-control={c.id}>{c.id}</span>)}</>
+                                : <><span className="badge badge-risk" style={{marginRight:'6px'}} data-reason={r.compliance.reason.code}>{r.compliance.reason.label}</span>{r.compliance.reason.text}</>}</div>}
                             </div>
                           </div>
                           {g.rules && r.canOverride && !r.locked && (
@@ -1542,7 +1552,7 @@
             );
           })}
           <div className="btn-group">
-            <button className="btn btn-ghost" onClick={onBack}>← Baseline</button>
+            <button className="btn btn-ghost" onClick={onBack}>{backLabel || '← Baseline'}</button>
             <button className="btn btn-primary" onClick={onNext} data-next>{nextLabel || 'Run Dry Run →'}</button>
           </div>
         </div>
@@ -2188,11 +2198,19 @@
               </div>
             ))}
           </div>
-          {g.scope.zia && (
-            <div className="form-group" style={{maxWidth:'420px'}}><label className="form-label">Baseline policies (Internet Access)</label>
-              <select value={g.baseline} onChange={e => set({ baseline: e.target.value })} data-intakebaseline>{baselines.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}</select>
-              <div className="form-hint">{preset ? `The ${preset.name} preset suggests ${preset.baseline}.` : ''} You can still change it on the Internet Access step.</div></div>
-          )}
+          {(g.scope.zia || g.scope.aiguard) && (() => {
+            // v2.7: the one place the POV's compliance profile is chosen; Internet Access, AI Guard, the test kit and the reports all use it
+            const GROUPS = [['HEALTHCARE', 'Healthcare'], ['FINANCE', 'Financial services'], ['EDUCATION', 'Education'], ['FEDERAL', 'Federal and public sector'], ['GENERAL', 'Any industry']];
+            const sel = baselines.find(b => b.id === g.baseline);
+            return (
+              <div className="form-group" style={{maxWidth:'640px'}} data-intakecompliance><label className="form-label">Compliance profile</label>
+                <select value={g.baseline} onChange={e => set({ baseline: e.target.value })} data-intakebaseline>
+                  {GROUPS.map(([v, l]) => { const items = meta.baselines.compliance.filter(b => b.vertical === v); return items.length ? <optgroup key={v} label={l}>{items.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}</optgroup> : null; })}
+                  <optgroup label="Best-practice baselines (CIS Controls, NIST CSF)">{meta.baselines.nonMapped.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}</optgroup>
+                </select>
+                <div className="form-hint">{sel ? <><strong>{sel.fullName || sel.name}.</strong> {sel.description} </> : ''}{preset && preset.baseline !== g.baseline ? `The ${preset.name} preset suggests ${preset.baseline}. ` : ''}Every rule the wizard creates is mapped to this profile's controls; the test kit and reports follow it.</div></div>
+            );
+          })()}
           <div className="btn-group">
             <button className="btn btn-ghost" onClick={onBack}>← Back</button>
             <button className="btn btn-primary" onClick={onNext} disabled={!ok || busy} data-next>{busy ? <><span className="spinner"></span> Preparing…</> : 'Next →'}</button>
@@ -2226,7 +2244,8 @@
         const zcc = Object.fromEntries(Object.entries(p.zcc || {}).map(([k, v]) => [k, v && !v.tamperPassword && wantsTamper(v) ? { ...v, tamperPassword: genPassword() } : v]));
         return { zcc: {}, ziaReady: false, zpa: null, zdx: null, ...p, zcc };
       });
-      const [ziaSub, setZiaSub] = useState((R && R.ziaSub) || 'scope');
+      // v2.7: the compliance profile is chosen once, on Customer intake; a POV saved on the old baseline step resumes on Rules
+      const [ziaSub, setZiaSub] = useState(((R && R.ziaSub) === 'baseline' ? 'rules' : (R && R.ziaSub)) || 'scope');
       const [fwdProfiles, setFwdProfiles] = useState(null);
       const [busy, setBusy] = useState(false);
       useEffect(() => { api.call('GET', '/v2/intake/presets').then(setPresets).catch(() => {}); }, []);
@@ -2286,7 +2305,7 @@
             setZiaSub('scope');
           }
           if (g.scope.zia && pov.baseline !== g.baseline) {
-            setPov(prev => ({ ...prev, baseline: g.baseline, disabledRules: { 'firewallFiltering:Default-Block-All': true }, actionSettings: { policy: {}, rules: {} }, settingOverrides: {} }));
+            setPov(prev => ({ ...prev, baseline: g.baseline, fromIntake: true, disabledRules: { 'firewallFiltering:Default-Block-All': true }, actionSettings: { policy: {}, rules: {} }, settingOverrides: {} }));
           }
           next();
         } catch (e) { setError(e.message); }
@@ -2326,9 +2345,8 @@
           )}
           {wizardKey && g.scope.zia && visited.has('zia') && meta && (
             <div style={show('zia')} data-guide="zia">
-              {ziaSub === 'scope' && <ScopeStep meta={meta} pov={pov} setPov={setPov} licensing={licensing} onBack={back} onNext={() => setZiaSub('baseline')} />}
-              {ziaSub === 'baseline' && <BaselineStep meta={meta} pov={pov} setPov={setPov} setError={setError} onBack={() => setZiaSub('scope')} onNext={() => setZiaSub('rules')} />}
-              {ziaSub === 'rules' && <PovRulesStep meta={meta} pov={pov} setPov={setPov} prefix={prefix} auth={auth} setError={setError} onBack={() => setZiaSub('baseline')}
+              {ziaSub === 'scope' && <ScopeStep meta={meta} pov={pov} setPov={setPov} licensing={licensing} onBack={back} onNext={() => setZiaSub('rules')} nextLabel="Next: Rules →" />}
+              {ziaSub === 'rules' && <PovRulesStep meta={meta} pov={pov} setPov={setPov} prefix={prefix} auth={auth} setError={setError} onBack={() => setZiaSub('scope')} backLabel="← Scope"
                 nextLabel={nextLabel} onNext={() => { setPayloads(p => ({ ...p, ziaReady: true })); next(); }} />}
             </div>
           )}
@@ -2628,8 +2646,12 @@
                 </>}
               </div>
               <div className="card">
-                <div className="card-header"><h2>Test kit</h2><p>Only what this POV covers: DLP files for its vertical plus generic PII, EICAR and AMTSO threat tests, and a unique sandbox file.</p></div>
+                <div className="card-header"><h2>Test kit</h2><p>Only what this POV covers: DLP files for its compliance profile and vertical plus generic PII, EICAR and AMTSO threat tests, and a unique sandbox file.</p></div>
                 <TestKit povId={p.id} setError={setError} />
+              </div>
+              <div className="card">
+                <div className="card-header"><h2>Compliance pack</h2><p>Control mapping report, policy export and test plan by control for this POV's compliance profile.</p></div>
+                <CompliancePack povId={p.id} setError={setError} />
               </div>
             </div>
           )}
@@ -2803,7 +2825,8 @@
     // v2.5 — AI Guard: ZIA inspects AI apps and proxy-chains them to AI Guard
     // ========================
     // compliance baseline (intake) → AI Guard profile; tiers and the ZTH baseline use the general profile
-    const AIG_PROFILE_FOR = (b) => ['HIPAA', 'HITRUST', 'PCI', 'GDPR', 'CJIS', 'FERPA', 'SOX', 'NIST_800_171', 'NIST_800_53'].includes(b) ? b : 'GENERAL';
+    const AIG_PROFILE_FOR = (b) => ['HIPAA', 'HITRUST', 'PCI', 'GDPR', 'CJIS', 'FERPA', 'SOX', 'NIST_800_171', 'NIST_800_53', 'IRS_1075'].includes(b) ? b
+      : ({ FEDRAMP_MOD: 'NIST_800_53', FEDRAMP_HIGH: 'NIST_800_53', GOVRAMP: 'NIST_800_53', FED_ZT: 'NIST_800_53', CMMC_L2: 'NIST_800_171' })[b] || 'GENERAL';
     function AiGuardStep({ prefix, setError, guided, onReport, baseline }) {
       const saved = (guided && guided.saved) || null;
       const [ctx, setCtx] = useState(null);
@@ -2815,6 +2838,8 @@
       const [host, setHost] = useState(() => (saved && saved.proxyHost) || '');
       const [ziaAllow, setZiaAllow] = useState(() => saved && saved.ziaAllow ? new Set(saved.ziaAllow) : null);   // null = follow the AI Guard apps
       const [compliance, setCompliance] = useState(() => (saved && saved.compliance) || { profile: AIG_PROFILE_FOR(baseline), mode: 'monitor' });
+      // v2.7: in a POV the profile always follows the compliance profile chosen on Customer intake (only Monitor / Block is chosen here)
+      useEffect(() => { if (baseline && compliance.profile !== AIG_PROFILE_FOR(baseline)) setCompliance(c => ({ ...c, profile: AIG_PROFILE_FOR(baseline) })); }, [baseline]);
       const [opts, setOpts] = useState(() => ({ blockQuic: saved ? saved.blockQuic !== false : true, sslInspect: saved ? saved.sslInspect !== false : true, promptCapture: saved ? saved.promptCapture !== false : true }));
       const [plan, setPlan] = useState(null);
       const [result, setResult] = useState(null);
@@ -2916,14 +2941,14 @@
             const label = (t) => NAMES[t] || t;
             return <div className="card" style={{padding:'0.9rem', marginTop:'6px'}} data-agcompliance>
               <div style={{display:'flex', gap:'10px', flexWrap:'wrap', alignItems:'center'}}>
-                <select value={compliance.profile} onChange={e => setCompliance({ ...compliance, profile: e.target.value })} style={{maxWidth:'320px'}} data-agprofile>
+                {baseline ? <span style={{fontSize:'13px'}} data-agprofilefixed><strong>{(P && P.name) || compliance.profile}</strong> <span className="form-hint" style={{margin:0}}>from the compliance profile on Customer intake ({baseline})</span></span>
+                : <select value={compliance.profile} onChange={e => setCompliance({ ...compliance, profile: e.target.value })} style={{maxWidth:'320px'}} data-agprofile>
                   {profs.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                   <option value="NONE">None (set up policies in the AI Guard portal)</option>
-                </select>
+                </select>}
                 {compliance.profile !== 'NONE' && <div className="seg" role="group" style={{display:'inline-flex', border:'1px solid var(--border)', borderRadius:'8px', overflow:'hidden'}} data-agmode>
                   {[['monitor', 'Monitor'], ['block', 'Block']].map(([k, l]) => <button key={k} type="button" className={`btn btn-sm ${compliance.mode === k ? 'btn-primary' : 'btn-ghost'}`} style={{borderRadius:0}} onClick={() => setCompliance({ ...compliance, mode: k })} data-agmodebtn={k}>{l}</button>)}
                 </div>}
-                {baseline && AIG_PROFILE_FOR(baseline) === compliance.profile && <span className="form-hint" style={{margin:0}}>From the POV baseline ({baseline}).</span>}
               </div>
               {P && compliance.profile !== 'NONE' && <div style={{marginTop:'0.6rem', fontSize:'12.5px', lineHeight:1.6}}>
                 <div style={{color:'var(--text-secondary)'}}>{P.why}</div>
@@ -3037,7 +3062,8 @@
       const [kit, setKit] = useState(null);
       useEffect(() => { setKit(null); api.call('GET', `/v2/test-kit${povId ? `?povId=${encodeURIComponent(povId)}` : ''}`).then(setKit).catch(e => setError && setError(e.message)); }, [povId]);
       if (!kit) return <div className="form-hint"><span className="spinner"></span> Loading the test kit…</div>;
-      const fileLink = (f) => <a className="btn btn-ghost btn-sm" href={`/api/v2/test-kit/file/${f.id}`} download={f.name} data-kitfile={f.id}>⬇ Download</a>;
+      const fileLink = (f) => f.available === false ? <span className="form-hint" style={{maxWidth:'280px'}} data-kitnote={f.id}>{f.note}</span>
+        : <a className="btn btn-ghost btn-sm" href={`/api/v2/test-kit/file/${f.id}`} download={f.name} data-kitfile={f.id}>⬇ Download</a>;
       return (
         <div data-testkit>
           {!kit.sections.length && <div className="alert alert-info"><span>This POV has no DLP, malware or sandbox tests in scope, so there is nothing to download.</span></div>}
@@ -3056,6 +3082,30 @@
           {kit.hidden.length > 0 && <div className="form-hint" data-kithidden>Not shown: {kit.hidden.join(', ')}.{kit.basis === 'licences' ? ' (No POV scope yet, so this follows the tenant licences.)' : ''}</div>}
         </div>
       );
+    }
+
+    // v2.7: the compliance pack for a saved POV (mapping report, policy export, test plan by control)
+    function CompliancePack({ povId, setError }) {
+      const [pack, setPack] = useState(null);
+      const [err, setErr] = useState(null);
+      useEffect(() => { setPack(null); setErr(null); if (!povId) return; api.call('GET', `/v2/compliance-pack?povId=${encodeURIComponent(povId)}`).then(setPack).catch(e => setErr(e.message)); }, [povId]);
+      if (!povId) return null;
+      if (err) return <div className="form-hint" data-compliancepack="none">{err}</div>;
+      if (!pack) return <div className="form-hint"><span className="spinner"></span> Loading the compliance pack…</div>;
+      return (
+        <div data-compliancepack={pack.profile.id}>
+          <div className="form-hint" style={{marginTop:0}}>For <strong>{pack.profile.fullName || pack.profile.name}</strong>, the profile chosen on Customer intake. Built from this POV's choices; nothing is read from the tenant.</div>
+          {pack.files.map(f => <div key={f.id} className="toggle-item"><div><strong style={{fontSize:'13px'}}>{f.label}</strong><div className="form-hint">{f.why}</div></div>
+            <a className="btn btn-ghost btn-sm" href={`/api/v2/compliance-pack/file/${f.id}?povId=${encodeURIComponent(povId)}`} data-packfile={f.id}>⬇ Download</a></div>)}
+        </div>
+      );
+    }
+    // Rules page (before the POV is saved): the same files from the choices on screen
+    async function downloadPack(id, body) {
+      const r = await fetch(`/api/v2/compliance-pack/file/${id}`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Session-Id': api.sessionId || '' }, body: JSON.stringify(body) });
+      if (!r.ok) { let m = `HTTP ${r.status}`; try { m = (await r.json()).error || m; } catch (e) {} throw new Error(m); }
+      const name = ((r.headers.get('Content-Disposition') || '').match(/filename="([^"]+)"/) || [])[1] || id;
+      const a = document.createElement('a'); a.href = URL.createObjectURL(await r.blob()); a.download = name; a.click();
     }
 
     function PovTests({ setError }) {

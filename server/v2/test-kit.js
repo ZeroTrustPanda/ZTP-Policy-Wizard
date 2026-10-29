@@ -43,7 +43,7 @@ const VERTICALS = {
   PUBLIC: { label: 'Public sector (CJIS / government IDs)', file: 'public-sector-CJIS', why: 'SSN, passport and driver license numbers, case and booking numbers with names and dates of birth (PII, government ID dictionaries).',
     build: () => csv('Subject,Date of birth,SSN,Passport,Driver license (state),Case number,Booking number,Agency', Array.from({ length: 12 }, (_, i) => [name(i), dob(), ssn(), `${pad(1 + rnd(9), 1)}${pad(rnd(1e8), 8)}`, `${pick(['IL', 'ME', 'TX', 'CO'])} ${pick(['D', 'S', 'A'])}${pad(rnd(1e8), 8)}`, `CR-20${pad(20 + rnd(7), 2)}-${pad(rnd(1e6), 6)}`, `BK${pad(rnd(1e7), 7)}`, pick(['County Sheriff (test)', 'City PD (test)', 'State Police (test)'])])) }
 };
-const VERTICAL_FOR_PRESET = { HEALTHCARE: 'HEALTHCARE', FINANCE: 'FINANCE', EDUCATION: 'EDUCATION', PUBLIC: 'PUBLIC', GOVERNMENT: 'PUBLIC', GENERAL: null, BLANK: null };
+const VERTICAL_FOR_PRESET = { HEALTHCARE: 'HEALTHCARE', FINANCE: 'FINANCE', EDUCATION: 'EDUCATION', PUBLIC: 'PUBLIC', GOVERNMENT: 'PUBLIC', FEDERAL: 'PUBLIC', GENERAL: null, BLANK: null };
 
 const EICAR = [
   { label: 'eicar.com', url: 'https://secure.eicar.org/eicar.com' },

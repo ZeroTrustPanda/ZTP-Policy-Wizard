@@ -5,7 +5,7 @@
   "fullName": "Health Information Trust Alliance Common Security Framework v11",
   "description": "Prescriptive, certifiable control framework for healthcare that harmonizes HIPAA, NIST and ISO controls.",
   "version": "2026.10.1",
-  "researchedAt": "2026-10-16",
+  "researchedAt": "2026-10-29",
   "baseTier": "STRICT",
   "complianceKey": "HITRUST",
   "sources": [
@@ -78,7 +78,42 @@
     },
     {
       "id": "10.d",
-      "name": "Message integrity / cryptographic controls",
+      "name": "Message integrity",
+      "source": "hitrust"
+    },
+    {
+      "id": "01.t",
+      "name": "Session time-out",
+      "source": "hitrust"
+    },
+    {
+      "id": "07.c",
+      "name": "Acceptable use of assets",
+      "source": "hitrust"
+    },
+    {
+      "id": "09.k",
+      "name": "Controls against mobile code",
+      "source": "hitrust"
+    },
+    {
+      "id": "09.o",
+      "name": "Management of removable media",
+      "source": "hitrust"
+    },
+    {
+      "id": "09.ab",
+      "name": "Monitoring system use",
+      "source": "hitrust"
+    },
+    {
+      "id": "09.af",
+      "name": "Clock synchronization",
+      "source": "hitrust"
+    },
+    {
+      "id": "01.j",
+      "name": "User authentication for external connections",
       "source": "hitrust"
     }
   ],
@@ -215,6 +250,83 @@
       "REMOVABLE_DRIVE_TRANSFER",
       "PERSONAL_CLOUD_STORAGE",
       "PRINTING"
+    ]
+  },
+  "objectives": {
+    "MALWARE": [
+      "09.j"
+    ],
+    "THREAT_SITES": [
+      "09.j",
+      "01.v"
+    ],
+    "ACCEPTABLE_USE": [
+      "07.c"
+    ],
+    "PRODUCTIVITY": [
+      "07.c"
+    ],
+    "LEAST_FUNCTION": [
+      "09.m",
+      "09.j"
+    ],
+    "BOUNDARY": [
+      "09.m"
+    ],
+    "ALLOW_EXCEPTION": [
+      "09.m"
+    ],
+    "INFO_FLOW": [
+      "09.s"
+    ],
+    "DATA_LOSS": [
+      "09.s"
+    ],
+    "DATA_MONITOR": [
+      "09.aa",
+      "09.ab"
+    ],
+    "MEDIA": [
+      "09.o",
+      "09.s"
+    ],
+    "INSPECT_TLS": [
+      "09.m",
+      "09.ab"
+    ],
+    "PRIVACY_EXEMPT": [],
+    "DNS": [
+      "09.m"
+    ],
+    "DNS_TUNNEL": [
+      "09.m",
+      "09.ab"
+    ],
+    "SANDBOX": [
+      "09.j"
+    ],
+    "ISOLATION": [
+      "09.k"
+    ],
+    "MOBILE_CODE": [
+      "09.k"
+    ],
+    "AI_GOV": [
+      "09.s"
+    ],
+    "TIME_SYNC": [
+      "09.af"
+    ],
+    "REMOTE_ACCESS": [
+      "01.j",
+      "01.v"
+    ],
+    "SESSION": [
+      "01.t"
+    ],
+    "APP_PROTECT": [
+      "09.j",
+      "09.m"
     ]
   }
 }

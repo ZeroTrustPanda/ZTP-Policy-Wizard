@@ -5,13 +5,13 @@
   "fullName": "Sarbanes-Oxley Act",
   "description": "Internal control over financial reporting for public companies, enforced through IT general controls.",
   "version": "2026.10.1",
-  "researchedAt": "2026-10-16",
+  "researchedAt": "2026-10-29",
   "baseTier": "BALANCED",
   "complianceKey": "SOX",
   "sources": [
     {
       "id": "sox",
-      "title": "Sarbanes-Oxley Act of 2002 \u00a7302 / \u00a7404 (SEC)",
+      "title": "Sarbanes-Oxley Act of 2002 §302 / §404 (SEC)",
       "url": "https://www.sec.gov/about/laws/soa2002.pdf"
     },
     {
@@ -42,12 +42,12 @@
   ],
   "controls": [
     {
-      "id": "\u00a7302",
+      "id": "§302",
       "name": "Corporate responsibility for financial reports",
       "source": "sox"
     },
     {
-      "id": "\u00a7404",
+      "id": "§404",
       "name": "Management assessment of internal controls",
       "source": "sox"
     },
@@ -60,84 +60,84 @@
   "areas": {
     "urlFiltering": {
       "controls": [
-        "\u00a7404",
+        "§404",
         "AS2201-ITGC"
       ],
       "rationale": "Protect financial systems from web-borne threats."
     },
     "cloudAppControl": {
       "controls": [
-        "\u00a7404",
+        "§404",
         "AS2201-ITGC"
       ],
       "rationale": "Control financial data in unsanctioned cloud apps."
     },
     "fileTypeControl": {
       "controls": [
-        "\u00a7404",
+        "§404",
         "AS2201-ITGC"
       ],
       "rationale": "Block malware delivery file types."
     },
     "advancedThreatProtection": {
       "controls": [
-        "\u00a7404",
+        "§404",
         "AS2201-ITGC"
       ],
       "rationale": "Protect integrity of financial systems."
     },
     "firewallFiltering": {
       "controls": [
-        "\u00a7404",
+        "§404",
         "AS2201-ITGC"
       ],
       "rationale": "Restrict outbound connectivity."
     },
     "dnsSecurity": {
       "controls": [
-        "\u00a7404",
+        "§404",
         "AS2201-ITGC"
       ],
       "rationale": "DNS-layer protection."
     },
     "sslInspection": {
       "controls": [
-        "\u00a7404",
+        "§404",
         "AS2201-ITGC"
       ],
       "rationale": "Inspect TLS; exempt banking and health sites for privacy."
     },
     "dlpMonitor": {
       "controls": [
-        "\u00a7404",
+        "§404",
         "AS2201-ITGC"
       ],
       "rationale": "Log movement of financial statements and MNPI."
     },
     "dlpBlock": {
       "controls": [
-        "\u00a7404",
+        "§404",
         "AS2201-ITGC"
       ],
       "rationale": "Block MNPI and financial statement leakage before disclosure."
     },
     "endpointDlp": {
       "controls": [
-        "\u00a7404",
+        "§404",
         "AS2201-ITGC"
       ],
       "rationale": "Monitor financial data copied to removable media, cloud sync and print."
     },
     "sandbox": {
       "controls": [
-        "\u00a7404",
+        "§404",
         "AS2201-ITGC"
       ],
       "rationale": "Detonate unknown files."
     },
     "aiPromptCapture": {
       "controls": [
-        "\u00a7404",
+        "§404",
         "AS2201-ITGC"
       ],
       "rationale": "Capture GenAI prompts that may contain unreleased financial data."
@@ -157,7 +157,7 @@
           "custom:MNPI"
         ],
         "controls": [
-          "\u00a7302"
+          "§302"
         ]
       },
       {
@@ -168,7 +168,7 @@
           "predefined:CREDIT_CARD"
         ],
         "controls": [
-          "\u00a7404"
+          "§404"
         ]
       }
     ],
@@ -176,6 +176,91 @@
       "REMOVABLE_DRIVE_TRANSFER",
       "PERSONAL_CLOUD_STORAGE",
       "PRINTING"
+    ]
+  },
+  "objectives": {
+    "MALWARE": [
+      "§404",
+      "AS2201-ITGC"
+    ],
+    "THREAT_SITES": [
+      "§404",
+      "AS2201-ITGC"
+    ],
+    "ACCEPTABLE_USE": [],
+    "PRODUCTIVITY": [],
+    "LEAST_FUNCTION": [
+      "§404",
+      "AS2201-ITGC"
+    ],
+    "BOUNDARY": [
+      "§404",
+      "AS2201-ITGC"
+    ],
+    "ALLOW_EXCEPTION": [
+      "§404",
+      "AS2201-ITGC"
+    ],
+    "INFO_FLOW": [
+      "§404",
+      "AS2201-ITGC"
+    ],
+    "DATA_LOSS": [
+      "§302",
+      "§404",
+      "AS2201-ITGC"
+    ],
+    "DATA_MONITOR": [
+      "§404",
+      "AS2201-ITGC"
+    ],
+    "MEDIA": [
+      "§404",
+      "AS2201-ITGC"
+    ],
+    "INSPECT_TLS": [
+      "§404",
+      "AS2201-ITGC"
+    ],
+    "PRIVACY_EXEMPT": [],
+    "DNS": [
+      "§404",
+      "AS2201-ITGC"
+    ],
+    "DNS_TUNNEL": [
+      "§404",
+      "AS2201-ITGC"
+    ],
+    "SANDBOX": [
+      "§404",
+      "AS2201-ITGC"
+    ],
+    "ISOLATION": [
+      "§404",
+      "AS2201-ITGC"
+    ],
+    "MOBILE_CODE": [
+      "§404",
+      "AS2201-ITGC"
+    ],
+    "AI_GOV": [
+      "§404",
+      "AS2201-ITGC"
+    ],
+    "TIME_SYNC": [
+      "AS2201-ITGC"
+    ],
+    "REMOTE_ACCESS": [
+      "§404",
+      "AS2201-ITGC"
+    ],
+    "SESSION": [
+      "§404",
+      "AS2201-ITGC"
+    ],
+    "APP_PROTECT": [
+      "§404",
+      "AS2201-ITGC"
     ]
   }
 }

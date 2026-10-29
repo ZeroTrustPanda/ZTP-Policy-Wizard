@@ -44,7 +44,7 @@
       ],
       "phrases": [],
       "source": {
-        "title": "45 CFR 164.514(b)(2)(i)(H) \u2014 medical record numbers are a HIPAA identifier",
+        "title": "45 CFR 164.514(b)(2)(i)(H) — medical record numbers are a HIPAA identifier",
         "url": "https://www.ecfr.gov/current/title-45/subtitle-A/subchapter-C/part-164/subpart-E/section-164.514"
       }
     },
@@ -58,7 +58,7 @@
       ],
       "phrases": [],
       "source": {
-        "title": "PCI DSS v4.0.1 Requirement 3.3.1 \u2014 SAD (full track) not retained",
+        "title": "PCI DSS v4.0.1 Requirement 3.3.1 — SAD (full track) not retained",
         "url": "https://opensecurityarchitecture.org/frameworks/pci-dss-v4"
       }
     },
@@ -95,7 +95,7 @@
         "State Identification Number"
       ],
       "source": {
-        "title": "FBI CJIS Security Policy v6.0 \u2014 definition of CJI",
+        "title": "FBI CJIS Security Policy v6.0 — definition of CJI",
         "url": "https://www.fdle.state.fl.us/CJJIS/CJIS_Security_Policy_v6-0_20241227-(2).aspx"
       }
     },
@@ -114,7 +114,7 @@
         "education record"
       ],
       "source": {
-        "title": "34 CFR 99.3 \u2014 education records",
+        "title": "34 CFR 99.3 — education records",
         "url": "https://www.ecfr.gov/current/title-34/subtitle-A/part-99/subpart-A/section-99.3"
       }
     },
@@ -133,8 +133,27 @@
         "insider list"
       ],
       "source": {
-        "title": "Sarbanes-Oxley Act \u00a7302 / SEC Regulation FD",
+        "title": "Sarbanes-Oxley Act §302 / SEC Regulation FD",
         "url": "https://www.sec.gov/about/laws/soa2002.pdf"
+      }
+    },
+    "FTI_MARKINGS": {
+      "name": "FTI-Markings",
+      "description": "Federal Tax Information labels and IRC 6103 references (Pub 1075 requires FTI to be labelled and protected in transit).",
+      "customPhraseMatchType": "MATCH_ANY_CUSTOM_PHRASE_PATTERN_DICTIONARY",
+      "patterns": [
+        "\\b(IRC|26 U\\.?S\\.?C\\.?)\\s*6103\\b"
+      ],
+      "phrases": [
+        "Federal Tax Information",
+        "FTI",
+        "return information",
+        "taxpayer return information",
+        "Contains FTI"
+      ],
+      "source": {
+        "title": "IRS Publication 1075 (Rev. 11-2021)",
+        "url": "https://www.irs.gov/pub/irs-pdf/p1075.pdf"
       }
     }
   }
