@@ -2,10 +2,10 @@
   "id": "HIPAA",
   "type": "compliance",
   "name": "HIPAA",
-  "fullName": "Health Insurance Portability and Accountability Act \u2014 Security Rule",
+  "fullName": "Health Insurance Portability and Accountability Act — Security Rule",
   "description": "Technical and administrative safeguards for electronic protected health information (ePHI).",
   "version": "2026.10.1",
-  "researchedAt": "2026-10-16",
+  "researchedAt": "2026-10-29",
   "baseTier": "BALANCED",
   "complianceKey": "HIPAA",
   "sources": [
@@ -21,7 +21,7 @@
     },
     {
       "id": "hipaa-310",
-      "title": "45 CFR 164.310 Physical safeguards \u2014 device and media controls (eCFR)",
+      "title": "45 CFR 164.310 Physical safeguards — device and media controls (eCFR)",
       "url": "https://www.ecfr.gov/current/title-45/subtitle-A/subchapter-C/part-164/subpart-C/section-164.310"
     },
     {
@@ -89,6 +89,11 @@
     {
       "id": "164.312(e)(1)",
       "name": "Transmission security",
+      "source": "hipaa-312"
+    },
+    {
+      "id": "164.312(a)(2)(iii)",
+      "name": "Automatic logoff",
       "source": "hipaa-312"
     }
   ],
@@ -219,6 +224,78 @@
       "REMOVABLE_DRIVE_TRANSFER",
       "PERSONAL_CLOUD_STORAGE",
       "PRINTING"
+    ]
+  },
+  "objectives": {
+    "MALWARE": [
+      "164.308(a)(5)(ii)(B)"
+    ],
+    "THREAT_SITES": [
+      "164.308(a)(5)(ii)(B)"
+    ],
+    "ACCEPTABLE_USE": [],
+    "PRODUCTIVITY": [],
+    "LEAST_FUNCTION": [
+      "164.308(a)(5)(ii)(B)",
+      "164.312(e)(1)"
+    ],
+    "BOUNDARY": [
+      "164.312(a)(1)",
+      "164.312(e)(1)"
+    ],
+    "ALLOW_EXCEPTION": [
+      "164.312(a)(1)"
+    ],
+    "INFO_FLOW": [
+      "164.312(a)(1)",
+      "164.312(e)(1)"
+    ],
+    "DATA_LOSS": [
+      "164.312(e)(1)",
+      "164.312(a)(1)"
+    ],
+    "DATA_MONITOR": [
+      "164.312(b)",
+      "164.308(a)(1)(ii)(D)"
+    ],
+    "MEDIA": [
+      "164.310(d)(1)"
+    ],
+    "INSPECT_TLS": [
+      "164.312(b)",
+      "164.308(a)(1)(ii)(D)"
+    ],
+    "PRIVACY_EXEMPT": [],
+    "DNS": [
+      "164.308(a)(5)(ii)(B)"
+    ],
+    "DNS_TUNNEL": [
+      "164.312(e)(1)",
+      "164.312(b)"
+    ],
+    "SANDBOX": [
+      "164.308(a)(5)(ii)(B)"
+    ],
+    "ISOLATION": [
+      "164.308(a)(5)(ii)(B)"
+    ],
+    "MOBILE_CODE": [
+      "164.308(a)(5)(ii)(B)"
+    ],
+    "AI_GOV": [
+      "164.312(a)(1)",
+      "164.312(e)(1)"
+    ],
+    "TIME_SYNC": [],
+    "REMOTE_ACCESS": [
+      "164.312(a)(1)"
+    ],
+    "SESSION": [
+      "164.312(a)(2)(iii)"
+    ],
+    "APP_PROTECT": [
+      "164.308(a)(5)(ii)(B)",
+      "164.312(c)(1)"
     ]
   }
 }

@@ -56,6 +56,8 @@ const PROFILES = {
     block: ['US_SSN', 'US_PASSPORT', 'US_DRIVER_LICENSE', 'US_ITIN', 'CREDIT_CARD', 'US_BANK_NUMBER'], detect: ['PERSON', 'EMAIL_ADDRESS', 'IP_ADDRESS'], deep: true },
   NIST_800_53: { name: 'NIST 800-53 (PII)', why: 'PII handling controls (PT / SI families).',
     block: ['US_SSN', 'US_PASSPORT', 'US_DRIVER_LICENSE', 'US_ITIN', 'CREDIT_CARD', 'US_BANK_NUMBER'], detect: ['PERSON', 'EMAIL_ADDRESS', 'IP_ADDRESS'], deep: true },
+  IRS_1075: { name: 'IRS Pub 1075 (FTI)', why: 'Taxpayer identifiers and account data that make up Federal Tax Information.',
+    block: ['US_SSN', 'US_ITIN', 'US_BANK_NUMBER', 'DATE_OF_BIRTH', 'STREET_ADDRESS'], detect: ['PERSON', 'EMAIL_ADDRESS', 'PHONE_NUMBER'], deep: true },
   GENERAL: { name: 'General (high-risk PII)', why: 'Card, bank and government ids every organisation protects.',
     block: ['US_SSN', 'CREDIT_CARD', 'US_BANK_NUMBER', 'US_PASSPORT', 'US_DRIVER_LICENSE', 'US_ITIN'], detect: ['PERSON'], deep: false }
 };

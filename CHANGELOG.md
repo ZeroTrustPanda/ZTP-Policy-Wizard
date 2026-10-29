@@ -1,8 +1,15 @@
 # Changelog
 
-## v2.0.0 → v2.6.1 — 2026-10-19 to 2026-10-23
+## v2.0.0 → v2.7.0 — 2026-10-19 to 2026-10-29
 
-Release notes for the whole 2.x line: [docs/release-notes/v2.6.1.md](docs/release-notes/v2.6.1.md).
+Release notes for the whole 2.x line: [docs/release-notes/v2.7.0.md](docs/release-notes/v2.7.0.md).
+
+### 2.7.0
+- **Compliance mapping** (`server/v2/compliance-map.js`): rule → objectives → the profile's controls (`objectives` in each `server/frameworks/<id>.json`); unmapped rules carry a reason (best practice, differentiator, operational, privacy, weakens). Attached to every rule and setting in `generate()` and the rule catalog.
+- **Federal profiles:** `FEDRAMP_MOD`, `FEDRAMP_HIGH`, `CMMC_L2`, `FED_ZT`, `IRS_1075`, `GOVRAMP`; 800-53 ids checked against the SP 800-53B OSCAL baselines; `FTI_MARKINGS` custom dictionary; `vertical` on every compliance profile; `FEDERAL` intake preset; `IRS_1075` AI Guard profile.
+- **One compliance pane:** Customer intake groups profiles by vertical; the guided Internet Access step skips the baseline page (old resume points land on Rules); AI Guard follows the intake profile.
+- **Compliance pack** (`server/v2/compliance-pack.js`; `GET /api/v2/compliance-pack?povId=`, `GET|POST /api/v2/compliance-pack/file/:id`): mapping report, policy export, test plan by control; profile DLP files in the test kit (`cp-<profile>-<rule>`).
+- **Fix:** ZTH eBook DLP rules cited controls outside its catalog.
 
 ### 2.6.1
 - **Licence model** (`server/v2/entitlements.js`): subscriptions → scope licensed / not licensed, editions (firewall, DNS tunnels, sandbox, DLP, isolation, ZDX) and edition notes. Decisions only; no quantities.

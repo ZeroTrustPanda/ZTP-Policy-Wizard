@@ -1,0 +1,371 @@
+{
+  "id": "IRS_1075",
+  "type": "compliance",
+  "vertical": "FEDERAL",
+  "name": "IRS Pub 1075",
+  "fullName": "IRS Publication 1075: Tax Information Security Guidelines for Federal, State and Local Agencies (Rev. 11-2021)",
+  "description": "Agencies and contractors that receive Federal Tax Information (FTI); Section 4.0 applies NIST SP 800-53 Rev 5 controls, with FTI transmission and email rules in Sections 1.3, 2.E.3 and 3.3.2.",
+  "version": "2026.10.29",
+  "researchedAt": "2026-10-29",
+  "baseTier": "STRICT",
+  "complianceKey": "IRS_1075",
+  "sources": [
+    {
+      "id": "p1075",
+      "title": "IRS Publication 1075 (Rev. 11-2021): Tax Information Security Guidelines — Section 4.0 (NIST 800-53 Rev 5)",
+      "url": "https://www.irs.gov/pub/irs-pdf/p1075.pdf"
+    },
+    {
+      "id": "nist53b",
+      "title": "NIST SP 800-53B Control Baselines (OSCAL profiles, usnistgov/oscal-content)",
+      "url": "https://github.com/usnistgov/oscal-content/tree/main/nist.gov/SP800-53/rev5"
+    },
+    {
+      "id": "nist53",
+      "title": "NIST SP 800-53 Rev. 5 Security and Privacy Controls",
+      "url": "https://csrc.nist.gov/pubs/sp/800/53/r5/upd1/final"
+    },
+    {
+      "id": "zs-sandbox",
+      "title": "Zscaler: Recommended Sandbox Policy",
+      "url": "https://help.zscaler.com/zia/recommended-sandbox-policy"
+    },
+    {
+      "id": "zs-edlp",
+      "title": "Zscaler: Configuring Endpoint DLP Policy Rules",
+      "url": "https://help.zscaler.com/zia/configuring-endpoint-dlp-policy-rules"
+    },
+    {
+      "id": "zs-api-adv-url",
+      "title": "Zscaler SDK (Go): URL & Cloud App advanced settings incl. GenAI prompt capture flags",
+      "url": "https://github.com/zscaler/zscaler-sdk-go/blob/master/zscaler/zia/services/urlfilteringpolicies/urlfilteringpolicies.go"
+    },
+    {
+      "id": "cis",
+      "title": "CIS Critical Security Controls v8.1 (Safeguards 9.2 DNS filtering, 9.3 URL filters, 9.6 block unnecessary file types, 10.1 anti-malware, 3.13 DLP)",
+      "url": "https://myctrl.tools/frameworks/cis-controls-v8"
+    }
+  ],
+  "controls": [
+    {
+      "id": "SI-3",
+      "name": "Malicious code protection (Pub 1075 §4)",
+      "source": "p1075"
+    },
+    {
+      "id": "SC-7",
+      "name": "Boundary protection (Pub 1075 §4)",
+      "source": "p1075"
+    },
+    {
+      "id": "SI-4",
+      "name": "System monitoring (Pub 1075 §4)",
+      "source": "p1075"
+    },
+    {
+      "id": "PL-4",
+      "name": "Rules of behavior (Pub 1075 §4)",
+      "source": "p1075"
+    },
+    {
+      "id": "CM-7",
+      "name": "Least functionality (Pub 1075 §4)",
+      "source": "p1075"
+    },
+    {
+      "id": "SC-7(5)",
+      "name": "Deny by default — allow by exception (Pub 1075 §4)",
+      "source": "p1075"
+    },
+    {
+      "id": "AC-4",
+      "name": "Information flow enforcement (Pub 1075 §4)",
+      "source": "p1075"
+    },
+    {
+      "id": "AC-20",
+      "name": "Use of external systems (Pub 1075 §4)",
+      "source": "p1075"
+    },
+    {
+      "id": "AU-2",
+      "name": "Event logging (Pub 1075 §4)",
+      "source": "p1075"
+    },
+    {
+      "id": "AU-12",
+      "name": "Audit record generation (Pub 1075 §4)",
+      "source": "p1075"
+    },
+    {
+      "id": "MP-7",
+      "name": "Media use (Pub 1075 §4)",
+      "source": "p1075"
+    },
+    {
+      "id": "SC-7(8)",
+      "name": "Route traffic to authenticated proxy servers (Pub 1075 §4)",
+      "source": "p1075"
+    },
+    {
+      "id": "SC-8(1)",
+      "name": "Cryptographic protection (Pub 1075 §4)",
+      "source": "p1075"
+    },
+    {
+      "id": "SC-21",
+      "name": "Secure name/address resolution service (recursive or caching resolver) (Pub 1075 §4)",
+      "source": "p1075"
+    },
+    {
+      "id": "SI-4(4)",
+      "name": "Inbound and outbound communications traffic (Pub 1075 §4)",
+      "source": "p1075"
+    },
+    {
+      "id": "SC-18",
+      "name": "Mobile code (Pub 1075 §4)",
+      "source": "p1075"
+    },
+    {
+      "id": "AU-8",
+      "name": "Time stamps (Pub 1075 §4)",
+      "source": "p1075"
+    },
+    {
+      "id": "AC-17",
+      "name": "Remote access (Pub 1075 §4)",
+      "source": "p1075"
+    },
+    {
+      "id": "AC-3",
+      "name": "Access enforcement (Pub 1075 §4)",
+      "source": "p1075"
+    },
+    {
+      "id": "AC-12",
+      "name": "Session termination (Pub 1075 §4)",
+      "source": "p1075"
+    },
+    {
+      "id": "SI-10",
+      "name": "Information input validation (Pub 1075 §4)",
+      "source": "p1075"
+    },
+    {
+      "id": "SC-8",
+      "name": "Transmission confidentiality and integrity (Pub 1075 §4)",
+      "source": "p1075"
+    }
+  ],
+  "areas": {
+    "urlFiltering": {
+      "controls": [
+        "SI-3",
+        "SC-7",
+        "SI-4"
+      ],
+      "rationale": "Derived from the rule-level objective mapping (v2.7)."
+    },
+    "cloudAppControl": {
+      "controls": [
+        "AC-4",
+        "AC-20"
+      ],
+      "rationale": "Derived from the rule-level objective mapping (v2.7)."
+    },
+    "fileTypeControl": {
+      "controls": [
+        "CM-7",
+        "SC-7",
+        "SI-3"
+      ],
+      "rationale": "Derived from the rule-level objective mapping (v2.7)."
+    },
+    "advancedThreatProtection": {
+      "controls": [
+        "SI-3",
+        "SC-7",
+        "SI-4"
+      ],
+      "rationale": "Derived from the rule-level objective mapping (v2.7)."
+    },
+    "firewallFiltering": {
+      "controls": [
+        "SC-7",
+        "SC-7(5)"
+      ],
+      "rationale": "Derived from the rule-level objective mapping (v2.7)."
+    },
+    "dnsSecurity": {
+      "controls": [
+        "SC-21",
+        "SI-4"
+      ],
+      "rationale": "Derived from the rule-level objective mapping (v2.7)."
+    },
+    "sslInspection": {
+      "controls": [
+        "SI-4",
+        "SC-7(8)",
+        "SC-8(1)"
+      ],
+      "rationale": "Derived from the rule-level objective mapping (v2.7)."
+    },
+    "dlpMonitor": {
+      "controls": [
+        "AU-2",
+        "AU-12",
+        "SI-4"
+      ],
+      "rationale": "Derived from the rule-level objective mapping (v2.7)."
+    },
+    "dlpBlock": {
+      "controls": [
+        "AC-4",
+        "SC-7"
+      ],
+      "rationale": "Derived from the rule-level objective mapping (v2.7)."
+    },
+    "endpointDlp": {
+      "controls": [
+        "MP-7",
+        "AC-4"
+      ],
+      "rationale": "Derived from the rule-level objective mapping (v2.7)."
+    },
+    "sandbox": {
+      "controls": [
+        "SI-3"
+      ],
+      "rationale": "Derived from the rule-level objective mapping (v2.7)."
+    },
+    "aiPromptCapture": {
+      "controls": [
+        "AU-2",
+        "AU-12",
+        "SI-4"
+      ],
+      "rationale": "Derived from the rule-level objective mapping (v2.7)."
+    }
+  },
+  "dlp": {
+    "monitorEngines": [
+      "GLBA"
+    ],
+    "blockRules": [
+      {
+        "key": "FTI",
+        "label": "Federal Tax Information",
+        "dictionaries": [
+          "custom:FTI_MARKINGS",
+          "predefined:SSN",
+          "predefined:TIN_LEAKAGE"
+        ],
+        "controls": [
+          "AC-4",
+          "SC-8"
+        ]
+      },
+      {
+        "key": "PII",
+        "label": "PII",
+        "dictionaries": [
+          "predefined:SSN",
+          "predefined:TIN_LEAKAGE",
+          "predefined:USDL_LEAKAGE"
+        ],
+        "controls": [
+          "AC-4"
+        ]
+      }
+    ],
+    "endpointChannels": [
+      "REMOVABLE_DRIVE_TRANSFER",
+      "PERSONAL_CLOUD_STORAGE",
+      "PRINTING"
+    ]
+  },
+  "objectives": {
+    "MALWARE": [
+      "SI-3"
+    ],
+    "THREAT_SITES": [
+      "SI-3",
+      "SC-7",
+      "SI-4"
+    ],
+    "ACCEPTABLE_USE": [
+      "PL-4"
+    ],
+    "PRODUCTIVITY": [],
+    "LEAST_FUNCTION": [
+      "CM-7",
+      "SC-7"
+    ],
+    "BOUNDARY": [
+      "SC-7"
+    ],
+    "ALLOW_EXCEPTION": [
+      "SC-7(5)"
+    ],
+    "INFO_FLOW": [
+      "AC-4",
+      "AC-20"
+    ],
+    "DATA_LOSS": [
+      "AC-4",
+      "SC-7"
+    ],
+    "DATA_MONITOR": [
+      "AU-2",
+      "AU-12",
+      "SI-4"
+    ],
+    "MEDIA": [
+      "MP-7",
+      "AC-4"
+    ],
+    "INSPECT_TLS": [
+      "SI-4",
+      "SC-7(8)"
+    ],
+    "PRIVACY_EXEMPT": [],
+    "DNS": [
+      "SC-21",
+      "SI-4"
+    ],
+    "DNS_TUNNEL": [
+      "SI-4(4)",
+      "SC-7"
+    ],
+    "SANDBOX": [
+      "SI-3"
+    ],
+    "ISOLATION": [
+      "SC-18"
+    ],
+    "MOBILE_CODE": [
+      "SC-18",
+      "SI-3"
+    ],
+    "AI_GOV": [
+      "AC-4",
+      "AC-20"
+    ],
+    "TIME_SYNC": [
+      "AU-8"
+    ],
+    "REMOTE_ACCESS": [
+      "AC-17",
+      "AC-3"
+    ],
+    "SESSION": [
+      "AC-12"
+    ],
+    "APP_PROTECT": [
+      "SI-10",
+      "SC-7"
+    ]
+  }
+}

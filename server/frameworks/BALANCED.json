@@ -5,7 +5,7 @@
   "fullName": "Balanced Security",
   "description": "Blocks known-bad and legal-liability content; cautions on productivity categories.",
   "version": "2026.10.1",
-  "researchedAt": "2026-10-16",
+  "researchedAt": "2026-10-29",
   "baseTier": "BALANCED",
   "complianceKey": null,
   "sources": [
@@ -85,6 +85,51 @@
       "id": "CSF-DE.CM",
       "name": "Continuous monitoring",
       "source": "nistcsf"
+    },
+    {
+      "id": "CIS-2.7",
+      "name": "Allowlist authorized scripts",
+      "source": "cis"
+    },
+    {
+      "id": "CIS-3.3",
+      "name": "Configure data access control lists",
+      "source": "cis"
+    },
+    {
+      "id": "CIS-6.4",
+      "name": "Require MFA for remote network access",
+      "source": "cis"
+    },
+    {
+      "id": "CIS-8.2",
+      "name": "Collect audit logs",
+      "source": "cis"
+    },
+    {
+      "id": "CIS-8.4",
+      "name": "Standardize time synchronization",
+      "source": "cis"
+    },
+    {
+      "id": "CIS-10.7",
+      "name": "Use behavior-based anti-malware software",
+      "source": "cis"
+    },
+    {
+      "id": "CIS-13.3",
+      "name": "Deploy a network intrusion detection solution",
+      "source": "cis"
+    },
+    {
+      "id": "CIS-13.10",
+      "name": "Perform application layer filtering",
+      "source": "cis"
+    },
+    {
+      "id": "CSF-PR.AA",
+      "name": "Identity management, authentication and access control",
+      "source": "cis"
     }
   ],
   "areas": {
@@ -194,6 +239,87 @@
       "REMOVABLE_DRIVE_TRANSFER",
       "PERSONAL_CLOUD_STORAGE",
       "PRINTING"
+    ]
+  },
+  "objectives": {
+    "MALWARE": [
+      "CIS-10.1"
+    ],
+    "THREAT_SITES": [
+      "CIS-9.3",
+      "CIS-10.1"
+    ],
+    "ACCEPTABLE_USE": [
+      "CIS-9.3"
+    ],
+    "PRODUCTIVITY": [
+      "CIS-9.3"
+    ],
+    "LEAST_FUNCTION": [
+      "CIS-9.6",
+      "CIS-2.7",
+      "CIS-13.4"
+    ],
+    "BOUNDARY": [
+      "CIS-13.4"
+    ],
+    "ALLOW_EXCEPTION": [
+      "CIS-13.4"
+    ],
+    "INFO_FLOW": [
+      "CSF-PR.DS",
+      "CIS-3.3"
+    ],
+    "DATA_LOSS": [
+      "CIS-3.13",
+      "CSF-PR.DS"
+    ],
+    "DATA_MONITOR": [
+      "CSF-DE.CM",
+      "CIS-8.2"
+    ],
+    "MEDIA": [
+      "CIS-3.13"
+    ],
+    "INSPECT_TLS": [
+      "CIS-13.10",
+      "CSF-DE.CM"
+    ],
+    "PRIVACY_EXEMPT": [],
+    "DNS": [
+      "CIS-9.2"
+    ],
+    "DNS_TUNNEL": [
+      "CIS-9.2",
+      "CIS-13.3"
+    ],
+    "SANDBOX": [
+      "CIS-10.1",
+      "CIS-10.7"
+    ],
+    "ISOLATION": [
+      "CIS-10.1",
+      "CIS-9.3"
+    ],
+    "MOBILE_CODE": [
+      "CIS-10.1"
+    ],
+    "AI_GOV": [
+      "CSF-PR.DS",
+      "CIS-3.13"
+    ],
+    "TIME_SYNC": [
+      "CIS-8.4"
+    ],
+    "REMOTE_ACCESS": [
+      "CSF-PR.AA",
+      "CIS-6.4"
+    ],
+    "SESSION": [
+      "CSF-PR.AA"
+    ],
+    "APP_PROTECT": [
+      "CIS-13.10"
     ]
   }
 }

@@ -17,14 +17,19 @@ function loadAll() {
 }
 
 // Order on the Baseline Framework page: the tool's existing compliance list (FWK-02), then the non-mapped tiers (FWK-03)
-const COMPLIANCE_ORDER = ['HIPAA', 'HITRUST', 'NIST_800_53', 'NIST_800_171', 'PCI', 'CJIS', 'SOX', 'FERPA', 'GDPR'];
+const COMPLIANCE_ORDER = ['HIPAA', 'HITRUST', 'NIST_800_53', 'NIST_800_171', 'PCI', 'CJIS', 'SOX', 'FERPA', 'GDPR',
+  'FEDRAMP_MOD', 'FEDRAMP_HIGH', 'CMMC_L2', 'FED_ZT', 'IRS_1075', 'GOVRAMP'];
+// v2.7: which vertical each compliance profile belongs to (the onboarding pane groups the profiles by vertical)
+const VERTICAL_OF = { HIPAA: 'HEALTHCARE', HITRUST: 'HEALTHCARE', PCI: 'FINANCE', SOX: 'FINANCE', GDPR: 'GENERAL', FERPA: 'EDUCATION',
+  NIST_800_53: 'FEDERAL', NIST_800_171: 'FEDERAL', CJIS: 'FEDERAL', FEDRAMP_MOD: 'FEDERAL', FEDRAMP_HIGH: 'FEDERAL', CMMC_L2: 'FEDERAL',
+  FED_ZT: 'FEDERAL', IRS_1075: 'FEDERAL', GOVRAMP: 'FEDERAL' };
 const NON_MAPPED_ORDER = ['STRICT', 'BALANCED', 'PERMISSIVE', 'ZTH_EBOOK'];
 
 function listBaselines() {
   const all = loadAll();
   const pick = (id) => all[id] && {
     id, type: all[id].type, name: all[id].name, fullName: all[id].fullName, description: all[id].description,
-    version: all[id].version, researchedAt: all[id].researchedAt, sources: all[id].sources
+    version: all[id].version, researchedAt: all[id].researchedAt, sources: all[id].sources, vertical: VERTICAL_OF[id] || null
   };
   return {
     compliance: COMPLIANCE_ORDER.map(pick).filter(Boolean),
@@ -188,6 +193,13 @@ function build(opts, withChoices) {
     objects.dlpDictionaries = objects.dlpDictionaries.filter(d => dUsed.has(d.name));
   }
 
+  // 6. v2.7: every rule and setting carries the profile's controls, or the reason it has none
+  const CM = require('./compliance-map');
+  for (const [type, p] of Object.entries(policies)) {
+    const items = Array.isArray(p) ? p : (p.settings || []);
+    for (const r of items) r.compliance = CM.mapRule(fw, r.toggleKey || r.actionKey || `${type}:${r.key}`);
+  }
+
   return {
     metadata: {
       name: `${prefix}-${fw.id}`, prefix, baseline: { id: fw.id, name: fw.name, type: fw.type, version: fw.version, researchedAt: fw.researchedAt },
@@ -209,13 +221,14 @@ function buildCatalog(policies) {
     const p = policies[type];
     if (!Array.isArray(p)) {
       return { type, label: POLICY_LABELS[type], singleton: true,
-        settings: p.settings.map(s => ({ key: s.toggleKey, label: s.label, group: s.group || null, defaultValue: s.value })) };
+        settings: p.settings.map(s => ({ key: s.toggleKey, label: s.label, group: s.group || null, defaultValue: s.value, compliance: s.compliance || null })) };
     }
     return {
       type, label: POLICY_LABELS[type], canOverride: p.some(r => r.canOverride), canIsolate: type === 'urlFiltering',
       rules: p.map(r => ({
         key: r.toggleKey, name: r.name, description: r.description || '', locked: !!r.locked, canOverride: !!r.canOverride,
-        allowOnly: !!r.allowOnly, defaultAction: r.defaultAction || '', categoryCount: Array.isArray(r.urlCategories) ? r.urlCategories.length : undefined
+        allowOnly: !!r.allowOnly, defaultAction: r.defaultAction || '', categoryCount: Array.isArray(r.urlCategories) ? r.urlCategories.length : undefined,
+        compliance: r.compliance || null
       }))
     };
   });
@@ -261,4 +274,4 @@ function fitToEditions(policies, ed, prefix, notes) {
   return out;
 }
 
-module.exports = { fitToEditions, listBaselines, getBaseline, generate, inScopeTypes, POLICY_LABELS, SINGLETON_TYPES };
+module.exports = { VERTICAL_OF, fitToEditions, listBaselines, getBaseline, generate, inScopeTypes, POLICY_LABELS, SINGLETON_TYPES };

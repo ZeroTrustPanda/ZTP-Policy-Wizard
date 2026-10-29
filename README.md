@@ -1,4 +1,4 @@
-# 🐼 ZeroTrustPanda — ZTP Policy Wizard v2.6.1
+# 🐼 ZeroTrustPanda — ZTP Policy Wizard v2.7.0
 
 Proof-of-value automation for Zscaler SEs: Zscaler Internet Access (ZIA), Zscaler Client Connector (ZCC), Zscaler Private Access (ZPA) and Zscaler Digital Experience (ZDX), all with one set of OneAPI (ZIdentity) client credentials.
 
@@ -8,9 +8,9 @@ No Node.js, no npm, nothing to install. Click your download, unzip it, and doubl
 
 | Computer | Download (click to download) |
 |---|---|
-| **Mac with Apple silicon (M1–M4)** | [**ZTP-Wizard-2.6.1-macos-arm64.zip**](https://github.com/ZeroTrustPanda/ZTP-Policy-Wizard/raw/standalone/standalone/release/ZTP-Wizard-2.6.1-macos-arm64.zip) |
-| Windows 10/11 (64-bit) | [ZTP-Wizard-2.6.1-windows-x64.zip](https://github.com/ZeroTrustPanda/ZTP-Policy-Wizard/raw/standalone/standalone/release/ZTP-Wizard-2.6.1-windows-x64.zip) |
-| Intel Mac | [ZTP-Wizard-2.6.1-macos-x64.zip](https://github.com/ZeroTrustPanda/ZTP-Policy-Wizard/raw/standalone/standalone/release/ZTP-Wizard-2.6.1-macos-x64.zip) |
+| **Mac with Apple silicon (M1–M4)** | [**ZTP-Wizard-2.7.0-macos-arm64.zip**](https://github.com/ZeroTrustPanda/ZTP-Policy-Wizard/raw/standalone/standalone/release/ZTP-Wizard-2.7.0-macos-arm64.zip) |
+| Windows 10/11 (64-bit) | [ZTP-Wizard-2.7.0-windows-x64.zip](https://github.com/ZeroTrustPanda/ZTP-Policy-Wizard/raw/standalone/standalone/release/ZTP-Wizard-2.7.0-windows-x64.zip) |
+| Intel Mac | [ZTP-Wizard-2.7.0-macos-x64.zip](https://github.com/ZeroTrustPanda/ZTP-Policy-Wizard/raw/standalone/standalone/release/ZTP-Wizard-2.7.0-macos-x64.zip) |
 
 The wizard starts on `http://127.0.0.1:3000` (or the next free port), opens your browser, and keeps your API credentials on your computer. Logs go to `ZTP-Wizard/logs` in your home folder.
 
@@ -18,11 +18,11 @@ The wizard starts on `http://127.0.0.1:3000` (or the next free port), opens your
 - **Mac:** right-click `ZTP-Wizard` → *Open* → *Open*. If macOS still refuses, run `xattr -d com.apple.quarantine ZTP-Wizard` in the unzipped folder. If it then reports "killed", also run `codesign --force --sign - ZTP-Wizard`.
 - **Windows:** SmartScreen → *More info* → *Run anyway*.
 
-These are the same features as the v2.6.1 server version on `main`. The UI is compiled ahead of time, with React and fonts built in, so it works without reaching any CDN; only the Zscaler API calls need the network.
+These are the same features as the v2.7.0 server version on `main`. The UI is compiled ahead of time, with React and fonts built in, so it works without reaching any CDN; only the Zscaler API calls need the network.
 
-**Release notes (2.0 → 2.6.1):** [docs/release-notes/v2.6.1.md](docs/release-notes/v2.6.1.md) · **Change log:** [CHANGELOG.md](CHANGELOG.md) · **Releases:** [GitHub releases](https://github.com/ZeroTrustPanda/ZTP-Policy-Wizard/releases)
+**Release notes (2.0 → 2.7.0):** [docs/release-notes/v2.7.0.md](docs/release-notes/v2.7.0.md) · **Change log:** [CHANGELOG.md](CHANGELOG.md) · **Releases:** [GitHub releases](https://github.com/ZeroTrustPanda/ZTP-Policy-Wizard/releases)
 
-## What's in 2.x (2.0 → 2.6.1)
+## What's in 2.x (2.0 → 2.7.0)
 
 - **AI Guard (2.5):**
   - A fourth product toggle; it needs ZIA, so turning it on turns ZIA on.
@@ -30,6 +30,11 @@ These are the same features as the v2.6.1 server version on `main`. The UI is co
   - Blocks QUIC, and puts an SSL Inspect rule above every bypass (including Office 365 One Click).
   - Turns on Gen AI prompt capture when licensed, and checks the AI Guard ("zguard") API.
   - Reuses an AI Guard proxy and gateway already in ZIA. The gateway itself is a portal step, because the API can't create it.
+
+- **Compliance profiles (2.7):**
+  - Chosen once on Customer intake; a Federal vertical adds FedRAMP Moderate and High, CMMC 2.0 Level 2, Federal Zero Trust, IRS Pub 1075 and GovRAMP.
+  - Every rule maps to the profile's controls or states why not.
+  - A compliance pack per POV: profile DLP test files, control mapping report, policy export and test plan by control.
 
 - **Licence-aware POVs (2.6.1):**
   - Readiness fails any core ZIA feature the tenant is not licensed for.
@@ -96,7 +101,7 @@ These are the same features as the v2.6.1 server version on `main`. The UI is co
   - A layout that fits any window size.
   - An update badge.
 
-The full feature list, by product and by version, is in the [release notes](docs/release-notes/v2.6.1.md).
+The full feature list, by product and by version, is in the [release notes](docs/release-notes/v2.7.0.md).
 
 ## 1.9 flows (still available)
 
@@ -290,6 +295,7 @@ The DLP module uses a **dictionary-first** approach:
 
 | Version | Changes |
 |---------|---------|
+| **2.7.0** | One compliance pane; Federal vertical and six federal profiles; every rule mapped or a stated reason; compliance pack per POV. |
 | **2.6.1** | Core ZIA prerequisites; Not licensed in the scope; Cloud Firewall Standard rule set; DNS tunnel rules need Advanced Firewall; ZDX tier choice. |
 | **2.6.0** | API keys per POV in memory with tenant switching; Prove it for every web test type; test kit by POV scope and vertical; ZPA bulk delete order and dependency flags; API permissions and SKU printout in readiness. |
 | **2.5.2** | Allow in ZIA includes Claude / Anthropic, OpenAI, Grok and Glean (ZIA accepts them although its action lookup lists none). |

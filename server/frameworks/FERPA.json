@@ -5,13 +5,13 @@
   "fullName": "Family Educational Rights and Privacy Act",
   "description": "Protects the privacy of student education records; schools commonly pair it with CIPA content filtering.",
   "version": "2026.10.1",
-  "researchedAt": "2026-10-16",
+  "researchedAt": "2026-10-29",
   "baseTier": "BALANCED",
   "complianceKey": "FERPA",
   "sources": [
     {
       "id": "ferpa",
-      "title": "34 CFR Part 99 \u2014 FERPA (eCFR)",
+      "title": "34 CFR Part 99 — FERPA (eCFR)",
       "url": "https://www.ecfr.gov/current/title-34/subtitle-A/part-99"
     },
     {
@@ -53,7 +53,7 @@
     },
     {
       "id": "99.31",
-      "name": "Disclosure without consent \u2014 reasonable methods",
+      "name": "Disclosure without consent — reasonable methods",
       "source": "ferpa"
     },
     {
@@ -170,6 +170,74 @@
       "REMOVABLE_DRIVE_TRANSFER",
       "PERSONAL_CLOUD_STORAGE",
       "PRINTING"
+    ]
+  },
+  "objectives": {
+    "MALWARE": [
+      "99.31"
+    ],
+    "THREAT_SITES": [
+      "99.31"
+    ],
+    "ACCEPTABLE_USE": [
+      "CIPA"
+    ],
+    "PRODUCTIVITY": [],
+    "LEAST_FUNCTION": [
+      "99.31"
+    ],
+    "BOUNDARY": [
+      "99.31"
+    ],
+    "ALLOW_EXCEPTION": [
+      "99.31"
+    ],
+    "INFO_FLOW": [
+      "99.31"
+    ],
+    "DATA_LOSS": [
+      "99.3",
+      "99.31"
+    ],
+    "DATA_MONITOR": [
+      "99.31"
+    ],
+    "MEDIA": [
+      "99.31"
+    ],
+    "INSPECT_TLS": [
+      "CIPA",
+      "99.31"
+    ],
+    "PRIVACY_EXEMPT": [],
+    "DNS": [
+      "CIPA",
+      "99.31"
+    ],
+    "DNS_TUNNEL": [
+      "99.31"
+    ],
+    "SANDBOX": [
+      "99.31"
+    ],
+    "ISOLATION": [
+      "99.31"
+    ],
+    "MOBILE_CODE": [
+      "99.31"
+    ],
+    "AI_GOV": [
+      "99.31"
+    ],
+    "TIME_SYNC": [],
+    "REMOTE_ACCESS": [
+      "99.31"
+    ],
+    "SESSION": [
+      "99.31"
+    ],
+    "APP_PROTECT": [
+      "99.31"
     ]
   }
 }
