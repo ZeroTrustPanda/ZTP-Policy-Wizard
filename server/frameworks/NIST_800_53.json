@@ -103,7 +103,7 @@
     },
     {
       "id": "SC-20",
-      "name": "Secure name/address resolution",
+      "name": "Secure name/address resolution service (authoritative source)",
       "source": "nist53"
     },
     {
@@ -149,11 +149,6 @@
     {
       "id": "PL-4",
       "name": "Rules of behavior",
-      "source": "nist53"
-    },
-    {
-      "id": "SC-8(1)",
-      "name": "Cryptographic protection",
       "source": "nist53"
     },
     {
@@ -366,8 +361,7 @@
     "INSPECT_TLS": [
       "SI-4",
       "SI-4(10)",
-      "SC-7(8)",
-      "SC-8(1)"
+      "SC-7(8)"
     ],
     "PRIVACY_EXEMPT": [],
     "DNS": [

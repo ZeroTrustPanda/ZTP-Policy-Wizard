@@ -87,11 +87,6 @@
       "source": "nist171"
     },
     {
-      "id": "03.01.01",
-      "name": "Account management",
-      "source": "nist171"
-    },
-    {
       "id": "03.01.11",
       "name": "Session termination",
       "source": "nist171"
@@ -119,6 +114,11 @@
     {
       "id": "03.15.03",
       "name": "Rules of behavior",
+      "source": "nist171"
+    },
+    {
+      "id": "03.01.02",
+      "name": "Access enforcement",
       "source": "nist171"
     }
   ],
@@ -283,8 +283,7 @@
       "03.08.07"
     ],
     "INSPECT_TLS": [
-      "03.14.06",
-      "03.13.08"
+      "03.14.06"
     ],
     "PRIVACY_EXEMPT": [],
     "DNS": [
@@ -313,7 +312,7 @@
     ],
     "REMOTE_ACCESS": [
       "03.01.12",
-      "03.01.01"
+      "03.01.02"
     ],
     "SESSION": [
       "03.01.11"

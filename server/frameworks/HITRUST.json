@@ -78,7 +78,7 @@
     },
     {
       "id": "10.d",
-      "name": "Message integrity / cryptographic controls",
+      "name": "Message integrity",
       "source": "hitrust"
     },
     {

@@ -127,11 +127,6 @@
       "source": "nist53"
     },
     {
-      "id": "SC-8(1)",
-      "name": "Cryptographic protection",
-      "source": "nist53"
-    },
-    {
       "id": "SC-18",
       "name": "Mobile code",
       "source": "nist53"
@@ -309,8 +304,7 @@
     ],
     "INSPECT_TLS": [
       "SI-4",
-      "SC-7(8)",
-      "SC-8(1)"
+      "SC-7(8)"
     ],
     "PRIVACY_EXEMPT": [],
     "DNS": [

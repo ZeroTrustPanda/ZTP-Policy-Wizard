@@ -123,11 +123,6 @@
       "source": "fedramp"
     },
     {
-      "id": "SC-8(1)",
-      "name": "Cryptographic protection",
-      "source": "fedramp"
-    },
-    {
       "id": "SC-21",
       "name": "Secure name/address resolution service (recursive or caching resolver)",
       "source": "fedramp"
@@ -348,8 +343,7 @@
       "SI-4",
       "SI-4(10)",
       "AC-4(4)",
-      "SC-7(8)",
-      "SC-8(1)"
+      "SC-7(8)"
     ],
     "PRIVACY_EXEMPT": [],
     "DNS": [

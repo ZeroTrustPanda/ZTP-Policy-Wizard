@@ -52,11 +52,6 @@
       "source": "pci"
     },
     {
-      "id": "3.3.1",
-      "name": "Sensitive authentication data is not retained",
-      "source": "pci"
-    },
-    {
       "id": "4.2",
       "name": "PAN is protected with strong cryptography during transmission",
       "source": "pci"
@@ -179,14 +174,13 @@
     },
     "dlpBlock": {
       "controls": [
-        "3.3.1",
         "4.2"
       ],
       "rationale": "Block PAN and track data leaving the organization."
     },
     "endpointDlp": {
       "controls": [
-        "3.3.1"
+        "4.2"
       ],
       "rationale": "Monitor PAN copied to removable media, cloud sync and print."
     },
@@ -226,7 +220,7 @@
           "custom:CARD_TRACK"
         ],
         "controls": [
-          "3.3.1"
+          "4.2"
         ]
       },
       {
@@ -277,8 +271,7 @@
       "12.3"
     ],
     "DATA_LOSS": [
-      "4.2",
-      "3.3.1"
+      "4.2"
     ],
     "DATA_MONITOR": [
       "10.2"

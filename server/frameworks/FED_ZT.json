@@ -98,8 +98,8 @@
       "source": "m2209"
     },
     {
-      "id": "ZTMM 5.4",
-      "name": "CISA ZTMM Data: Data access",
+      "id": "ZTMM Data: Data access",
+      "name": "CISA ZTMM Data pillar: Data access",
       "source": "m2209"
     },
     {
@@ -118,8 +118,8 @@
       "source": "m2209"
     },
     {
-      "id": "ZTMM 5.2",
-      "name": "CISA ZTMM Data: Data categorization",
+      "id": "ZTMM Data: Data categorization",
+      "name": "CISA ZTMM Data pillar: Data categorization",
       "source": "m2209"
     },
     {
@@ -129,22 +129,12 @@
     },
     {
       "id": "M-22-09 III.E.4",
-      "name": "M-22-09: Comprehensive logging (M-21-31)",
+      "name": "M-22-09 III.E.4: Timely access to logs (logging per M-21-31)",
       "source": "m2209"
     },
     {
       "id": "TIC 3.PEP.WE.BINSP",
       "name": "TIC 3.0 Web: Break and inspect",
-      "source": "m2209"
-    },
-    {
-      "id": "M-22-09 III.C.2",
-      "name": "M-22-09: Encrypt all HTTP traffic (enforce HTTPS, TLS)",
-      "source": "m2209"
-    },
-    {
-      "id": "ZTMM 3.3",
-      "name": "CISA ZTMM Networks: Traffic encryption",
       "source": "m2209"
     },
     {
@@ -158,8 +148,8 @@
       "source": "m2209"
     },
     {
-      "id": "M-22-09 III.C.1",
-      "name": "M-22-09: Resolve DNS queries using encrypted DNS",
+      "id": "M-22-09 III.C.2",
+      "name": "M-22-09 III.C.2: Encrypting DNS traffic (resolve DNS using encrypted DNS)",
       "source": "m2209"
     },
     {
@@ -193,24 +183,29 @@
       "source": "m2209"
     },
     {
-      "id": "ZTMM 4.1",
-      "name": "CISA ZTMM Applications: Application access",
+      "id": "ZTMM Applications and Workloads: Application access",
+      "name": "CISA ZTMM Applications and Workloads pillar: Application access",
       "source": "m2209"
     },
     {
-      "id": "ZTMM 3.2",
-      "name": "CISA ZTMM Networks: Network traffic management",
+      "id": "ZTMM Networks: Network traffic management",
+      "name": "CISA ZTMM Networks pillar: Network traffic management",
       "source": "m2209"
     },
     {
-      "id": "ZTMM 4.2",
-      "name": "CISA ZTMM Applications: Application threat protections",
+      "id": "ZTMM Applications and Workloads: Application threat protections",
+      "name": "CISA ZTMM Applications and Workloads pillar: Application threat protections",
       "source": "m2209"
     },
     {
       "id": "TIC 3.PEP.SE.MCFIL",
       "name": "TIC 3.0 Services: Malicious content filtering",
       "source": "m2209"
+    },
+    {
+      "id": "TIC 3.PEP.WE.APROX",
+      "name": "TIC 3.0 Web: Authenticated proxy",
+      "source": "tic3"
     }
   ],
   "areas": {
@@ -226,7 +221,7 @@
       "controls": [
         "TIC 3.PEP.SE.ACONT",
         "TIC 3.PEP.EN.SITDE",
-        "ZTMM 5.4"
+        "ZTMM Data: Data access"
       ],
       "rationale": "Derived from the rule-level objective mapping (v2.7)."
     },
@@ -257,15 +252,14 @@
       "controls": [
         "TIC 3.PEP.WE.DRESF",
         "TIC 3.PEP.DO.DNMON",
-        "M-22-09 III.C.1"
+        "M-22-09 III.C.2"
       ],
       "rationale": "Derived from the rule-level objective mapping (v2.7)."
     },
     "sslInspection": {
       "controls": [
         "TIC 3.PEP.WE.BINSP",
-        "M-22-09 III.C.2",
-        "ZTMM 3.3"
+        "TIC 3.PEP.WE.APROX"
       ],
       "rationale": "Derived from the rule-level objective mapping (v2.7)."
     },
@@ -288,7 +282,7 @@
     "endpointDlp": {
       "controls": [
         "TIC 3.PEP.DA.DLPRE",
-        "ZTMM 5.4"
+        "ZTMM Data: Data access"
       ],
       "rationale": "Derived from the rule-level objective mapping (v2.7)."
     },
@@ -382,13 +376,13 @@
     "INFO_FLOW": [
       "TIC 3.PEP.SE.ACONT",
       "TIC 3.PEP.EN.SITDE",
-      "ZTMM 5.4"
+      "ZTMM Data: Data access"
     ],
     "DATA_LOSS": [
       "TIC 3.PEP.WE.DLPRE",
       "TIC 3.PEP.DA.DLPRE",
       "M-22-09 III.E.2",
-      "ZTMM 5.2"
+      "ZTMM Data: Data categorization"
     ],
     "DATA_MONITOR": [
       "TIC 3.PEP.DA.DAUTE",
@@ -397,18 +391,17 @@
     ],
     "MEDIA": [
       "TIC 3.PEP.DA.DLPRE",
-      "ZTMM 5.4"
+      "ZTMM Data: Data access"
     ],
     "INSPECT_TLS": [
       "TIC 3.PEP.WE.BINSP",
-      "M-22-09 III.C.2",
-      "ZTMM 3.3"
+      "TIC 3.PEP.WE.APROX"
     ],
     "PRIVACY_EXEMPT": [],
     "DNS": [
       "TIC 3.PEP.WE.DRESF",
       "TIC 3.PEP.DO.DNMON",
-      "M-22-09 III.C.1"
+      "M-22-09 III.C.2"
     ],
     "DNS_TUNNEL": [
       "TIC 3.PEP.DO.DNMON",
@@ -434,14 +427,14 @@
     ],
     "REMOTE_ACCESS": [
       "M-22-09 III.D",
-      "ZTMM 4.1",
-      "ZTMM 3.2"
+      "ZTMM Applications and Workloads: Application access",
+      "ZTMM Networks: Network traffic management"
     ],
     "SESSION": [
-      "ZTMM 4.1"
+      "ZTMM Applications and Workloads: Application access"
     ],
     "APP_PROTECT": [
-      "ZTMM 4.2",
+      "ZTMM Applications and Workloads: Application threat protections",
       "TIC 3.PEP.SE.MCFIL"
     ]
   }
