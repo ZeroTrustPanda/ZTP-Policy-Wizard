@@ -1,0 +1,348 @@
+{
+  "id": "CMMC_L2",
+  "type": "compliance",
+  "vertical": "FEDERAL",
+  "name": "CMMC 2.0 Level 2",
+  "fullName": "Cybersecurity Maturity Model Certification 2.0 — Level 2 (Advanced)",
+  "description": "Defense Industrial Base contractors that handle Controlled Unclassified Information (CUI); the 110 NIST SP 800-171 Rev 2 requirements, assessed under 32 CFR 170.",
+  "version": "2026.10.29",
+  "researchedAt": "2026-10-29",
+  "baseTier": "STRICT",
+  "complianceKey": "CMMC_L2",
+  "sources": [
+    {
+      "id": "cmmc",
+      "title": "DoD CIO: CMMC Assessment Guide — Level 2",
+      "url": "https://dodcio.defense.gov/Portals/0/Documents/CMMC/AssessmentGuideL2.pdf"
+    },
+    {
+      "id": "cfr170",
+      "title": "32 CFR Part 170 — CMMC Program",
+      "url": "https://www.ecfr.gov/current/title-32/subtitle-A/chapter-I/subchapter-G/part-170"
+    },
+    {
+      "id": "nist53",
+      "title": "NIST SP 800-53 Rev. 5 Security and Privacy Controls",
+      "url": "https://csrc.nist.gov/pubs/sp/800/53/r5/upd1/final"
+    },
+    {
+      "id": "zs-sandbox",
+      "title": "Zscaler: Recommended Sandbox Policy",
+      "url": "https://help.zscaler.com/zia/recommended-sandbox-policy"
+    },
+    {
+      "id": "zs-edlp",
+      "title": "Zscaler: Configuring Endpoint DLP Policy Rules",
+      "url": "https://help.zscaler.com/zia/configuring-endpoint-dlp-policy-rules"
+    },
+    {
+      "id": "zs-api-adv-url",
+      "title": "Zscaler SDK (Go): URL & Cloud App advanced settings incl. GenAI prompt capture flags",
+      "url": "https://github.com/zscaler/zscaler-sdk-go/blob/master/zscaler/zia/services/urlfilteringpolicies/urlfilteringpolicies.go"
+    },
+    {
+      "id": "cis",
+      "title": "CIS Critical Security Controls v8.1 (Safeguards 9.2 DNS filtering, 9.3 URL filters, 9.6 block unnecessary file types, 10.1 anti-malware, 3.13 DLP)",
+      "url": "https://myctrl.tools/frameworks/cis-controls-v8"
+    }
+  ],
+  "controls": [
+    {
+      "id": "SI.L1-3.14.2",
+      "name": "Malicious code protection",
+      "source": "cmmc"
+    },
+    {
+      "id": "SI.L1-3.14.5",
+      "name": "System and file scanning",
+      "source": "cmmc"
+    },
+    {
+      "id": "SC.L1-3.13.1",
+      "name": "Boundary protection",
+      "source": "cmmc"
+    },
+    {
+      "id": "CM.L2-3.4.7",
+      "name": "Nonessential functionality",
+      "source": "cmmc"
+    },
+    {
+      "id": "SC.L2-3.13.6",
+      "name": "Network communication by exception",
+      "source": "cmmc"
+    },
+    {
+      "id": "AC.L2-3.1.3",
+      "name": "Control CUI flow",
+      "source": "cmmc"
+    },
+    {
+      "id": "AC.L1-3.1.20",
+      "name": "External connections",
+      "source": "cmmc"
+    },
+    {
+      "id": "AU.L2-3.3.1",
+      "name": "System auditing",
+      "source": "cmmc"
+    },
+    {
+      "id": "SI.L2-3.14.7",
+      "name": "Identify unauthorized use",
+      "source": "cmmc"
+    },
+    {
+      "id": "MP.L2-3.8.7",
+      "name": "Removable media",
+      "source": "cmmc"
+    },
+    {
+      "id": "AC.L2-3.1.21",
+      "name": "Portable storage use",
+      "source": "cmmc"
+    },
+    {
+      "id": "SI.L2-3.14.6",
+      "name": "Monitor communications for attacks",
+      "source": "cmmc"
+    },
+    {
+      "id": "SC.L2-3.13.8",
+      "name": "Data in transit",
+      "source": "cmmc"
+    },
+    {
+      "id": "SC.L2-3.13.13",
+      "name": "Mobile code",
+      "source": "cmmc"
+    },
+    {
+      "id": "AU.L2-3.3.7",
+      "name": "Authoritative time source",
+      "source": "cmmc"
+    },
+    {
+      "id": "AC.L2-3.1.12",
+      "name": "Control remote access",
+      "source": "cmmc"
+    },
+    {
+      "id": "AC.L1-3.1.1",
+      "name": "Authorized access control",
+      "source": "cmmc"
+    },
+    {
+      "id": "AC.L2-3.1.11",
+      "name": "Session termination",
+      "source": "cmmc"
+    }
+  ],
+  "areas": {
+    "urlFiltering": {
+      "controls": [
+        "SI.L1-3.14.2",
+        "SC.L1-3.13.1"
+      ],
+      "rationale": "Derived from the rule-level objective mapping (v2.7)."
+    },
+    "cloudAppControl": {
+      "controls": [
+        "AC.L2-3.1.3",
+        "AC.L1-3.1.20"
+      ],
+      "rationale": "Derived from the rule-level objective mapping (v2.7)."
+    },
+    "fileTypeControl": {
+      "controls": [
+        "CM.L2-3.4.7",
+        "SI.L1-3.14.2",
+        "SI.L1-3.14.5"
+      ],
+      "rationale": "Derived from the rule-level objective mapping (v2.7)."
+    },
+    "advancedThreatProtection": {
+      "controls": [
+        "SI.L1-3.14.2",
+        "SI.L1-3.14.5",
+        "SC.L1-3.13.1"
+      ],
+      "rationale": "Derived from the rule-level objective mapping (v2.7)."
+    },
+    "firewallFiltering": {
+      "controls": [
+        "SC.L1-3.13.1",
+        "SC.L2-3.13.6"
+      ],
+      "rationale": "Derived from the rule-level objective mapping (v2.7)."
+    },
+    "dnsSecurity": {
+      "controls": [
+        "SC.L1-3.13.1",
+        "SI.L2-3.14.6"
+      ],
+      "rationale": "Derived from the rule-level objective mapping (v2.7)."
+    },
+    "sslInspection": {
+      "controls": [
+        "SI.L2-3.14.6",
+        "SC.L2-3.13.8"
+      ],
+      "rationale": "Derived from the rule-level objective mapping (v2.7)."
+    },
+    "dlpMonitor": {
+      "controls": [
+        "AU.L2-3.3.1",
+        "SI.L2-3.14.7"
+      ],
+      "rationale": "Derived from the rule-level objective mapping (v2.7)."
+    },
+    "dlpBlock": {
+      "controls": [
+        "AC.L2-3.1.3"
+      ],
+      "rationale": "Derived from the rule-level objective mapping (v2.7)."
+    },
+    "endpointDlp": {
+      "controls": [
+        "MP.L2-3.8.7",
+        "AC.L2-3.1.21"
+      ],
+      "rationale": "Derived from the rule-level objective mapping (v2.7)."
+    },
+    "sandbox": {
+      "controls": [
+        "SI.L1-3.14.2",
+        "SI.L1-3.14.5"
+      ],
+      "rationale": "Derived from the rule-level objective mapping (v2.7)."
+    },
+    "aiPromptCapture": {
+      "controls": [
+        "AU.L2-3.3.1",
+        "SI.L2-3.14.7",
+        "AC.L2-3.1.3"
+      ],
+      "rationale": "Derived from the rule-level objective mapping (v2.7)."
+    }
+  },
+  "dlp": {
+    "monitorEngines": [],
+    "blockRules": [
+      {
+        "key": "CUI-Markings",
+        "label": "CUI-Markings",
+        "dictionaries": [
+          "custom:CUI_MARKINGS"
+        ],
+        "controls": [
+          "AC.L2-3.1.3"
+        ]
+      },
+      {
+        "key": "PII",
+        "label": "PII",
+        "dictionaries": [
+          "predefined:SSN",
+          "predefined:TIN_LEAKAGE",
+          "predefined:USDL_LEAKAGE"
+        ],
+        "controls": [
+          "AC.L2-3.1.3"
+        ]
+      },
+      {
+        "key": "Credentials",
+        "label": "Credentials",
+        "dictionaries": [
+          "predefined:CRED_LEAKAGE"
+        ],
+        "controls": [
+          "AC.L2-3.1.3"
+        ]
+      }
+    ],
+    "endpointChannels": [
+      "REMOVABLE_DRIVE_TRANSFER",
+      "PERSONAL_CLOUD_STORAGE",
+      "PRINTING"
+    ]
+  },
+  "objectives": {
+    "MALWARE": [
+      "SI.L1-3.14.2",
+      "SI.L1-3.14.5"
+    ],
+    "THREAT_SITES": [
+      "SI.L1-3.14.2",
+      "SC.L1-3.13.1"
+    ],
+    "ACCEPTABLE_USE": [],
+    "PRODUCTIVITY": [],
+    "LEAST_FUNCTION": [
+      "CM.L2-3.4.7"
+    ],
+    "BOUNDARY": [
+      "SC.L1-3.13.1"
+    ],
+    "ALLOW_EXCEPTION": [
+      "SC.L2-3.13.6"
+    ],
+    "INFO_FLOW": [
+      "AC.L2-3.1.3",
+      "AC.L1-3.1.20"
+    ],
+    "DATA_LOSS": [
+      "AC.L2-3.1.3"
+    ],
+    "DATA_MONITOR": [
+      "AU.L2-3.3.1",
+      "SI.L2-3.14.7"
+    ],
+    "MEDIA": [
+      "MP.L2-3.8.7",
+      "AC.L2-3.1.21"
+    ],
+    "INSPECT_TLS": [
+      "SI.L2-3.14.6",
+      "SC.L2-3.13.8"
+    ],
+    "PRIVACY_EXEMPT": [],
+    "DNS": [
+      "SC.L1-3.13.1",
+      "SI.L2-3.14.6"
+    ],
+    "DNS_TUNNEL": [
+      "SI.L2-3.14.6"
+    ],
+    "SANDBOX": [
+      "SI.L1-3.14.2",
+      "SI.L1-3.14.5"
+    ],
+    "ISOLATION": [
+      "SC.L2-3.13.13"
+    ],
+    "MOBILE_CODE": [
+      "SC.L2-3.13.13",
+      "SI.L1-3.14.2"
+    ],
+    "AI_GOV": [
+      "AC.L2-3.1.3",
+      "AC.L1-3.1.20"
+    ],
+    "TIME_SYNC": [
+      "AU.L2-3.3.7"
+    ],
+    "REMOTE_ACCESS": [
+      "AC.L2-3.1.12",
+      "AC.L1-3.1.1"
+    ],
+    "SESSION": [
+      "AC.L2-3.1.11"
+    ],
+    "APP_PROTECT": [
+      "SI.L2-3.14.6",
+      "SC.L1-3.13.1"
+    ]
+  }
+}

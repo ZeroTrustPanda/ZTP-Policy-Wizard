@@ -1,0 +1,448 @@
+{
+  "id": "FED_ZT",
+  "type": "compliance",
+  "vertical": "FEDERAL",
+  "name": "Federal Zero Trust",
+  "fullName": "Federal Zero Trust: OMB M-22-09, CISA Zero Trust Maturity Model v2.0 and TIC 3.0",
+  "description": "Federal civilian agencies moving to zero trust: M-22-09 actions (encrypted DNS, HTTPS everywhere, apps treated as internet-connected, automated data categorization, logging), mapped to CISA ZTMM functions and TIC 3.0 policy enforcement point capabilities.",
+  "version": "2026.10.29",
+  "researchedAt": "2026-10-29",
+  "baseTier": "STRICT",
+  "complianceKey": "FED_ZT",
+  "sources": [
+    {
+      "id": "m2209",
+      "title": "OMB M-22-09: Moving the U.S. Government Toward Zero Trust Cybersecurity Principles (2022-01-26)",
+      "url": "https://www.whitehouse.gov/wp-content/uploads/2022/01/M-22-09.pdf"
+    },
+    {
+      "id": "ztmm",
+      "title": "CISA Zero Trust Maturity Model v2.0 (April 2023)",
+      "url": "https://www.cisa.gov/zero-trust-maturity-model"
+    },
+    {
+      "id": "tic3",
+      "title": "CISA TIC 3.0 Security Capabilities Catalog",
+      "url": "https://www.cisa.gov/sites/default/files/2023-05/TIC%203.0%20Security%20Capabilities%20Catalog_508c.pdf"
+    },
+    {
+      "id": "zs-sandbox",
+      "title": "Zscaler: Recommended Sandbox Policy",
+      "url": "https://help.zscaler.com/zia/recommended-sandbox-policy"
+    },
+    {
+      "id": "zs-edlp",
+      "title": "Zscaler: Configuring Endpoint DLP Policy Rules",
+      "url": "https://help.zscaler.com/zia/configuring-endpoint-dlp-policy-rules"
+    },
+    {
+      "id": "zs-api-adv-url",
+      "title": "Zscaler SDK (Go): URL & Cloud App advanced settings incl. GenAI prompt capture flags",
+      "url": "https://github.com/zscaler/zscaler-sdk-go/blob/master/zscaler/zia/services/urlfilteringpolicies/urlfilteringpolicies.go"
+    },
+    {
+      "id": "cis",
+      "title": "CIS Critical Security Controls v8.1 (Safeguards 9.2 DNS filtering, 9.3 URL filters, 9.6 block unnecessary file types, 10.1 anti-malware, 3.13 DLP)",
+      "url": "https://myctrl.tools/frameworks/cis-controls-v8"
+    }
+  ],
+  "controls": [
+    {
+      "id": "TIC 3.PEP.FI.AMALW",
+      "name": "TIC 3.0 Files: Anti-malware",
+      "source": "m2209"
+    },
+    {
+      "id": "TIC 3.PEP.WE.MCFIL",
+      "name": "TIC 3.0 Web: Malicious content filtering",
+      "source": "m2209"
+    },
+    {
+      "id": "TIC 3.PEP.WE.DREPF",
+      "name": "TIC 3.0 Web: Domain reputation filtering",
+      "source": "m2209"
+    },
+    {
+      "id": "TIC 3.PEP.WE.DCFIL",
+      "name": "TIC 3.0 Web: Domain category filtering",
+      "source": "m2209"
+    },
+    {
+      "id": "TIC 3.PEP.WE.BCONT",
+      "name": "TIC 3.0 Web: Bandwidth control",
+      "source": "m2209"
+    },
+    {
+      "id": "TIC 3.PEP.WE.PCENF",
+      "name": "TIC 3.0 Web: Protocol compliance enforcement",
+      "source": "m2209"
+    },
+    {
+      "id": "TIC 3.PEP.NE.ACONT",
+      "name": "TIC 3.0 Networking: Access control",
+      "source": "m2209"
+    },
+    {
+      "id": "TIC 3.PEP.NE.IADEN",
+      "name": "TIC 3.0 Networking: Internet address denylisting",
+      "source": "m2209"
+    },
+    {
+      "id": "TIC 3.PEP.SE.ACONT",
+      "name": "TIC 3.0 Services: Access control",
+      "source": "m2209"
+    },
+    {
+      "id": "TIC 3.PEP.EN.SITDE",
+      "name": "TIC 3.0 Enterprise: Shadow IT detection",
+      "source": "m2209"
+    },
+    {
+      "id": "ZTMM 5.4",
+      "name": "CISA ZTMM Data: Data access",
+      "source": "m2209"
+    },
+    {
+      "id": "TIC 3.PEP.WE.DLPRE",
+      "name": "TIC 3.0 Web: Data loss prevention",
+      "source": "m2209"
+    },
+    {
+      "id": "TIC 3.PEP.DA.DLPRE",
+      "name": "TIC 3.0 Data protection: Data loss prevention",
+      "source": "m2209"
+    },
+    {
+      "id": "M-22-09 III.E.2",
+      "name": "M-22-09: Automated data categorization and security responses (report-only first)",
+      "source": "m2209"
+    },
+    {
+      "id": "ZTMM 5.2",
+      "name": "CISA ZTMM Data: Data categorization",
+      "source": "m2209"
+    },
+    {
+      "id": "TIC 3.PEP.DA.DAUTE",
+      "name": "TIC 3.0 Data protection: Data access and use telemetry",
+      "source": "m2209"
+    },
+    {
+      "id": "M-22-09 III.E.4",
+      "name": "M-22-09: Comprehensive logging (M-21-31)",
+      "source": "m2209"
+    },
+    {
+      "id": "TIC 3.PEP.WE.BINSP",
+      "name": "TIC 3.0 Web: Break and inspect",
+      "source": "m2209"
+    },
+    {
+      "id": "M-22-09 III.C.2",
+      "name": "M-22-09: Encrypt all HTTP traffic (enforce HTTPS, TLS)",
+      "source": "m2209"
+    },
+    {
+      "id": "ZTMM 3.3",
+      "name": "CISA ZTMM Networks: Traffic encryption",
+      "source": "m2209"
+    },
+    {
+      "id": "TIC 3.PEP.WE.DRESF",
+      "name": "TIC 3.0 Web: Domain resolution filtering",
+      "source": "m2209"
+    },
+    {
+      "id": "TIC 3.PEP.DO.DNMON",
+      "name": "TIC 3.0 DNS: Domain name monitoring",
+      "source": "m2209"
+    },
+    {
+      "id": "M-22-09 III.C.1",
+      "name": "M-22-09: Resolve DNS queries using encrypted DNS",
+      "source": "m2209"
+    },
+    {
+      "id": "TIC 3.PEP.IN.IDPSY",
+      "name": "TIC 3.0 Intrusion detection: IDPS",
+      "source": "m2209"
+    },
+    {
+      "id": "TIC 3.PEP.FI.DCHAM",
+      "name": "TIC 3.0 Files: Detonation chamber",
+      "source": "m2209"
+    },
+    {
+      "id": "TIC 3.PEP.WE.ACMIT",
+      "name": "TIC 3.0 Web: Active content mitigation",
+      "source": "m2209"
+    },
+    {
+      "id": "TIC 3.PEP.SE.DLPRE",
+      "name": "TIC 3.0 Services: Data loss prevention",
+      "source": "m2209"
+    },
+    {
+      "id": "TIC 3.UNI.TSYNC",
+      "name": "TIC 3.0 Universal: Time synchronization",
+      "source": "m2209"
+    },
+    {
+      "id": "M-22-09 III.D",
+      "name": "M-22-09: Treat applications as internet-connected; secure access to them",
+      "source": "m2209"
+    },
+    {
+      "id": "ZTMM 4.1",
+      "name": "CISA ZTMM Applications: Application access",
+      "source": "m2209"
+    },
+    {
+      "id": "ZTMM 3.2",
+      "name": "CISA ZTMM Networks: Network traffic management",
+      "source": "m2209"
+    },
+    {
+      "id": "ZTMM 4.2",
+      "name": "CISA ZTMM Applications: Application threat protections",
+      "source": "m2209"
+    },
+    {
+      "id": "TIC 3.PEP.SE.MCFIL",
+      "name": "TIC 3.0 Services: Malicious content filtering",
+      "source": "m2209"
+    }
+  ],
+  "areas": {
+    "urlFiltering": {
+      "controls": [
+        "TIC 3.PEP.WE.DREPF",
+        "TIC 3.PEP.WE.MCFIL",
+        "TIC 3.PEP.WE.DCFIL"
+      ],
+      "rationale": "Derived from the rule-level objective mapping (v2.7)."
+    },
+    "cloudAppControl": {
+      "controls": [
+        "TIC 3.PEP.SE.ACONT",
+        "TIC 3.PEP.EN.SITDE",
+        "ZTMM 5.4"
+      ],
+      "rationale": "Derived from the rule-level objective mapping (v2.7)."
+    },
+    "fileTypeControl": {
+      "controls": [
+        "TIC 3.PEP.WE.PCENF",
+        "TIC 3.PEP.NE.ACONT",
+        "TIC 3.PEP.FI.AMALW"
+      ],
+      "rationale": "Derived from the rule-level objective mapping (v2.7)."
+    },
+    "advancedThreatProtection": {
+      "controls": [
+        "TIC 3.PEP.FI.AMALW",
+        "TIC 3.PEP.WE.MCFIL",
+        "TIC 3.PEP.WE.DREPF"
+      ],
+      "rationale": "Derived from the rule-level objective mapping (v2.7)."
+    },
+    "firewallFiltering": {
+      "controls": [
+        "TIC 3.PEP.NE.ACONT",
+        "TIC 3.PEP.NE.IADEN"
+      ],
+      "rationale": "Derived from the rule-level objective mapping (v2.7)."
+    },
+    "dnsSecurity": {
+      "controls": [
+        "TIC 3.PEP.WE.DRESF",
+        "TIC 3.PEP.DO.DNMON",
+        "M-22-09 III.C.1"
+      ],
+      "rationale": "Derived from the rule-level objective mapping (v2.7)."
+    },
+    "sslInspection": {
+      "controls": [
+        "TIC 3.PEP.WE.BINSP",
+        "M-22-09 III.C.2",
+        "ZTMM 3.3"
+      ],
+      "rationale": "Derived from the rule-level objective mapping (v2.7)."
+    },
+    "dlpMonitor": {
+      "controls": [
+        "TIC 3.PEP.DA.DAUTE",
+        "M-22-09 III.E.2",
+        "M-22-09 III.E.4"
+      ],
+      "rationale": "Derived from the rule-level objective mapping (v2.7)."
+    },
+    "dlpBlock": {
+      "controls": [
+        "TIC 3.PEP.WE.DLPRE",
+        "TIC 3.PEP.DA.DLPRE",
+        "M-22-09 III.E.2"
+      ],
+      "rationale": "Derived from the rule-level objective mapping (v2.7)."
+    },
+    "endpointDlp": {
+      "controls": [
+        "TIC 3.PEP.DA.DLPRE",
+        "ZTMM 5.4"
+      ],
+      "rationale": "Derived from the rule-level objective mapping (v2.7)."
+    },
+    "sandbox": {
+      "controls": [
+        "TIC 3.PEP.FI.DCHAM"
+      ],
+      "rationale": "Derived from the rule-level objective mapping (v2.7)."
+    },
+    "aiPromptCapture": {
+      "controls": [
+        "TIC 3.PEP.DA.DAUTE",
+        "M-22-09 III.E.2",
+        "M-22-09 III.E.4"
+      ],
+      "rationale": "Derived from the rule-level objective mapping (v2.7)."
+    }
+  },
+  "dlp": {
+    "monitorEngines": [
+      "GLBA"
+    ],
+    "blockRules": [
+      {
+        "key": "CUI-Markings",
+        "label": "CUI-Markings",
+        "dictionaries": [
+          "custom:CUI_MARKINGS"
+        ],
+        "controls": [
+          "TIC 3.PEP.WE.DLPRE",
+          "M-22-09 III.E.2"
+        ]
+      },
+      {
+        "key": "PII",
+        "label": "PII",
+        "dictionaries": [
+          "predefined:SSN",
+          "predefined:TIN_LEAKAGE",
+          "predefined:USDL_LEAKAGE"
+        ],
+        "controls": [
+          "TIC 3.PEP.WE.DLPRE"
+        ]
+      },
+      {
+        "key": "Credentials",
+        "label": "Credentials",
+        "dictionaries": [
+          "predefined:CRED_LEAKAGE"
+        ],
+        "controls": [
+          "TIC 3.PEP.WE.DLPRE"
+        ]
+      }
+    ],
+    "endpointChannels": [
+      "REMOVABLE_DRIVE_TRANSFER",
+      "PERSONAL_CLOUD_STORAGE",
+      "PRINTING"
+    ]
+  },
+  "objectives": {
+    "MALWARE": [
+      "TIC 3.PEP.FI.AMALW",
+      "TIC 3.PEP.WE.MCFIL"
+    ],
+    "THREAT_SITES": [
+      "TIC 3.PEP.WE.DREPF",
+      "TIC 3.PEP.WE.MCFIL"
+    ],
+    "ACCEPTABLE_USE": [
+      "TIC 3.PEP.WE.DCFIL"
+    ],
+    "PRODUCTIVITY": [
+      "TIC 3.PEP.WE.DCFIL",
+      "TIC 3.PEP.WE.BCONT"
+    ],
+    "LEAST_FUNCTION": [
+      "TIC 3.PEP.WE.PCENF",
+      "TIC 3.PEP.NE.ACONT"
+    ],
+    "BOUNDARY": [
+      "TIC 3.PEP.NE.ACONT",
+      "TIC 3.PEP.NE.IADEN"
+    ],
+    "ALLOW_EXCEPTION": [
+      "TIC 3.PEP.NE.ACONT"
+    ],
+    "INFO_FLOW": [
+      "TIC 3.PEP.SE.ACONT",
+      "TIC 3.PEP.EN.SITDE",
+      "ZTMM 5.4"
+    ],
+    "DATA_LOSS": [
+      "TIC 3.PEP.WE.DLPRE",
+      "TIC 3.PEP.DA.DLPRE",
+      "M-22-09 III.E.2",
+      "ZTMM 5.2"
+    ],
+    "DATA_MONITOR": [
+      "TIC 3.PEP.DA.DAUTE",
+      "M-22-09 III.E.2",
+      "M-22-09 III.E.4"
+    ],
+    "MEDIA": [
+      "TIC 3.PEP.DA.DLPRE",
+      "ZTMM 5.4"
+    ],
+    "INSPECT_TLS": [
+      "TIC 3.PEP.WE.BINSP",
+      "M-22-09 III.C.2",
+      "ZTMM 3.3"
+    ],
+    "PRIVACY_EXEMPT": [],
+    "DNS": [
+      "TIC 3.PEP.WE.DRESF",
+      "TIC 3.PEP.DO.DNMON",
+      "M-22-09 III.C.1"
+    ],
+    "DNS_TUNNEL": [
+      "TIC 3.PEP.DO.DNMON",
+      "TIC 3.PEP.IN.IDPSY"
+    ],
+    "SANDBOX": [
+      "TIC 3.PEP.FI.DCHAM"
+    ],
+    "ISOLATION": [
+      "TIC 3.PEP.WE.ACMIT"
+    ],
+    "MOBILE_CODE": [
+      "TIC 3.PEP.WE.ACMIT",
+      "TIC 3.PEP.WE.MCFIL"
+    ],
+    "AI_GOV": [
+      "TIC 3.PEP.SE.ACONT",
+      "TIC 3.PEP.EN.SITDE",
+      "TIC 3.PEP.SE.DLPRE"
+    ],
+    "TIME_SYNC": [
+      "TIC 3.UNI.TSYNC"
+    ],
+    "REMOTE_ACCESS": [
+      "M-22-09 III.D",
+      "ZTMM 4.1",
+      "ZTMM 3.2"
+    ],
+    "SESSION": [
+      "ZTMM 4.1"
+    ],
+    "APP_PROTECT": [
+      "ZTMM 4.2",
+      "TIC 3.PEP.SE.MCFIL"
+    ]
+  }
+}

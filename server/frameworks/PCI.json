@@ -5,7 +5,7 @@
   "fullName": "Payment Card Industry Data Security Standard v4.0.1",
   "description": "Security standard for entities that store, process or transmit cardholder data.",
   "version": "2026.10.1",
-  "researchedAt": "2026-10-16",
+  "researchedAt": "2026-10-29",
   "baseTier": "STRICT",
   "complianceKey": "PCI",
   "sources": [
@@ -16,7 +16,7 @@
     },
     {
       "id": "pci5",
-      "title": "PCI DSS v4.0.1 Requirement 5 \u2014 Protect systems against malware",
+      "title": "PCI DSS v4.0.1 Requirement 5 — Protect systems against malware",
       "url": "https://www.myctrl.tools/frameworks/pci-dss-v4/family/5"
     },
     {
@@ -79,6 +79,46 @@
     {
       "id": "12.3",
       "name": "Risks to the cardholder data environment are identified",
+      "source": "pci"
+    },
+    {
+      "id": "1.2.5",
+      "name": "All services, protocols and ports allowed are identified, approved and have a defined business need",
+      "source": "pci"
+    },
+    {
+      "id": "6.4.2",
+      "name": "An automated technical solution detects and prevents web-based attacks on public-facing web applications",
+      "source": "pci"
+    },
+    {
+      "id": "7.2",
+      "name": "Access to system components and data is appropriately defined and assigned",
+      "source": "pci"
+    },
+    {
+      "id": "8.2.8",
+      "name": "Sessions idle for more than 15 minutes require re-authentication",
+      "source": "pci"
+    },
+    {
+      "id": "9.4",
+      "name": "Media with cardholder data is securely stored, accessed, distributed and destroyed",
+      "source": "pci"
+    },
+    {
+      "id": "10.6",
+      "name": "Time-synchronization mechanisms support consistent time settings",
+      "source": "pci"
+    },
+    {
+      "id": "11.5",
+      "name": "Network intrusions and unexpected file changes are detected and responded to",
+      "source": "pci"
+    },
+    {
+      "id": "12.2",
+      "name": "Acceptable use policies for end-user technologies are defined and implemented",
       "source": "pci"
     }
   ],
@@ -204,6 +244,87 @@
       "REMOVABLE_DRIVE_TRANSFER",
       "PERSONAL_CLOUD_STORAGE",
       "PRINTING"
+    ]
+  },
+  "objectives": {
+    "MALWARE": [
+      "5.2"
+    ],
+    "THREAT_SITES": [
+      "5.2",
+      "5.4.1"
+    ],
+    "ACCEPTABLE_USE": [
+      "12.2"
+    ],
+    "PRODUCTIVITY": [
+      "12.2"
+    ],
+    "LEAST_FUNCTION": [
+      "1.2.5",
+      "5.2"
+    ],
+    "BOUNDARY": [
+      "1.3",
+      "1.4"
+    ],
+    "ALLOW_EXCEPTION": [
+      "1.2.5",
+      "1.3"
+    ],
+    "INFO_FLOW": [
+      "1.4",
+      "12.3"
+    ],
+    "DATA_LOSS": [
+      "4.2",
+      "3.3.1"
+    ],
+    "DATA_MONITOR": [
+      "10.2"
+    ],
+    "MEDIA": [
+      "9.4"
+    ],
+    "INSPECT_TLS": [
+      "5.2",
+      "4.2"
+    ],
+    "PRIVACY_EXEMPT": [],
+    "DNS": [
+      "5.2",
+      "1.4"
+    ],
+    "DNS_TUNNEL": [
+      "11.5",
+      "1.4"
+    ],
+    "SANDBOX": [
+      "5.2"
+    ],
+    "ISOLATION": [
+      "5.2",
+      "5.4.1"
+    ],
+    "MOBILE_CODE": [
+      "5.2"
+    ],
+    "AI_GOV": [
+      "1.4",
+      "12.3"
+    ],
+    "TIME_SYNC": [
+      "10.6"
+    ],
+    "REMOTE_ACCESS": [
+      "7.2",
+      "1.4"
+    ],
+    "SESSION": [
+      "8.2.8"
+    ],
+    "APP_PROTECT": [
+      "6.4.2"
     ]
   }
 }

@@ -1,0 +1,364 @@
+{
+  "id": "GOVRAMP",
+  "type": "compliance",
+  "vertical": "FEDERAL",
+  "name": "GovRAMP Moderate",
+  "fullName": "GovRAMP (formerly StateRAMP) Moderate — NIST SP 800-53 Rev. 5 moderate baseline",
+  "description": "Cloud services sold to state and local governments; GovRAMP (StateRAMP before February 2025) security baselines follow NIST SP 800-53 Rev. 5.",
+  "version": "2026.10.29",
+  "researchedAt": "2026-10-29",
+  "baseTier": "STRICT",
+  "complianceKey": "GOVRAMP",
+  "sources": [
+    {
+      "id": "govramp",
+      "title": "GovRAMP (formerly StateRAMP): rebrand announcement, 2025-02-14",
+      "url": "https://govramp.org/blog/stateramp-announces-rebrand-to-govramp-reflecting-mission-to-unite-public-and-private-sectors-in-advancing-cybersecurity/"
+    },
+    {
+      "id": "nist53b",
+      "title": "NIST SP 800-53B Control Baselines (OSCAL profiles, usnistgov/oscal-content)",
+      "url": "https://github.com/usnistgov/oscal-content/tree/main/nist.gov/SP800-53/rev5"
+    },
+    {
+      "id": "nist53",
+      "title": "NIST SP 800-53 Rev. 5 Security and Privacy Controls",
+      "url": "https://csrc.nist.gov/pubs/sp/800/53/r5/upd1/final"
+    },
+    {
+      "id": "zs-sandbox",
+      "title": "Zscaler: Recommended Sandbox Policy",
+      "url": "https://help.zscaler.com/zia/recommended-sandbox-policy"
+    },
+    {
+      "id": "zs-edlp",
+      "title": "Zscaler: Configuring Endpoint DLP Policy Rules",
+      "url": "https://help.zscaler.com/zia/configuring-endpoint-dlp-policy-rules"
+    },
+    {
+      "id": "zs-api-adv-url",
+      "title": "Zscaler SDK (Go): URL & Cloud App advanced settings incl. GenAI prompt capture flags",
+      "url": "https://github.com/zscaler/zscaler-sdk-go/blob/master/zscaler/zia/services/urlfilteringpolicies/urlfilteringpolicies.go"
+    },
+    {
+      "id": "cis",
+      "title": "CIS Critical Security Controls v8.1 (Safeguards 9.2 DNS filtering, 9.3 URL filters, 9.6 block unnecessary file types, 10.1 anti-malware, 3.13 DLP)",
+      "url": "https://myctrl.tools/frameworks/cis-controls-v8"
+    }
+  ],
+  "controls": [
+    {
+      "id": "SI-3",
+      "name": "Malicious code protection",
+      "source": "govramp"
+    },
+    {
+      "id": "SC-7",
+      "name": "Boundary protection",
+      "source": "govramp"
+    },
+    {
+      "id": "SI-4",
+      "name": "System monitoring",
+      "source": "govramp"
+    },
+    {
+      "id": "PL-4",
+      "name": "Rules of behavior",
+      "source": "govramp"
+    },
+    {
+      "id": "CM-7",
+      "name": "Least functionality",
+      "source": "govramp"
+    },
+    {
+      "id": "SC-7(5)",
+      "name": "Deny by default — allow by exception",
+      "source": "govramp"
+    },
+    {
+      "id": "AC-4",
+      "name": "Information flow enforcement",
+      "source": "govramp"
+    },
+    {
+      "id": "AC-20",
+      "name": "Use of external systems",
+      "source": "govramp"
+    },
+    {
+      "id": "AU-2",
+      "name": "Event logging",
+      "source": "govramp"
+    },
+    {
+      "id": "AU-12",
+      "name": "Audit record generation",
+      "source": "govramp"
+    },
+    {
+      "id": "MP-7",
+      "name": "Media use",
+      "source": "govramp"
+    },
+    {
+      "id": "SC-7(8)",
+      "name": "Route traffic to authenticated proxy servers",
+      "source": "govramp"
+    },
+    {
+      "id": "SC-8(1)",
+      "name": "Cryptographic protection",
+      "source": "govramp"
+    },
+    {
+      "id": "SC-21",
+      "name": "Secure name/address resolution service (recursive or caching resolver)",
+      "source": "govramp"
+    },
+    {
+      "id": "SI-4(4)",
+      "name": "Inbound and outbound communications traffic",
+      "source": "govramp"
+    },
+    {
+      "id": "SC-18",
+      "name": "Mobile code",
+      "source": "govramp"
+    },
+    {
+      "id": "AU-8",
+      "name": "Time stamps",
+      "source": "govramp"
+    },
+    {
+      "id": "AC-17",
+      "name": "Remote access",
+      "source": "govramp"
+    },
+    {
+      "id": "AC-3",
+      "name": "Access enforcement",
+      "source": "govramp"
+    },
+    {
+      "id": "AC-12",
+      "name": "Session termination",
+      "source": "govramp"
+    },
+    {
+      "id": "SI-10",
+      "name": "Information input validation",
+      "source": "govramp"
+    }
+  ],
+  "areas": {
+    "urlFiltering": {
+      "controls": [
+        "SI-3",
+        "SC-7",
+        "SI-4"
+      ],
+      "rationale": "Derived from the rule-level objective mapping (v2.7)."
+    },
+    "cloudAppControl": {
+      "controls": [
+        "AC-4",
+        "AC-20"
+      ],
+      "rationale": "Derived from the rule-level objective mapping (v2.7)."
+    },
+    "fileTypeControl": {
+      "controls": [
+        "CM-7",
+        "SC-7",
+        "SI-3"
+      ],
+      "rationale": "Derived from the rule-level objective mapping (v2.7)."
+    },
+    "advancedThreatProtection": {
+      "controls": [
+        "SI-3",
+        "SC-7",
+        "SI-4"
+      ],
+      "rationale": "Derived from the rule-level objective mapping (v2.7)."
+    },
+    "firewallFiltering": {
+      "controls": [
+        "SC-7",
+        "SC-7(5)"
+      ],
+      "rationale": "Derived from the rule-level objective mapping (v2.7)."
+    },
+    "dnsSecurity": {
+      "controls": [
+        "SC-21",
+        "SI-4"
+      ],
+      "rationale": "Derived from the rule-level objective mapping (v2.7)."
+    },
+    "sslInspection": {
+      "controls": [
+        "SI-4",
+        "SC-7(8)",
+        "SC-8(1)"
+      ],
+      "rationale": "Derived from the rule-level objective mapping (v2.7)."
+    },
+    "dlpMonitor": {
+      "controls": [
+        "AU-2",
+        "AU-12",
+        "SI-4"
+      ],
+      "rationale": "Derived from the rule-level objective mapping (v2.7)."
+    },
+    "dlpBlock": {
+      "controls": [
+        "AC-4",
+        "SC-7"
+      ],
+      "rationale": "Derived from the rule-level objective mapping (v2.7)."
+    },
+    "endpointDlp": {
+      "controls": [
+        "MP-7",
+        "AC-4"
+      ],
+      "rationale": "Derived from the rule-level objective mapping (v2.7)."
+    },
+    "sandbox": {
+      "controls": [
+        "SI-3"
+      ],
+      "rationale": "Derived from the rule-level objective mapping (v2.7)."
+    },
+    "aiPromptCapture": {
+      "controls": [
+        "AU-2",
+        "AU-12",
+        "SI-4"
+      ],
+      "rationale": "Derived from the rule-level objective mapping (v2.7)."
+    }
+  },
+  "dlp": {
+    "monitorEngines": [
+      "GLBA"
+    ],
+    "blockRules": [
+      {
+        "key": "PII",
+        "label": "PII",
+        "dictionaries": [
+          "predefined:SSN",
+          "predefined:TIN_LEAKAGE",
+          "predefined:USDL_LEAKAGE"
+        ],
+        "controls": [
+          "AC-4"
+        ]
+      },
+      {
+        "key": "Credentials",
+        "label": "Credentials",
+        "dictionaries": [
+          "predefined:CRED_LEAKAGE"
+        ],
+        "controls": [
+          "AC-4"
+        ]
+      }
+    ],
+    "endpointChannels": [
+      "REMOVABLE_DRIVE_TRANSFER",
+      "PERSONAL_CLOUD_STORAGE",
+      "PRINTING"
+    ]
+  },
+  "objectives": {
+    "MALWARE": [
+      "SI-3"
+    ],
+    "THREAT_SITES": [
+      "SI-3",
+      "SC-7",
+      "SI-4"
+    ],
+    "ACCEPTABLE_USE": [
+      "PL-4"
+    ],
+    "PRODUCTIVITY": [],
+    "LEAST_FUNCTION": [
+      "CM-7",
+      "SC-7"
+    ],
+    "BOUNDARY": [
+      "SC-7"
+    ],
+    "ALLOW_EXCEPTION": [
+      "SC-7(5)"
+    ],
+    "INFO_FLOW": [
+      "AC-4",
+      "AC-20"
+    ],
+    "DATA_LOSS": [
+      "AC-4",
+      "SC-7"
+    ],
+    "DATA_MONITOR": [
+      "AU-2",
+      "AU-12",
+      "SI-4"
+    ],
+    "MEDIA": [
+      "MP-7",
+      "AC-4"
+    ],
+    "INSPECT_TLS": [
+      "SI-4",
+      "SC-7(8)",
+      "SC-8(1)"
+    ],
+    "PRIVACY_EXEMPT": [],
+    "DNS": [
+      "SC-21",
+      "SI-4"
+    ],
+    "DNS_TUNNEL": [
+      "SI-4(4)",
+      "SC-7"
+    ],
+    "SANDBOX": [
+      "SI-3"
+    ],
+    "ISOLATION": [
+      "SC-18"
+    ],
+    "MOBILE_CODE": [
+      "SC-18",
+      "SI-3"
+    ],
+    "AI_GOV": [
+      "AC-4",
+      "AC-20"
+    ],
+    "TIME_SYNC": [
+      "AU-8"
+    ],
+    "REMOTE_ACCESS": [
+      "AC-17",
+      "AC-3"
+    ],
+    "SESSION": [
+      "AC-12"
+    ],
+    "APP_PROTECT": [
+      "SI-10",
+      "SC-7"
+    ]
+  }
+}

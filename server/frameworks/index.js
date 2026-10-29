@@ -16,4 +16,11 @@ module.exports = [
   require('./SOX.json'),
   require('./STRICT.json'),
   require('./ZTH_EBOOK.json'),
+  // v2.7 federal
+  require('./FEDRAMP_MOD.json'),
+  require('./FEDRAMP_HIGH.json'),
+  require('./CMMC_L2.json'),
+  require('./FED_ZT.json'),
+  require('./IRS_1075.json'),
+  require('./GOVRAMP.json'),
 ];

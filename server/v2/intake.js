@@ -63,6 +63,22 @@ const PRESETS = {
     ],
     notes: ['Check which baseline the customer audits against (PCI DSS, SOX).']
   },
+  FEDERAL: {
+    id: 'FEDERAL', name: 'Federal and public sector', icon: '🏛️', baseline: 'FEDRAMP_MOD',
+    description: 'Federal, state or local agency, or a contractor that serves one: FedRAMP Moderate baseline (pick CMMC, Zero Trust, IRS 1075, CJIS or GovRAMP instead); case management and HR apps on ZPA; login.gov and USAJOBS in ZDX.',
+    apps: [
+      { name: 'Case management', destinations: ['cases.{domain}'], ports: '443' },
+      { name: 'Financial management', destinations: ['finance.{domain}'], ports: '443' },
+      { name: 'HR and time and attendance', destinations: ['hr.{domain}'], ports: '443' }
+    ],
+    zdxApps: [
+      { name: 'Login.gov', url: 'https://secure.login.gov/' },
+      { name: 'USAJOBS', url: 'https://www.usajobs.gov/' },
+      { name: 'SAM.gov', url: 'https://sam.gov/' }
+    ],
+    notes: ['Confirm the authorization the customer works to (FedRAMP Moderate or High, CMMC Level 2, IRS Pub 1075, CJIS, GovRAMP) and pick that compliance profile.',
+      'Federal civilian agencies on a GovCloud tenant use the GovCloud Edition of the wizard.']
+  },
   EDUCATION: {
     id: 'EDUCATION', name: 'Education', icon: '🎓', baseline: 'BALANCED',
     description: 'School district, college or university: Balanced baseline; student information system on ZPA; learning platforms in ZDX.',

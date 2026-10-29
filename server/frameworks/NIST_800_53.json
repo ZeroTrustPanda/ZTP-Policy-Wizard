@@ -5,7 +5,7 @@
   "fullName": "NIST Special Publication 800-53 Rev. 5",
   "description": "Security and privacy controls for federal information systems (moderate/high baselines).",
   "version": "2026.10.1",
-  "researchedAt": "2026-10-16",
+  "researchedAt": "2026-10-29",
   "baseTier": "STRICT",
   "complianceKey": "NIST_800_53",
   "sources": [
@@ -83,7 +83,7 @@
     },
     {
       "id": "SC-7(5)",
-      "name": "Deny by default \u2014 allow by exception",
+      "name": "Deny by default — allow by exception",
       "source": "nist53"
     },
     {
@@ -124,6 +124,56 @@
     {
       "id": "SI-4",
       "name": "System monitoring",
+      "source": "nist53"
+    },
+    {
+      "id": "AC-3",
+      "name": "Access enforcement",
+      "source": "nist53"
+    },
+    {
+      "id": "AC-12",
+      "name": "Session termination",
+      "source": "nist53"
+    },
+    {
+      "id": "AC-17",
+      "name": "Remote access",
+      "source": "nist53"
+    },
+    {
+      "id": "AU-8",
+      "name": "Time stamps",
+      "source": "nist53"
+    },
+    {
+      "id": "PL-4",
+      "name": "Rules of behavior",
+      "source": "nist53"
+    },
+    {
+      "id": "SC-8(1)",
+      "name": "Cryptographic protection",
+      "source": "nist53"
+    },
+    {
+      "id": "SC-18",
+      "name": "Mobile code",
+      "source": "nist53"
+    },
+    {
+      "id": "SI-4(4)",
+      "name": "Inbound and outbound communications traffic",
+      "source": "nist53"
+    },
+    {
+      "id": "SI-4(10)",
+      "name": "Visibility of encrypted communications",
+      "source": "nist53"
+    },
+    {
+      "id": "SI-10",
+      "name": "Information input validation",
       "source": "nist53"
     }
   ],
@@ -271,6 +321,92 @@
       "REMOVABLE_DRIVE_TRANSFER",
       "PERSONAL_CLOUD_STORAGE",
       "PRINTING"
+    ]
+  },
+  "objectives": {
+    "MALWARE": [
+      "SI-3"
+    ],
+    "THREAT_SITES": [
+      "SI-3",
+      "SC-7",
+      "SI-4"
+    ],
+    "ACCEPTABLE_USE": [
+      "PL-4"
+    ],
+    "PRODUCTIVITY": [],
+    "LEAST_FUNCTION": [
+      "CM-7",
+      "SC-7"
+    ],
+    "BOUNDARY": [
+      "SC-7"
+    ],
+    "ALLOW_EXCEPTION": [
+      "SC-7(5)"
+    ],
+    "INFO_FLOW": [
+      "AC-4",
+      "AC-20"
+    ],
+    "DATA_LOSS": [
+      "AC-4",
+      "SC-7(10)"
+    ],
+    "DATA_MONITOR": [
+      "AU-2",
+      "AU-12",
+      "SI-4"
+    ],
+    "MEDIA": [
+      "MP-7",
+      "AC-4"
+    ],
+    "INSPECT_TLS": [
+      "SI-4",
+      "SI-4(10)",
+      "SC-7(8)",
+      "SC-8(1)"
+    ],
+    "PRIVACY_EXEMPT": [],
+    "DNS": [
+      "SC-21",
+      "SI-4"
+    ],
+    "DNS_TUNNEL": [
+      "SI-4(4)",
+      "SC-7"
+    ],
+    "SANDBOX": [
+      "SI-3",
+      "SC-44"
+    ],
+    "ISOLATION": [
+      "SC-18",
+      "SC-44"
+    ],
+    "MOBILE_CODE": [
+      "SC-18",
+      "SI-3"
+    ],
+    "AI_GOV": [
+      "AC-4",
+      "AC-20"
+    ],
+    "TIME_SYNC": [
+      "AU-8"
+    ],
+    "REMOTE_ACCESS": [
+      "AC-17",
+      "AC-3"
+    ],
+    "SESSION": [
+      "AC-12"
+    ],
+    "APP_PROTECT": [
+      "SI-10",
+      "SC-7"
     ]
   }
 }

@@ -5,7 +5,7 @@
   "fullName": "NIST Special Publication 800-171 Rev. 3",
   "description": "Security requirements for protecting Controlled Unclassified Information (CUI) in nonfederal systems (CMMC Level 2).",
   "version": "2026.10.1",
-  "researchedAt": "2026-10-16",
+  "researchedAt": "2026-10-29",
   "baseTier": "STRICT",
   "complianceKey": "NIST_800_171",
   "sources": [
@@ -68,7 +68,7 @@
     },
     {
       "id": "03.13.06",
-      "name": "Network communications \u2014 deny by default",
+      "name": "Network communications — deny by default",
       "source": "nist171"
     },
     {
@@ -84,6 +84,41 @@
     {
       "id": "03.14.06",
       "name": "System monitoring",
+      "source": "nist171"
+    },
+    {
+      "id": "03.01.01",
+      "name": "Account management",
+      "source": "nist171"
+    },
+    {
+      "id": "03.01.11",
+      "name": "Session termination",
+      "source": "nist171"
+    },
+    {
+      "id": "03.01.12",
+      "name": "Remote access",
+      "source": "nist171"
+    },
+    {
+      "id": "03.01.20",
+      "name": "Use of external systems",
+      "source": "nist171"
+    },
+    {
+      "id": "03.03.07",
+      "name": "Time stamps",
+      "source": "nist171"
+    },
+    {
+      "id": "03.13.13",
+      "name": "Mobile code",
+      "source": "nist171"
+    },
+    {
+      "id": "03.15.03",
+      "name": "Rules of behavior",
       "source": "nist171"
     }
   ],
@@ -209,6 +244,83 @@
       "REMOVABLE_DRIVE_TRANSFER",
       "PERSONAL_CLOUD_STORAGE",
       "PRINTING"
+    ]
+  },
+  "objectives": {
+    "MALWARE": [
+      "03.14.02"
+    ],
+    "THREAT_SITES": [
+      "03.14.02",
+      "03.13.01"
+    ],
+    "ACCEPTABLE_USE": [
+      "03.15.03"
+    ],
+    "PRODUCTIVITY": [],
+    "LEAST_FUNCTION": [
+      "03.04.06"
+    ],
+    "BOUNDARY": [
+      "03.13.01"
+    ],
+    "ALLOW_EXCEPTION": [
+      "03.13.06"
+    ],
+    "INFO_FLOW": [
+      "03.01.03",
+      "03.01.20"
+    ],
+    "DATA_LOSS": [
+      "03.01.03",
+      "03.13.01"
+    ],
+    "DATA_MONITOR": [
+      "03.03.01",
+      "03.14.06"
+    ],
+    "MEDIA": [
+      "03.08.07"
+    ],
+    "INSPECT_TLS": [
+      "03.14.06",
+      "03.13.08"
+    ],
+    "PRIVACY_EXEMPT": [],
+    "DNS": [
+      "03.13.01",
+      "03.14.06"
+    ],
+    "DNS_TUNNEL": [
+      "03.14.06"
+    ],
+    "SANDBOX": [
+      "03.14.02"
+    ],
+    "ISOLATION": [
+      "03.13.13"
+    ],
+    "MOBILE_CODE": [
+      "03.13.13",
+      "03.14.02"
+    ],
+    "AI_GOV": [
+      "03.01.03",
+      "03.01.20"
+    ],
+    "TIME_SYNC": [
+      "03.03.07"
+    ],
+    "REMOTE_ACCESS": [
+      "03.01.12",
+      "03.01.01"
+    ],
+    "SESSION": [
+      "03.01.11"
+    ],
+    "APP_PROTECT": [
+      "03.14.02",
+      "03.13.01"
     ]
   }
 }
