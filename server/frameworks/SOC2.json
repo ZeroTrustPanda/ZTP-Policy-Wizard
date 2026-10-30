@@ -1,0 +1,297 @@
+{
+  "id": "SOC2",
+  "type": "compliance",
+  "vertical": "GENERAL",
+  "name": "SOC 2",
+  "fullName": "SOC 2: AICPA Trust Services Criteria (2017, revised points of focus 2022)",
+  "description": "Service organizations reporting on security and confidentiality controls to customers; the common criteria for logical access, transmission of information, malicious software and monitoring.",
+  "version": "2026.10.30",
+  "researchedAt": "2026-10-30",
+  "baseTier": "BALANCED",
+  "complianceKey": "SOC2",
+  "sources": [
+    {
+      "id": "aicpa-tsc",
+      "title": "AICPA: 2017 Trust Services Criteria (With Revised Points of Focus – 2022)",
+      "url": "https://www.aicpa-cima.com/resources/download/2017-trust-services-criteria-with-revised-points-of-focus-2022"
+    },
+    {
+      "id": "zs-sandbox",
+      "title": "Zscaler: Recommended Sandbox Policy",
+      "url": "https://help.zscaler.com/zia/recommended-sandbox-policy"
+    },
+    {
+      "id": "zs-edlp",
+      "title": "Zscaler: Configuring Endpoint DLP Policy Rules",
+      "url": "https://help.zscaler.com/zia/configuring-endpoint-dlp-policy-rules"
+    },
+    {
+      "id": "zs-api-adv-url",
+      "title": "Zscaler SDK (Go): URL & Cloud App advanced settings incl. GenAI prompt capture flags",
+      "url": "https://github.com/zscaler/zscaler-sdk-go/blob/master/zscaler/zia/services/urlfilteringpolicies/urlfilteringpolicies.go"
+    }
+  ],
+  "controls": [
+    {
+      "id": "CC6.8",
+      "name": "Prevent or detect unauthorized or malicious software",
+      "source": "aicpa-tsc"
+    },
+    {
+      "id": "CC6.6",
+      "name": "Logical access measures against threats from outside the system boundary",
+      "source": "aicpa-tsc"
+    },
+    {
+      "id": "CC6.7",
+      "name": "Restrict the transmission, movement and removal of information",
+      "source": "aicpa-tsc"
+    },
+    {
+      "id": "C1.1",
+      "name": "Identify and maintain confidential information",
+      "source": "aicpa-tsc"
+    },
+    {
+      "id": "CC7.2",
+      "name": "Monitor system components for anomalies that indicate malicious acts",
+      "source": "aicpa-tsc"
+    },
+    {
+      "id": "CC6.1",
+      "name": "Logical access security over protected information assets",
+      "source": "aicpa-tsc"
+    }
+  ],
+  "areas": {
+    "urlFiltering": {
+      "controls": [
+        "CC6.8",
+        "CC6.6"
+      ],
+      "rationale": "Derived from the rule-level objective mapping (v2.8)."
+    },
+    "cloudAppControl": {
+      "controls": [
+        "CC6.7"
+      ],
+      "rationale": "Derived from the rule-level objective mapping (v2.8)."
+    },
+    "fileTypeControl": {
+      "controls": [
+        "CC6.6",
+        "CC6.8"
+      ],
+      "rationale": "Derived from the rule-level objective mapping (v2.8)."
+    },
+    "advancedThreatProtection": {
+      "controls": [
+        "CC6.8",
+        "CC6.6"
+      ],
+      "rationale": "Derived from the rule-level objective mapping (v2.8)."
+    },
+    "firewallFiltering": {
+      "controls": [
+        "CC6.6"
+      ],
+      "rationale": "Derived from the rule-level objective mapping (v2.8)."
+    },
+    "dnsSecurity": {
+      "controls": [
+        "CC6.6"
+      ],
+      "rationale": "Derived from the rule-level objective mapping (v2.8)."
+    },
+    "sslInspection": {
+      "controls": [
+        "CC7.2",
+        "CC6.8"
+      ],
+      "rationale": "Derived from the rule-level objective mapping (v2.8)."
+    },
+    "dlpMonitor": {
+      "controls": [
+        "CC7.2"
+      ],
+      "rationale": "Derived from the rule-level objective mapping (v2.8)."
+    },
+    "dlpBlock": {
+      "controls": [
+        "CC6.7",
+        "C1.1"
+      ],
+      "rationale": "Derived from the rule-level objective mapping (v2.8)."
+    },
+    "endpointDlp": {
+      "controls": [
+        "CC6.7"
+      ],
+      "rationale": "Derived from the rule-level objective mapping (v2.8)."
+    },
+    "sandbox": {
+      "controls": [
+        "CC6.8"
+      ],
+      "rationale": "Derived from the rule-level objective mapping (v2.8)."
+    },
+    "aiPromptCapture": {
+      "controls": [
+        "CC7.2",
+        "CC6.7"
+      ],
+      "rationale": "Derived from the rule-level objective mapping (v2.8)."
+    },
+    "saasDlp": {
+      "controls": [
+        "CC6.7",
+        "C1.1",
+        "CC7.2"
+      ],
+      "rationale": "Derived from the rule-level objective mapping (v2.8)."
+    },
+    "emailDlp": {
+      "controls": [
+        "CC6.7",
+        "C1.1",
+        "CC7.2"
+      ],
+      "rationale": "Derived from the rule-level objective mapping (v2.8)."
+    }
+  },
+  "dlp": {
+    "monitorEngines": [
+      "PCI",
+      "GLBA"
+    ],
+    "blockRules": [
+      {
+        "key": "PII",
+        "label": "PII",
+        "dictionaries": [
+          "predefined:SSN",
+          "predefined:TIN_LEAKAGE",
+          "predefined:USDL_LEAKAGE"
+        ],
+        "controls": [
+          "CC6.7",
+          "C1.1"
+        ]
+      },
+      {
+        "key": "Payment-Cards",
+        "label": "Payment-Cards",
+        "dictionaries": [
+          "predefined:CREDIT_CARD"
+        ],
+        "controls": [
+          "CC6.7"
+        ]
+      },
+      {
+        "key": "Credentials",
+        "label": "Credentials",
+        "dictionaries": [
+          "predefined:CRED_LEAKAGE",
+          "custom:SECRETS_KEYS"
+        ],
+        "expression": "(({CRED_LEAKAGE} > 1) OR ({SECRETS_KEYS} > 0))",
+        "why": "Passwords in clear text, private keys and cloud or SaaS access tokens.",
+        "controls": [
+          "CC6.7"
+        ]
+      },
+      {
+        "key": "Source-Code",
+        "label": "Source-Code",
+        "defaultAction": "ALLOW",
+        "severity": "RULE_SEVERITY_MEDIUM",
+        "why": "Program source (structure and statements together) leaving the organization, for example pasted into AI apps or personal repositories. Monitor by default.",
+        "dictionaries": [
+          "custom:SRC_SIGNAL",
+          "custom:SRC_ANCHOR"
+        ],
+        "expression": "(({SRC_SIGNAL} > 4) AND ({SRC_ANCHOR} > 0))",
+        "controls": [
+          "CC6.7",
+          "C1.1"
+        ]
+      }
+    ],
+    "endpointChannels": [
+      "REMOVABLE_DRIVE_TRANSFER",
+      "PERSONAL_CLOUD_STORAGE",
+      "PRINTING"
+    ]
+  },
+  "objectives": {
+    "MALWARE": [
+      "CC6.8"
+    ],
+    "THREAT_SITES": [
+      "CC6.8",
+      "CC6.6"
+    ],
+    "ACCEPTABLE_USE": [],
+    "PRODUCTIVITY": [],
+    "LEAST_FUNCTION": [
+      "CC6.6",
+      "CC6.8"
+    ],
+    "BOUNDARY": [
+      "CC6.6"
+    ],
+    "ALLOW_EXCEPTION": [
+      "CC6.6"
+    ],
+    "INFO_FLOW": [
+      "CC6.7"
+    ],
+    "DATA_LOSS": [
+      "CC6.7",
+      "C1.1"
+    ],
+    "DATA_MONITOR": [
+      "CC7.2"
+    ],
+    "MEDIA": [
+      "CC6.7"
+    ],
+    "INSPECT_TLS": [
+      "CC7.2",
+      "CC6.8"
+    ],
+    "PRIVACY_EXEMPT": [],
+    "DNS": [
+      "CC6.6"
+    ],
+    "DNS_TUNNEL": [
+      "CC7.2",
+      "CC6.6"
+    ],
+    "SANDBOX": [
+      "CC6.8"
+    ],
+    "ISOLATION": [
+      "CC6.8"
+    ],
+    "MOBILE_CODE": [
+      "CC6.8"
+    ],
+    "AI_GOV": [
+      "CC6.7"
+    ],
+    "TIME_SYNC": [],
+    "REMOTE_ACCESS": [
+      "CC6.1",
+      "CC6.6"
+    ],
+    "SESSION": [
+      "CC6.1"
+    ],
+    "APP_PROTECT": [
+      "CC6.6",
+      "CC6.8"
+    ]
+  }
+}

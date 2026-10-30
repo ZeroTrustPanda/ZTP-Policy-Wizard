@@ -118,6 +118,13 @@ const RULES = {
   'advancedThreatProtection:bitTorrentBlocked': R(['LEAST_FUNCTION'], 'best_practice', ''),
   'advancedThreatProtection:torBlocked': R(['LEAST_FUNCTION', 'BOUNDARY'], 'best_practice', ''),
   'advancedThreatProtection:sshTunnellingBlocked': R(['LEAST_FUNCTION', 'BOUNDARY'], 'best_practice', ''),
+  // v2.8 DLP rules with their own reasons
+  'dlp:DLP-Source-Code': R(['DATA_LOSS', 'DATA_MONITOR'], 'differentiator', 'Program source leaving the organization (AI apps, paste sites, personal repositories); monitor by default.'),
+  'dlp:DLP-PHI-Bulk': R(['DATA_LOSS'], 'best_practice', 'A bulk export of patient identifiers in one transfer.'),
+  'dlp:DLP-PHI-Sensitive': R(['DATA_LOSS'], 'best_practice', 'Specially protected conditions (42 CFR Part 2, psychotherapy notes, HIV, genetic) with a patient identifier.'),
+  'dlp:DLP-PHI-Narrative': R(['DATA_LOSS'], 'best_practice', 'Clinical notes with a patient identifier.'),
+  'saasDlp:': R(['DATA_LOSS', 'DATA_MONITOR'], 'differentiator', 'Data at rest in sanctioned SaaS apps, scanned out of band by the SaaS Security API; incidents are reported.'),
+  'emailDlp:': R(['DATA_LOSS', 'DATA_MONITOR'], 'differentiator', 'Outbound email from the corporate mail service, inspected by Zscaler Email DLP; incidents are logged.'),
   // Endpoint DLP
   'endpointDlp:EDLP-USB': R(['MEDIA'], 'best_practice', 'USB and removable storage.'),
   'endpointDlp:EDLP-Cloud': R(['MEDIA', 'DATA_LOSS'], 'best_practice', 'Personal cloud storage from the endpoint.'),
@@ -141,6 +148,8 @@ const ZPA_RULES = {
 
 function ruleSpec(key) {
   if (RULES[key]) return RULES[key];
+  if (/^saasDlp:/.test(key)) return RULES['saasDlp:'];
+  if (/^emailDlp:/.test(key)) return RULES['emailDlp:'];
   for (const [re, spec] of FAMILY) if (re.test(key)) return spec;
   return null;
 }

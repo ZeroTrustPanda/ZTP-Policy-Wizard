@@ -1,8 +1,23 @@
 # Changelog
 
-## v2.0.0 → v2.7.0 — 2026-10-19 to 2026-10-29
+## v2.0.0 → v2.8.0 — 2026-10-19 to 2026-10-30
 
-Release notes for the whole 2.x line: [docs/release-notes/v2.7.0.md](docs/release-notes/v2.7.0.md).
+Release notes for the whole 2.x line: [docs/release-notes/v2.8.0.md](docs/release-notes/v2.8.0.md).
+
+### 2.8.0
+- **Shadow check** (`server/v2/shadow.js`): every planned rule body (the engine's new `planned` record) is compared with the customer's enabled rules above it in the same list (URL, Cloud Firewall, DNS, File Type, Cloud App Control per type, SSL). Shadowed / partial / duplicate (same outcome counts as duplicate); certain matches only; scoped rules counted, Zscaler-managed rules skipped. Returned by `POST /api/v2/zia/plan` as `shadow` and kept with the POV.
+- **Tenant-aware apply** (`routes.js`): the dry run stores a tenant signature (every list the engine read: id, order, state, modified time, plus the planned actions). Apply plans again and returns 409 with `changed` when it differs. After the apply the run is planned once more and `verify` lists any object that does not match.
+- **Engine** (`zia-engine.js`): `[ZTP POV]` provenance tag on every description (trimmed descriptions keep it; `isOurs()`); an existing object is read again before PUT and skipped if its modified time changed; a create that timed out is looked up by name before it is sent again; `planned`, `lists` and `fingerprint` in the result.
+- **ZIA write budget** (`zia-client.js`): writes counted per API client (about 400 an hour; stops with a clear message), Cloud App Control / Endpoint DLP / activation paced to about 10 a minute; `writeBudget()`; reads sent as POST (URL lookup, available actions) are not counted. The dry run returns a `forecast`.
+- **Manual steps** in the plan, the apply result and the report's follow-ups.
+- **Prove it** (`prove.js`): `trace` (Client Connector / PAC bypass, SSL decision, deciding rule), `expect` and `agrees`; default rules (negative order) are evaluated last (fixes firewall and DNS results on tenants whose default rules have order -1 / -3); DoH agreement uses the Cloud App Control rule.
+- **Coverage** (`server/v2/coverage.js`, `GET /api/v2/coverage`): SSL exemptions, Client Connector DNS / IP exclusions and VPN gateways (all app profiles), PAC DIRECT rules (read, never run). Facts cached five minutes per session.
+- **Posture score** (`server/v2/posture.js`, `GET|POST /api/v2/posture` with `stage: start|end`): 40 read-only checks, refused reads excluded, four-part findings, maturity; start / end kept with the POV, compared in the report.
+- **DLP:** engines with `{KEY}` expressions (AND, OR, AND NOT, counts; confirmed on ZTH that ZIA rejects a sum); new dictionaries DOB_LABEL, HEALTH_PLAN_ID, PHI_SENSITIVE, CLINICAL_NOTES, CUI_LEGACY, CUI_DECONTROL, SRC_ANCHOR, SRC_SIGNAL, SECRETS_KEYS; PHI-Sensitive / PHI-Narrative / PHI-Bulk for HIPAA, HITRUST and ZTH eBook; CUI-Markings and Credentials rules combined; Source-Code (monitor) on Strict, Balanced, SOX, NIST and federal profiles; `defaultAction` and `severity` per block rule.
+- **SaaS and Email DLP** (scope `saasDlp`, `emailDlp`): one monitor rule per onboarded SaaS app type (`/casbDlpRules`, needs a cloud app tenant), outbound Email DLP (`/emailDlpRules`); unlicensed or no tenant → SKIPPED with the reason.
+- **Profiles:** GLBA, SOC2, ISO_27001, NIST_CSF_2 (objectives → controls); compliance pack `alignment` (Aligned / Partial / Gaps) and Word files (`mapping-docx`, `testplan-docx`).
+- **Word** (`server/v2/docx.js`, no dependencies): `POST /api/v2/report/docx` and the compliance pack.
+- **UI:** dry run shows the shadow check, forecast and portal steps; the done page shows the check after apply; Prove it has an expected result and a Why row; POV page tab Posture & coverage; Word buttons; scope lists SaaS and Email Data Protection; About › Credits (Jason Smith, Mike Preissner).
 
 ### 2.7.0
 - **Compliance mapping** (`server/v2/compliance-map.js`): rule → objectives → the profile's controls (`objectives` in each `server/frameworks/<id>.json`); unmapped rules carry a reason (best practice, differentiator, operational, privacy, weakens). Attached to every rule and setting in `generate()` and the rule catalog.

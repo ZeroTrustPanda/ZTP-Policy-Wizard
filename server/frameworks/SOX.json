@@ -170,6 +170,21 @@
         "controls": [
           "§404"
         ]
+      },
+      {
+        "key": "Source-Code",
+        "label": "Source-Code",
+        "defaultAction": "ALLOW",
+        "severity": "RULE_SEVERITY_MEDIUM",
+        "why": "Program source (structure and statements together) leaving the organization, for example pasted into AI apps or personal repositories. Monitor by default.",
+        "dictionaries": [
+          "custom:SRC_SIGNAL",
+          "custom:SRC_ANCHOR"
+        ],
+        "expression": "(({SRC_SIGNAL} > 4) AND ({SRC_ANCHOR} > 0))",
+        "controls": [
+          "§302"
+        ]
       }
     ],
     "endpointChannels": [

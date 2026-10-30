@@ -100,6 +100,8 @@ const CATALOG = {
 const scopedNote = (r) => ((r.users || []).length || (r.groups || []).length || (r.departments || []).length || (r.locations || []).length || (r.locationGroups || []).length || (r.timeWindows || []).length)
   ? 'This rule only applies to certain users, groups, departments, locations or times; for everyone else the next matching rule applies.' : null;
 const ruleOut = (r, extra = {}) => ({ name: r.name, order: r.order, action: r.action || (r.actions || []).join(', '), predefined: !!r.predefined, note: scopedNote(r), ...extra });
+// Default rules (negative order on ZIA, e.g. -1, -3) are evaluated last, after every ordered rule
+const byOrder = (a, b) => (!!a.defaultRule - !!b.defaultRule) || ((a.order || 0) - (b.order || 0));
 const host = (t) => { try { return new URL(/^[a-z]+:\/\//i.test(t) ? t : `https://${t}`).hostname; } catch (e) { return null; } };
 
 async function lookup(client, h) {
@@ -112,7 +114,7 @@ async function proveUrl(client, target) {
   if (!h) throw Object.assign(new Error('Enter a URL or domain, for example https://www.example.com'), { status: 400 });
   const { categories, alerts } = await lookup(client, h);
   const cats = [...categories, ...alerts];
-  const rules = list(await client.apiCall('GET', '/api/v1/urlFilteringRules')).filter(r => r.state !== 'DISABLED').sort((a, b) => a.order - b.order);
+  const rules = list(await client.apiCall('GET', '/api/v1/urlFilteringRules')).filter(r => r.state !== 'DISABLED').sort(byOrder);
   const hits = [];
   for (const r of rules) {
     const rc = r.urlCategories || [];
@@ -131,7 +133,7 @@ async function proveThreat(client, target) {
     atp = Object.fromEntries(Object.entries(s || {}).filter(([k]) => keys.includes(k) || /Blocked$/.test(k)).slice(0, 14));
   } catch (e) { atp = null; }
   let sandbox = [];
-  try { sandbox = list(await client.apiCall('GET', '/api/v1/sandboxRules')).filter(r => r.state !== 'DISABLED').sort((a, b) => a.order - b.order).slice(0, 4).map(r => ruleOut(r, { ba: r.baRuleAction, firstTime: r.firstTimeEnable ? r.firstTimeOperation : null })); } catch (e) { /* not licensed */ }
+  try { sandbox = list(await client.apiCall('GET', '/api/v1/sandboxRules')).filter(r => r.state !== 'DISABLED').sort(byOrder).slice(0, 4).map(r => ruleOut(r, { ba: r.baRuleAction, firstTime: r.firstTimeEnable ? r.firstTimeOperation : null })); } catch (e) { /* not licensed */ }
   const file = /\.(com|txt|zip|exe|pdf|docx?|xlsx?)$/i.test(target.split('?')[0]);
   return { ...u, type: 'threat', atp, sandbox,
     verdict: u.securityAlerts.length ? `Security-alert category (${u.securityAlerts.join(', ')}); Advanced Threat Protection blocks it when that class is on.`
@@ -144,7 +146,7 @@ async function proveCloudApp(client, target, type) {
   let t = type;
   if (!t) { const hit = list(await client.apiCall('GET', `/api/v1/cloudApplications/policy?search=${encodeURIComponent(app.toLowerCase().replace(/_/g, ' '))}`)).find(a => a.app === app); t = hit && hit.parent; }
   if (!t) throw Object.assign(new Error(`ZIA does not know the app ${app}.`), { status: 400 });
-  const rules = list(await client.apiCall('GET', `/api/v1/webApplicationRules/${t}`)).filter(r => r.state !== 'DISABLED').sort((a, b) => a.order - b.order);
+  const rules = list(await client.apiCall('GET', `/api/v1/webApplicationRules/${t}`)).filter(r => r.state !== 'DISABLED').sort(byOrder);
   const hits = rules.filter(r => !(r.applications || []).length || (r.applications || []).includes(app)).map(r => ruleOut(r, { actions: r.actions || [], allApps: !(r.applications || []).length }));
   const first = hits[0];
   return { type: 'cloudApp', target: app, appType: t, match: first || null, alsoChecked: hits.slice(1, 4),
@@ -162,7 +164,7 @@ const APP_PORTS = { SSH: [22], RDP: [3389], FTP: [20, 21], TELNET: [23], SMB: [4
 async function proveFirewall(client, target) {
   const f = parseFw(target);
   if (!f || !f.port) throw Object.assign(new Error('Enter a destination and port, for example 203.0.113.10:22/tcp or rdp.example.net:3389'), { status: 400 });
-  const rules = list(await client.apiCall('GET', '/api/v1/firewallFilteringRules')).filter(r => r.state !== 'DISABLED').sort((a, b) => a.order - b.order);
+  const rules = list(await client.apiCall('GET', '/api/v1/firewallFilteringRules')).filter(r => r.state !== 'DISABLED').sort(byOrder);
   let services = [];
   try { services = list(await client.apiCall('GET', '/api/v1/networkServices')); } catch (e) { /* names only */ }
   const svcById = new Map(services.map(s => [String(s.id), s]));
@@ -198,9 +200,11 @@ async function proveDns(client, target, doh) {
   if (!h) throw Object.assign(new Error('Enter a domain, for example example.com'), { status: 400 });
   const { categories, alerts } = await lookup(client, h);
   const cats = [...categories, ...alerts];
-  const rules = list(await client.apiCall('GET', '/api/v1/firewallDnsRules')).filter(r => r.state !== 'DISABLED').sort((a, b) => a.order - b.order);
+  const rules = list(await client.apiCall('GET', '/api/v1/firewallDnsRules')).filter(r => r.state !== 'DISABLED').sort(byOrder);
   const hits = [];
   for (const r of rules) {
+    // ZPA resolver rules (REDIR_ZPA) only match the domains of ZPA application segments
+    if (r.action === 'REDIR_ZPA' || r.zpaIpGroup) continue;
     const protos = r.protocols || [];
     if (protos.length && !protos.includes('ANY_RULE') && !(doh ? protos.includes('DOHTTPS_RULE') : protos.some(p => p !== 'DOHTTPS_RULE'))) continue;
     const rc = [...(r.destIpCategories || []), ...(r.resCategories || [])];
@@ -215,7 +219,7 @@ async function proveDns(client, target, doh) {
   let dohApp = null;
   if (doh) {
     try {
-      const car = list(await client.apiCall('GET', '/api/v1/webApplicationRules/DNS_OVER_HTTPS')).filter(r => r.state !== 'DISABLED').sort((a, b) => a.order - b.order)[0];
+      const car = list(await client.apiCall('GET', '/api/v1/webApplicationRules/DNS_OVER_HTTPS')).filter(r => r.state !== 'DISABLED').sort(byOrder)[0];
       if (car) dohApp = ruleOut(car, { actions: car.actions || [] });
     } catch (e) { /* not available */ }
   }
@@ -226,7 +230,7 @@ async function proveDns(client, target, doh) {
   return { type: 'dns', target: h, doh: !!doh, categories, securityAlerts: alerts, match: first || dohApp || null, dohApp, alsoChecked: hits.slice(1, 4), verdict };
 }
 
-async function prove(client, { type, target, appType, doh }) {
+async function proveOne(client, { type, target, appType, doh }) {
   const t = type || 'url';
   if (!String(target || '').trim()) throw Object.assign(new Error('Pick a destination or type one.'), { status: 400 });
   if (t === 'url') return proveUrl(client, target);
@@ -237,4 +241,46 @@ async function prove(client, { type, target, appType, doh }) {
   throw Object.assign(new Error(`Unknown Prove it type ${t}.`), { status: 400 });
 }
 
-module.exports = { CATALOG, prove, parseFw };
+/**
+ * v2.8: the "why" behind a verdict. The path a web request takes, in order: does Client Connector or a PAC file send it
+ * around ZIA, is it decrypted (and does the SSL rule skip the other policies), then which rule decides. Each step names the
+ * rule or setting. With an expected result, the verdict says whether the configuration agrees.
+ * facts: from coverage.readFacts (cached by the caller); missing facts make that step "not checked", never a guess.
+ */
+const EXPECT = { BLOCK: /BLOCK|DENY/, ALLOW: /^ALLOW|ALLOW_/, CAUTION: /CAUTION/, ISOLATE: /ISOLATE/ };
+function agreement(expect, result, trace) {
+  if (!expect || expect === 'ANY') return null;
+  const around = trace.some(s => s.step === 'forwarding' && s.bypass);
+  if (expect === 'INSPECTED' || expect === 'NOT_INSPECTED') {
+    const ssl = trace.find(s => s.step === 'ssl');
+    if (!ssl || ssl.inspected === null || ssl.inspected === undefined) return null;
+    return around ? false : (expect === 'INSPECTED') === !!ssl.inspected;
+  }
+  if (around) return false;
+  const m = result.type === 'dns' && result.doh && result.dohApp ? result.dohApp : result.match;
+  if (!m) return expect === 'ALLOW' ? true : false;
+  if (m.note) return null;   // scoped rule: depends on the user
+  const act = String(m.action || (m.actions || []).join(',')).toUpperCase();
+  return EXPECT[expect] ? EXPECT[expect].test(act) : null;
+}
+async function prove(client, args, { facts = null } = {}) {
+  const r = await proveOne(client, args);
+  const trace = [];
+  const cov = require('./coverage');
+  const h = (r.type === 'url' || r.type === 'threat' || r.type === 'dns') ? r.target : null;
+  if (h && facts) {
+    const by = cov.hostBypass(facts, h);
+    trace.push({ step: 'forwarding', bypass: by.length > 0, text: by.length ? `Goes around ZIA: ${by.map(b => `${b.where} ${b.what}`).join(' ')}` : `Reaches ZIA: no Client Connector bypass${(facts.pac || []).length ? ' or PAC DIRECT rule' : ''} matches ${h}.${facts.zcc ? '' : ' (Client Connector bypasses not checked: not connected.)'}` });
+  }
+  if ((r.type === 'url' || r.type === 'threat') && facts && facts.ssl) {
+    const d = cov.sslDecision(facts, [...(r.categories || []), ...(r.securityAlerts || [])]);
+    if (d) trace.push({ step: 'ssl', inspected: d.inspected, text: `${d.inspected ? 'Decrypted' : 'Not decrypted'} by ${d.isDefault ? 'the default SSL rule' : `"${d.rule}" (order ${d.order})`}${!d.inspected && d.bypassOtherPolicies ? '; this rule also skips the other policies, so URL filtering and Cloud App Control do not apply' : !d.inspected ? '; URL filtering by domain still applies, content checks (DLP, file type, sandbox) do not' : ''}.${d.scopedAbove.length ? ` ${d.scopedAbove.length} rule(s) above apply only to some users or locations.` : ''}` });
+  }
+  trace.push({ step: 'policy', text: r.verdict });
+  const agrees = agreement(args.expect, r, trace);
+  return { ...r, trace, expect: args.expect || null, agrees,
+    agreement: agrees === null ? (args.expect && args.expect !== 'ANY' ? 'Cannot tell from configuration alone (a scoped rule or an unread setting decides); run the test.' : null)
+      : agrees ? `Agrees with the expected result (${String(args.expect).toLowerCase().replace(/_/g, ' ')}).` : `Does not agree with the expected result (${String(args.expect).toLowerCase().replace(/_/g, ' ')}); see the steps above for where it changes.` };
+}
+
+module.exports = { CATALOG, prove, parseFw, agreement };

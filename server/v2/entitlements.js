@@ -19,6 +19,7 @@ const SCOPE_SKUS = {
   dlpMonitor: ['ZDLP_WEB', 'ZDLP_WEB_BASIC'],
   dlpBlock: ['ZDLP_WEB', 'ZDLP_WEB_BASIC'],
   endpointDlp: ['Z_DLP_ENDPOINT'],
+  saasDlp: ['Z_CASB'],
   sandboxStandard: ['ZIA_ATP', 'ZSEC_WEB_ABA', 'ZSEC_WEB_ABA_ADV'],   // standard sandbox comes with the threat bundle
   sandboxAdvanced: ['ZSEC_WEB_ABA_ADV'],
   aiPromptCapture: ['ZS_DP_GEN_AI']

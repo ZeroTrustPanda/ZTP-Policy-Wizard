@@ -85,13 +85,50 @@ function register(app, requireAuth, { v2, rememberPlan, checkPlan, zpaOf, countA
     res.json({ ok: true, result: s.testResults[req.params.id] || null });
   });
   // v2.6: Prove it for every policy type (URL filtering, threat, cloud apps, firewall, DNS); built-in destinations + your own
+  // v2.8: SSL and bypass coverage. Facts are read once and kept for five minutes (Client Connector allows about 100 calls an hour).
+  const coverage = require('./coverage');
+  async function coverageFacts(session, fresh = false) {
+    const st = v2(session);
+    if (!fresh && st.coverage && Date.now() - st.coverage.at < 5 * 60e3) return st.coverage.facts;
+    const facts = await coverage.readFacts(session.client, session.client && session.client.authMode === 'oneapi' ? (session.zccClient || null) : null);
+    st.coverage = { at: Date.now(), facts };
+    return facts;
+  }
+  app.get('/api/v2/coverage', requireAuth, async (req, res) => {
+    try {
+      const facts = await coverageFacts(req.session, req.query.fresh === '1');
+      const out = coverage.summarize(facts);
+      v2(req.session).coverageSummary = { at: new Date().toISOString(), headline: out.headline, items: out.items.map(i => ({ severity: i.severity, area: i.area, title: i.title })) };
+      res.json(out);
+    } catch (e) { res.status(e.status || 502).json({ error: e.message }); }
+  });
+  // v2.8: POV posture score (read-only). stage 'start' or 'end' keeps the result with the POV for the before / after readout.
+  const posture = require('./posture');
+  app.get('/api/v2/posture', requireAuth, (req, res) => {
+    const st = v2(req.session), p = st.posture || {};
+    res.json({ start: p.start || null, end: p.end || null, compare: posture.compare(p.start, p.end) });
+  });
+  app.post('/api/v2/posture', requireAuth, async (req, res) => {
+    try {
+      const s = req.session, st = v2(s);
+      const stage = ['start', 'end'].includes((req.body || {}).stage) ? req.body.stage : null;
+      const r = await posture.assess(s.client, s.client && s.client.authMode === 'oneapi' ? (s.zccClient || null) : null);
+      if (stage) { st.posture = { ...(st.posture || {}), [stage]: r }; }
+      s.logger.log('V2_POSTURE', { stage, score: r.score, maturity: r.maturity });
+      const p = st.posture || {};
+      res.json({ result: r, start: p.start || null, end: p.end || null, compare: posture.compare(p.start, p.end) });
+    } catch (e) { res.status(e.status || 502).json({ error: e.message }); }
+  });
   app.get('/api/v2/prove/catalog', (req, res) => res.json({ catalog: prove.CATALOG }));
   app.post('/api/v2/prove', requireAuth, async (req, res) => {
     try {
       const b = req.body || {};
       const type = b.type || 'url';
       const target = String(b.target || b.url || '').trim().slice(0, 500);
-      const [match, ins] = await Promise.all([prove.prove(req.session.client, { type, target, appType: b.appType ? String(b.appType) : null, doh: !!b.doh }), tests.insights(req.session.client)]);
+      const EXP = ['BLOCK', 'ALLOW', 'CAUTION', 'ISOLATE', 'INSPECTED', 'NOT_INSPECTED', 'ANY'];
+      const expect = EXP.includes(String(b.expect || '').toUpperCase()) ? String(b.expect).toUpperCase() : null;
+      const facts = await coverageFacts(req.session).catch(() => null);
+      const [match, ins] = await Promise.all([prove.prove(req.session.client, { type, target, appType: b.appType ? String(b.appType) : null, doh: !!b.doh, expect }, { facts }), tests.insights(req.session.client)]);
       res.json({ ...match, host: match.target, insights: ins });
     } catch (e) { res.status(e.status || 502).json({ error: e.message }); }
   });

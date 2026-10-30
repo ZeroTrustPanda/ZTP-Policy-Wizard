@@ -643,7 +643,7 @@
     // ========================
     // App Version
     // ========================
-    const APP_VERSION = '2.7.0';
+    const APP_VERSION = '2.8.0';
     const BUILD_DATE = '2026-03-30';
 
     // ========================
@@ -1162,9 +1162,35 @@
                         </div>
                         <div className="card" style={{margin:'1rem 0 0'}}>
                           <div style={{fontSize:'13px', color:'var(--text-secondary)'}}>Version <strong style={{color:'var(--text-primary)'}}>{APP_VERSION}</strong></div>
-                          <div style={{fontSize:'13px', color:'var(--text-secondary)', marginTop:'4px'}}>Compliance baselines: HIPAA, HITRUST CSF, NIST 800-53, NIST 800-171, PCI DSS, CJIS, SOX, FERPA, GDPR</div>
+                          <div style={{fontSize:'13px', color:'var(--text-secondary)', marginTop:'4px'}}>Compliance profiles: HIPAA, HITRUST CSF, NIST 800-53, NIST 800-171, PCI DSS, CJIS, SOX, FERPA, GDPR, GLBA, SOC 2, ISO/IEC 27001, NIST CSF 2.0, FedRAMP Moderate and High, CMMC 2.0 Level 2, Federal Zero Trust, IRS Pub 1075, GovRAMP</div>
                           <div style={{fontSize:'13px', marginTop:'8px'}}><a href="https://github.com/ZeroTrustPanda/ZTP-Policy-Wizard" target="_blank" rel="noreferrer" style={{color:'var(--accent-blue)'}}>Source and release notes on GitHub</a></div>
                         </div>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="card" data-aboutcredits>
+                    <h3 style={{fontSize:'16px', margin:'0 0 0.6rem'}}>Credits</h3>
+                    <p style={{fontSize:'14px', color:'var(--text-secondary)', margin:'0 0 0.9rem'}}>Version 2.8 builds on ideas from two colleagues' tools. The code and content in this wizard are written for it; these are the people whose work shaped them.</p>
+                    <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(300px, 1fr))', gap:'1rem'}}>
+                      <div data-aboutcredit="jason-smith">
+                        <div style={{fontWeight:600, fontSize:'15px'}}>Jason Smith</div>
+                        <div className="form-hint" style={{marginTop:0}}>DLP content and assessment approach, from his Zscaler Made Easy toolkit</div>
+                        <ul className="about-list" style={{marginTop:'0.5rem'}}>
+                          <li><strong>DLP content</strong><span>The design of the 2.8 dictionaries and engines: identifiers that need their label, specially protected conditions only together with a patient identifier, bulk-record tiers, source code detected by structure plus statements, CUI and legacy markings with a decontrol exclusion, private keys and access tokens, and carrying the profile's engines to SaaS and Email DLP in monitor mode.</span></li>
+                          <li><strong>POV posture score</strong><span>Score = configured ÷ (configured + action needed + review); reads the API refuses are left out instead of failed; the maturity scale; every finding in four parts (found, means, do, outcome).</span></li>
+                          <li><strong>Shadow check and coverage</strong><span>Report a customer rule as deciding first only when every comparison is certain; list every reason traffic is not inspected and never guess at what cannot be read.</span></li>
+                          <li><strong>Safer writes</strong><span>A plan that also covers the tenant's current state, a fresh read before each write, a provenance tag on everything created, a name check before re-sending a create that timed out, and ZIA API budgets with a forecast.</span></li>
+                          <li><strong>Proof and reporting</strong><span>Prove it says whether the configuration agrees with the expected result; the Aligned / Partial / Gaps scale in the compliance pack; Word output.</span></li>
+                        </ul>
+                      </div>
+                      <div data-aboutcredit="mike-preissner">
+                        <div style={{fontWeight:600, fontSize:'15px'}}>Mike Preissner</div>
+                        <div className="form-hint" style={{marginTop:0}}>Author of zs-config, the multi-tenant Zscaler configuration tool (<a href="https://github.com/mpreissner/zs-config" target="_blank" rel="noreferrer" style={{color:'var(--accent-blue)'}}>github.com/mpreissner/zs-config</a>)</div>
+                        <ul className="about-list" style={{marginTop:'0.5rem'}}>
+                          <li><strong>Forwarding in Prove it</strong><span>His Client Connector traffic profile view, which reads PAC files to show where a flow goes, is the model for the first step of the Prove it trace: does Client Connector or a PAC file send the request around ZIA.</span></li>
+                          <li><strong>Check after apply</strong><span>Like his post-push consistency check, the wizard reads the tenant again after an apply and confirms every object matches the plan, listing any that do not.</span></li>
+                          <li><strong>Manual steps in the report</strong><span>What the API cannot write (Smart Browser Isolation, certificates on unmanaged machines, anything skipped) is listed as portal steps in the summary report rather than only as warnings.</span></li>
+                        </ul>
                       </div>
                     </div>
                   </div>
@@ -1172,6 +1198,7 @@
                     <summary style={{cursor:'pointer', fontWeight:600, fontSize:'14px'}}>Version history</summary>
                     <div style={{marginTop:'0.75rem', lineHeight:1.7}}>
                     <div style={{paddingLeft:'1rem', fontSize:'12px'}}>
+                      <div><strong>v2.8.0</strong> — Shadow check in the dry run (customer rules above the POV rules that decide first, certain matches only). Prove it explains why: Client Connector and PAC bypasses, SSL inspection, then the deciding rule, and whether that agrees with the expected result. POV posture score at the start and end, with the change in the report. What ZIA cannot see: SSL exemptions, Client Connector and PAC bypasses. Safer writes: the apply stops if the tenant changed since the dry run, each object is read again before it is changed, everything created carries a [ZTP POV] tag, ZIA API budget forecast. New DLP content (sensitive conditions, clinical notes and bulk PHI for healthcare; CUI with decontrol exclusion; source code; keys and tokens) and SaaS and Email DLP. SOC 2, ISO/IEC 27001, NIST CSF 2.0 and GLBA profiles, with Aligned / Partial / Gaps in the compliance pack. Word downloads for the report and the compliance pack. With thanks to Jason Smith and Mike Preissner (see Credits).</div>
                       <div><strong>v2.7.0</strong> — One compliance pane on Customer intake (Internet Access no longer asks again; AI Guard follows it). Federal vertical with FedRAMP Moderate and High, CMMC 2.0 Level 2, Federal Zero Trust (M-22-09, CISA ZTMM, TIC 3.0), IRS Pub 1075 and GovRAMP. Every rule and setting maps to the profile's controls or says why not (best practice, differentiating use case, operational, privacy). Compliance pack per POV: profile DLP test files, control mapping report, policy export and test plan by control.</div>
                       <div><strong>v2.6.1</strong> — Licence-aware POVs: the core ZIA features are readiness prerequisites; the scope screen marks what the tenant is not licensed for (Sandbox Advanced, AI prompt capture, Advanced Cloud Firewall, DNS tunnel detection); with Cloud Firewall Standard the wizard builds only standard rules (geo-blocking and QUIC by port); ZDX has a tier choice that holds back templates and call-quality apps the tier does not include.</div>
                       <div><strong>v2.6.0</strong> — Several POVs at once: each POV page takes its tenant's API key (kept in memory only) and opening a POV switches tenant. Prove it for every kind of web test (URL filtering, threat, cloud apps, firewall, DNS) with built-in test destinations or your own, on every runbook test and on each POV page. Test kit that follows the POV: DLP CSVs only when DLP is in scope, for its vertical (Healthcare, Finance, Education, Public sector) plus generic PII; EICAR and AMTSO threat tests; a unique sandbox file. ZPA bulk delete in the order ZPA requires, with unselected dependencies flagged. Readiness: API permissions per product (what is missing and where to fix it) and a printout of every tenant SKU.</div>
@@ -1326,6 +1353,7 @@
           <div className="form-hint" style={{marginBottom:'6px'}}>{meta.copy.scope.exclusiveNote}</div>
           {rows(['dlpMonitor', 'dlpBlock'])}
           {rows(['endpointDlp'])}
+          {rows(['saasDlp', 'emailDlp'])}
           {rows(['sandboxStandard', 'sandboxAdvanced'])}
           {rows(['aiPromptCapture'])}
           <h3 style={{fontSize:'13px', margin:'1rem 0 0.5rem'}}>Core internet security</h3>
@@ -1598,6 +1626,30 @@
     const countLine = (c) => Object.entries(c || {}).map(([k, v]) => `${ACTION_LABEL[k] || k} ${v}`).join(' · ') || 'nothing';
 
     // ---------- Dry run + apply (GLB-03/04) ----------
+    // v2.8: what the dry run found about the customer's own rules, the API budget, and steps the API cannot do
+    function ShadowPanel({ shadow }) {
+      if (!shadow) return null;
+      const f = shadow.findings || [];
+      const icon = (x) => x.severity === 'high' ? '✕' : x.severity === 'medium' ? '⚠' : 'ℹ';
+      return (
+        <div className={`alert ${f.some(x => x.severity === 'high') ? 'alert-danger' : f.length ? 'alert-warning' : 'alert-info'}`} style={{display:'block'}} data-shadow={f.length}>
+          <div><strong>Customer rules above the POV rules:</strong> {shadow.summary}</div>
+          {f.slice(0, 12).map((x, i) => <div key={i} style={{marginTop:'4px', fontSize:'13px'}} data-shadowfinding={x.kind}>{icon(x)} <strong>{x.rule}</strong> <span className="form-hint" style={{display:'inline'}}>({x.policy})</span>: {x.reason} <em>{x.fix}</em></div>)}
+          {f.length > 12 && <div className="form-hint">…and {f.length - 12} more; all of them are in the summary report.</div>}
+          {shadow.note && <div className="form-hint">{shadow.note}</div>}
+        </div>
+      );
+    }
+    function PlanExtras({ plan }) {
+      if (!plan) return null;
+      return (<>
+        <ShadowPanel shadow={plan.shadow} />
+        {plan.forecast && <div className="form-hint" data-forecast>⏱ {plan.forecast.text}{plan.forecast.fits === false ? ' That is more than this API client has left this hour: the run stops when the budget runs out, and running it again later carries on.' : ''}</div>}
+        {(plan.manualSteps || []).length > 0 && <details className="form-hint" data-manualsteps><summary style={{cursor:'pointer'}}>{plan.manualSteps.length} step{plan.manualSteps.length === 1 ? '' : 's'} to finish in the portal (the API cannot do these)</summary><ul style={{margin:'4px 0 0'}}>{plan.manualSteps.map((m, i) => <li key={i}><strong>{m.area}:</strong> {m.step}</li>)}</ul></details>}
+      </>);
+    }
+    const applyError = (e) => e.data && Array.isArray(e.data.changed) && e.data.changed.length ? `${e.message} Changed: ${e.data.changed.join('; ')}.` : e.message;
+
     function PovReviewStep({ pov, prefix, setError, result, setResult, onBack, onDone }) {
       const [plan, setPlan] = useState(null);
       const [busy, setBusy] = useState(false);
@@ -1609,7 +1661,7 @@
       const apply = async () => {
         setBusy(true); setError(null);
         try { const r = await api.call('POST', '/v2/zia/apply', { ...body(), planId: plan.planId }); setResult(r); onDone(); }
-        catch (e) { setError('Apply failed: ' + e.message); }
+        catch (e) { setError('Apply failed: ' + applyError(e)); }
         setBusy(false);
       };
       return (
@@ -1623,6 +1675,7 @@
               <div className="alert alert-warning" style={{display:'block'}} data-planwarnings>{plan.warnings.map((w, i) => <div key={i}>⚠ {w}</div>)}</div>
             )}
             {plan.resolved && plan.resolved.cbi && plan.resolved.cbi.name && <div className="form-hint">Isolation profile: {plan.resolved.cbi.name}</div>}
+            <PlanExtras plan={plan} />
             <LedgerTable ledger={plan.ledger} filterProduct />
             <div className="toggle-item" style={{marginTop:'1rem'}}>
               <label onClick={() => setConfirmed(!confirmed)} style={{cursor:'pointer'}}>I have reviewed this dry run. Apply these changes to ZIA and activate them.</label>
@@ -1646,6 +1699,7 @@
           <div className="card-header"><h2>Applied</h2><p>{countLine(result.counts)}. {result.activated === true ? 'Changes were activated.' : result.activated === false ? 'Activation failed — activate in the ZIA portal.' : 'Nothing needed activating.'}</p></div>
           {failed.length > 0 && <div className="alert alert-warning"><span>⚠ {failed.length} object(s) did not apply. Each one is listed below with the reason; everything else was applied.</span></div>}
           {result.warnings.length > 0 && <div className="alert alert-warning" style={{display:'block'}}>{result.warnings.map((w, i) => <div key={i}>⚠ {w}</div>)}</div>}
+          {result.verify && <div className={`alert ${result.verify.differ.length ? 'alert-warning' : 'alert-success'}`} style={{display:'block'}} data-verify={result.verify.differ.length}>{result.verify.text}{result.verify.differ.map((d, i) => <div key={i} className="form-hint" style={{margin:0}}>{d.category}: {d.name} — {d.why}</div>)}</div>}
           <LedgerTable ledger={result.ledger} filterProduct />
           <div className="btn-group">
             <button className="btn btn-ghost" onClick={onRestart}>Start another run</button>
@@ -2404,7 +2458,8 @@
         try {
           if (st.product === 'zia' || st.product === 'zpa' || st.product === 'aiguard') {
             const p = await api.call('POST', `/v2/${st.product}/plan`, st.payload);
-            return { status: (p.errors && p.errors.length) ? 'error' : 'ok', error: (p.errors || []).join(' '), payload: st.payload, planId: p.planId, counts: p.counts, rows: p.ledger, warnings: p.warnings };
+            return { status: (p.errors && p.errors.length) ? 'error' : 'ok', error: (p.errors || []).join(' '), payload: st.payload, planId: p.planId, counts: p.counts, rows: p.ledger, warnings: p.warnings,
+              shadow: p.shadow || null, forecast: p.forecast || null, manualSteps: p.manualSteps || null };
           }
           if (st.product === 'zcc') {
             const p = await api.call('POST', `/zcc/app-profiles/${st.platform}/dryrun`, st.payload);
@@ -2450,12 +2505,13 @@
           if (!pl || pl.status !== 'ok') { out[st.key] = { status: 'skipped', error: 'The dry run for this product did not pass.' }; setResults({ ...out }); continue; }
           out[st.key] = { status: 'running' }; setResults({ ...out });
           try {
-            if (st.product === 'zia') { const r = await api.call('POST', '/v2/zia/apply', { ...pl.payload, planId: pl.planId }); out[st.key] = { status: 'ok', counts: r.counts, rows: r.ledger, note: r.activated ? 'Activated' : '' }; }
+            if (st.product === 'zia') { const r = await api.call('POST', '/v2/zia/apply', { ...pl.payload, planId: pl.planId }); out[st.key] = { status: r.verify && r.verify.differ.length ? 'warn' : 'ok', counts: r.counts, rows: r.ledger, note: r.activated ? 'Activated' : '',
+              warnings: [...(r.verify ? [r.verify.text, ...r.verify.differ.map(d => `${d.category}: ${d.name} — ${d.why}`)] : []), ...((r.manualSteps || []).map(m => `Portal step: ${m.area}: ${m.step}`))] }; }
             else if (st.product === 'aiguard') { const r = await api.call('POST', '/v2/aiguard/apply', { ...pl.payload, planId: pl.planId }); out[st.key] = { status: 'ok', counts: r.counts, rows: r.ledger, warnings: [...(r.warnings || []), ...(r.gatewayMissing ? ['Create the proxy gateway in the ZIA portal, then re-run AI Guard to add the forwarding rule.'] : [])], note: r.activated ? 'Activated' : '' }; }
             else if (st.product === 'zpa') { const r = await api.call('POST', '/v2/zpa/apply', { ...pl.payload, planId: pl.planId }); out[st.key] = { status: 'ok', counts: r.counts, rows: r.ledger, key: !!r.provisioningKey }; }
             else if (st.product === 'zcc') { const r = await api.call('POST', `/zcc/app-profiles/${st.platform}`, { ...pl.payload, planId: pl.planId }); out[st.key] = { status: r.verified ? 'ok' : 'warn', rows: [{ product: 'ZCC', category: 'App Profile', name: r.name, action: r.action, note: r.verified ? 'Verified on read-back' : 'Some settings did not verify' }] }; }
             else if (st.product === 'zdx') { const r = await api.call('POST', '/zdx/apply', pl.payload); out[st.key] = { status: r.success ? 'ok' : 'warn', rows: r.results.map(x => ({ product: 'ZDX', category: x.kind, name: x.name, action: x.ok ? 'CREATE' : 'FAILED' })) }; }
-          } catch (e) { out[st.key] = { status: 'error', error: e.message }; }
+          } catch (e) { out[st.key] = { status: 'error', error: applyError(e) }; }
           setResults({ ...out });
         }
         setBusy(null);
@@ -2479,6 +2535,7 @@
                   {!applied && <button className="btn btn-ghost btn-sm" style={{marginLeft:'auto'}} onClick={() => go(st.stage)} disabled={!!busy}>Edit</button>}</h3>
                 {cur && cur.error && <div className="alert alert-danger"><span>{cur.error}</span></div>}
                 {cur && (cur.warnings || []).slice(0, 6).map((w, i) => <div key={i} className="form-hint" style={{color:'var(--accent-amber)'}}>⚠ {w}</div>)}
+                {pl && !rs && st.product === 'zia' && <PlanExtras plan={pl} />}
                 {cur && cur.rows && (
                   <details open={cur.rows.length <= 12}><summary style={{cursor:'pointer', fontSize:'12px'}}>{cur.rows.length} object{cur.rows.length === 1 ? '' : 's'}</summary><LedgerTable ledger={cur.rows} filterProduct /></details>
                 )}
@@ -2629,11 +2686,18 @@
           </div>
 
           <div style={{display:'flex', gap:'6px', flexWrap:'wrap', marginBottom:'1rem'}}>
-            {[['overview', 'Overview'], ['runs', `What the tool did (${runsFlat.length})`], ['tests', `Tests & success criteria (${sum.tests.pass}/${sum.tests.total})`], ['prove', 'Prove it & test kit'], ['timeline', `Timeline & notes`]].map(([k, l]) => (
+            {[['overview', 'Overview'], ['runs', `What the tool did (${runsFlat.length})`], ['tests', `Tests & success criteria (${sum.tests.pass}/${sum.tests.total})`], ['prove', 'Prove it & test kit'], ['posture', 'Posture & coverage'], ['timeline', `Timeline & notes`]].map(([k, l]) => (
               <button key={k} className={`btn btn-sm ${tab === k ? 'btn-primary' : 'btn-ghost'}`} onClick={() => setTab(k)} data-povtab={k}>{l}</button>
             ))}
           </div>
 
+          {tab === 'posture' && (
+            <div data-povposture>
+              {!(tenantOk && isActive) && <div className="alert alert-info"><span>Open this POV in a session signed in to <strong>{tenantLabel}</strong> (Resume, above) to take a posture score or read inspection coverage. Saved results are shown below.</span></div>}
+              <PosturePanel connected={tenantOk && isActive} saved={p.posture || null} setError={setError} />
+              <CoveragePanel connected={tenantOk && isActive} setError={setError} />
+            </div>
+          )}
           {tab === 'prove' && (
             <div data-povprove>
               <div className="card">
@@ -3008,6 +3072,8 @@
         <table className="diff-table" style={{marginTop:'0.6rem'}} data-proof><tbody>
           <tr><td style={{width:'170px'}}>Destination</td><td><code>{r.target}</code>{r.doh ? ' (DNS over HTTPS)' : ''}{r.appType ? <span className="form-hint" style={{marginLeft:'6px'}}>{r.appType}</span> : null}</td></tr>
           <tr><td>Result</td><td style={{fontWeight:600}} data-proofverdict>{r.verdict}</td></tr>
+          {(r.trace || []).length > 1 && <tr><td>Why</td><td data-prooftrace><ol style={{margin:0, paddingLeft:'18px', fontSize:'12.5px'}}>{r.trace.map((t, i) => <li key={i} data-tracestep={t.step} style={t.bypass ? {color:'var(--accent-red)'} : undefined}>{t.text}</li>)}</ol></td></tr>}
+          {r.agreement && <tr><td>Expected</td><td data-proofagrees={String(r.agrees)} style={{color: r.agrees === true ? 'var(--accent-green)' : r.agrees === false ? 'var(--accent-red)' : 'var(--text-muted)', fontWeight:600}}>{r.agrees === true ? '✓ ' : r.agrees === false ? '✕ ' : ''}{r.agreement}</td></tr>}
           {r.categories && <tr><td>Categories</td><td>{r.categories.join(', ') || '—'}{(r.securityAlerts || []).length > 0 && <span className="badge badge-risk" style={{marginLeft:'6px'}}>Security alert: {r.securityAlerts.join(', ')}</span>}</td></tr>}
           <tr><td>First matching rule</td><td>{r.match ? <><code>{r.match.name}</code> (order {r.match.order}) → {r.match.actions ? r.match.actions.join(', ') : <ActionBadge action={r.match.action} />}
             {(r.match.conditions || []).length > 0 && <div className="form-hint">{r.match.conditions.join('; ')}</div>}{r.match.note && <div className="form-hint">{r.match.note}</div>}</> : 'None; the default rule applies.'}</td></tr>
@@ -3028,6 +3094,7 @@
       const [custom, setCustom] = useState('');
       const [res, setRes] = useState(null);
       const [busy, setBusy] = useState(false);
+      const [expect, setExpect] = useState((initial && initial.expect) || '');
       useEffect(() => { if (!PROVE_CATALOG) api.call('GET', '/v2/prove/catalog').then(r => { PROVE_CATALOG = r.catalog; setCat(r.catalog); }).catch(() => {}); }, []);
       const items = (cat && cat[type] && cat[type].items) || [];
       const sel = items.find(i => i.target === choice);
@@ -3035,7 +3102,7 @@
         const target = choice === '__own' ? custom.trim() : choice;
         if (!target) return;
         setBusy(true); setRes(null);
-        try { setRes(await api.call('POST', '/v2/prove', { type, target, appType: sel ? sel.type : (initial && initial.type === type ? initial.appType : undefined), doh: sel ? !!sel.doh : (type === 'dns' && initial && initial.doh) })); }
+        try { setRes(await api.call('POST', '/v2/prove', { type, target, expect: expect || undefined, appType: sel ? sel.type : (initial && initial.type === type ? initial.appType : undefined), doh: sel ? !!sel.doh : (type === 'dns' && initial && initial.doh) })); }
         catch (e) { setError && setError(e.message); }
         setBusy(false);
       };
@@ -3050,13 +3117,92 @@
               <option value="__own">Your own…</option>
             </select>
             {choice === '__own' && <input type="text" value={custom} onChange={e => setCustom(e.target.value)} placeholder={PROVE_PH[type]} style={{flex:1, minWidth:'180px'}} data-proveown />}
+            {type !== 'cloudApp' && <select value={expect} onChange={e => { setExpect(e.target.value); setRes(null); }} style={{width:'auto', fontSize: compact ? '12px' : undefined}} title="What the POV should do with it; the result says whether the configuration agrees" data-proveexpect>
+              <option value="">Expect: any</option><option value="BLOCK">Expect: blocked</option><option value="ALLOW">Expect: allowed</option><option value="CAUTION">Expect: caution</option><option value="ISOLATE">Expect: isolated</option>
+              {(type === 'url' || type === 'threat') && <><option value="INSPECTED">Expect: inspected</option><option value="NOT_INSPECTED">Expect: not inspected</option></>}
+            </select>}
             <button className={`btn ${compact ? 'btn-ghost btn-sm' : 'btn-primary'}`} onClick={run} disabled={busy || !connected || !(choice && (choice !== '__own' || custom.trim()))} title={connected ? '' : 'Connect to the POV tenant first'} data-provebtn>{busy ? <span className="spinner"></span> : '🔎 Prove it'}</button>
           </div>
-          {!compact && cat && cat[type] && <div className="form-hint">{cat[type].hint} The check is simplified: users, groups, locations and time windows are not evaluated. The exact transaction is in ZIA Insights › Logs.</div>}
+          {!compact && cat && cat[type] && <div className="form-hint">{cat[type].hint} The check follows the request's path: Client Connector and PAC bypasses, SSL inspection, then the rule that decides. Users, groups, locations and time windows are not evaluated; the exact transaction is in ZIA Insights › Logs.</div>}
           <ProveResult r={res} />
         </div>
       );
     }
+    // v2.8: POV posture score at the start and the end, and what ZIA cannot see (SSL exemptions, Client Connector and PAC bypasses)
+    const POSTURE_STATUS = { pass: ['Configured', 'badge-create'], fail: ['Action needed', 'badge-risk'], review: ['Review', 'badge-update'], info: ['Info', 'badge-category'],
+      notPermitted: ['Not permitted', 'badge-category'], notChecked: ['Not checked', 'badge-category'], notLicensed: ['Not licensed', 'badge-category'] };
+    function PostureResult({ r, label }) {
+      const [open, setOpen] = useState(false);
+      if (!r) return null;
+      const findings = r.results.filter(x => x.status === 'fail' || x.status === 'review');
+      return (
+        <div style={{marginTop:'0.6rem'}} data-posture={label}>
+          <div style={{display:'flex', gap:'12px', alignItems:'baseline', flexWrap:'wrap'}}>
+            <strong style={{fontSize:'15px'}}>{label}</strong>
+            <span style={{fontSize:'26px', fontWeight:700}} data-posturescore>{r.score === null ? '—' : r.score}</span>
+            <span className="badge badge-category" data-posturematurity>{r.maturity}</span>
+            <span className="form-hint" style={{margin:0}}>{r.counts.pass} configured · {r.counts.fail} action needed · {r.counts.review} review{r.counts.notPermitted ? ` · ${r.counts.notPermitted} not permitted` : ''}{r.counts.notChecked ? ` · ${r.counts.notChecked} not checked` : ''} · {new Date(r.at).toLocaleString()}</span>
+          </div>
+          <div style={{display:'flex', flexWrap:'wrap', gap:'6px', margin:'6px 0'}}>{r.areas.map(a => <span key={a.area} className="badge badge-category" title={`${a.pass} configured, ${a.fail} action needed, ${a.review} review`}>{a.area}: {a.score === null ? '—' : `${a.score}%`}</span>)}</div>
+          <details open={open} onToggle={e => setOpen(e.target.open)}><summary style={{cursor:'pointer', fontSize:'13px'}}>{findings.length} finding{findings.length === 1 ? '' : 's'} to act on · all {r.results.length} checks</summary>
+            <table className="diff-table" style={{marginTop:'6px'}}><tbody>{r.results.map(x => <tr key={x.id} data-posturecheck={x.id}>
+              <td style={{width:'150px', fontSize:'12px'}}>{x.area}<div className="form-hint" style={{margin:0}}>{x.id}</div></td>
+              <td style={{fontSize:'12.5px'}}><strong>{x.label}</strong> <span className={`badge ${(POSTURE_STATUS[x.status] || [])[1] || 'badge-category'}`}>{(POSTURE_STATUS[x.status] || [x.status])[0]}</span>
+                <div>{x.found}</div>{x.means && <div className="form-hint" style={{margin:0}}><strong>Means:</strong> {x.means} <strong>Do:</strong> {x.do} <strong>Outcome:</strong> {x.outcome}</div>}</td></tr>)}</tbody></table>
+          </details>
+          <div className="form-hint">{r.method}</div>
+        </div>
+      );
+    }
+    function PosturePanel({ connected, saved, setError }) {
+      const [st, setSt] = useState(saved ? { start: saved.start || null, end: saved.end || null } : null);
+      const [cmp, setCmp] = useState(null);
+      const [busy, setBusy] = useState(null);
+      useEffect(() => { if (connected) api.call('GET', '/v2/posture').then(r => { if (r.start || r.end) { setSt(r); setCmp(r.compare); } }).catch(() => {}); }, [connected]);
+      const take = async (stage) => {
+        setBusy(stage); setError(null);
+        try { const r = await api.call('POST', '/v2/posture', { stage }); setSt({ start: r.start, end: r.end }); setCmp(r.compare); } catch (e) { setError('Posture check failed: ' + e.message); }
+        setBusy(null);
+      };
+      return (
+        <div className="card" data-posturepanel>
+          <div className="card-header"><h2>POV posture score</h2><p>A read-only check of about 40 settings the POV touches (SSL, threat, URL, firewall, DNS, file type, DLP, AI apps, Client Connector). Take it at the start of the POV and again at the end; the summary report shows both and what changed. Checks the API client cannot read are left out of the score, not counted against it.</p></div>
+          <div className="btn-group" style={{marginTop:0}}>
+            <button className="btn btn-primary" onClick={() => take('start')} disabled={!connected || !!busy} data-posturestart>{busy === 'start' ? <span className="spinner"></span> : '📍'} {st && st.start ? 'Retake start score' : 'Take start score'}</button>
+            <button className="btn btn-ghost" onClick={() => take('end')} disabled={!connected || !!busy} data-postureend>{busy === 'end' ? <span className="spinner"></span> : '🏁'} {st && st.end ? 'Retake end score' : 'Take end score'}</button>
+          </div>
+          {cmp && cmp.delta !== null && <div className={`alert ${cmp.delta > 0 ? 'alert-success' : cmp.delta < 0 ? 'alert-warning' : 'alert-info'}`} data-posturedelta={cmp.delta}><span><strong>{cmp.delta > 0 ? '+' : ''}{cmp.delta} points</strong> ({cmp.from} {cmp.fromMaturity} → {cmp.to} {cmp.toMaturity}).{cmp.improved.length ? ` Improved: ${cmp.improved.map(i => i.label).join('; ')}.` : ''}{cmp.regressed.length ? ` Went back: ${cmp.regressed.map(i => i.label).join('; ')}.` : ''}</span></div>}
+          {st && st.start && <PostureResult r={st.start} label="Start" />}
+          {st && st.end && <PostureResult r={st.end} label="End" />}
+          {!(st && (st.start || st.end)) && <div className="form-hint">No score taken yet.</div>}
+        </div>
+      );
+    }
+    function CoveragePanel({ connected, setError }) {
+      const [c, setC] = useState(null);
+      const [busy, setBusy] = useState(false);
+      const load = async (fresh) => { setBusy(true); try { setC(await api.call('GET', `/v2/coverage${fresh ? '?fresh=1' : ''}`)); } catch (e) { setError('Coverage check failed: ' + e.message); } setBusy(false); };
+      const SEV = { high: ['High', 'badge-risk'], medium: ['Medium', 'badge-update'], info: ['Info', 'badge-category'] };
+      return (
+        <div className="card" data-coveragepanel>
+          <div className="card-header"><h2>What ZIA cannot see</h2><p>Every reason traffic is not inspected: SSL exemptions, Client Connector bypasses (DNS and IP exclusions, VPN gateways) and PAC files that send traffic direct. Tests aimed at these destinations will not show inspection, by design. Configuration only; traffic volume is in the ZIA portal.</p></div>
+          <div className="btn-group" style={{marginTop:0}}>
+            <button className="btn btn-primary" onClick={() => load(!!c)} disabled={!connected || busy} data-coverageload>{busy ? <span className="spinner"></span> : '🔍'} {c ? 'Check again' : 'Check coverage'}</button>
+          </div>
+          {c && <>
+            <div className="alert alert-info" data-coverageheadline><span><strong>{c.headline}</strong></span></div>
+            {c.items.map((i, k) => <div key={k} className="toggle-item" style={{display:'block'}} data-coverageitem={i.area}>
+              <div><span className={`badge ${SEV[i.severity][1]}`}>{SEV[i.severity][0]}</span> <strong style={{fontSize:'13px'}}>{i.title}</strong> <span className="form-hint" style={{display:'inline'}}>({i.area})</span></div>
+              <div style={{fontSize:'12.5px'}}>{i.found}</div>
+              <div className="form-hint" style={{margin:0}}><strong>Means:</strong> {i.means} <strong>Do:</strong> {i.do}</div></div>)}
+            {!c.items.length && <div className="form-hint">Nothing found that keeps traffic away from inspection.</div>}
+            {[...(c.notes || []), ...(c.refused || [])].map((n, k) => <div key={k} className="form-hint">ℹ {n}</div>)}
+            <div className="form-hint">{c.volumeNote}</div>
+          </>}
+        </div>
+      );
+    }
+
     /** The test kit for a POV (or the POV open in this session): only what the POV covers. */
     function TestKit({ povId, setError }) {
       const [kit, setKit] = useState(null);
@@ -3095,6 +3241,10 @@
       return (
         <div data-compliancepack={pack.profile.id}>
           <div className="form-hint" style={{marginTop:0}}>For <strong>{pack.profile.fullName || pack.profile.name}</strong>, the profile chosen on Customer intake. Built from this POV's choices; nothing is read from the tenant.</div>
+          {pack.alignment && <div className={`alert ${pack.alignment.status === 'Aligned' ? 'alert-success' : pack.alignment.status === 'Partial' ? 'alert-warning' : 'alert-danger'}`} style={{display:'block'}} data-packalignment={pack.alignment.status}>
+            <strong>{pack.alignment.status}.</strong> {pack.alignment.text}
+            {pack.alignment.missing.length > 0 && <details className="form-hint"><summary style={{cursor:'pointer'}}>{pack.alignment.missing.length} control{pack.alignment.missing.length === 1 ? '' : 's'} not addressed</summary>{pack.alignment.missing.map(m => <div key={m.id}><code>{m.id}</code> {m.name}</div>)}</details>}
+          </div>}
           {pack.files.map(f => <div key={f.id} className="toggle-item"><div><strong style={{fontSize:'13px'}}>{f.label}</strong><div className="form-hint">{f.why}</div></div>
             <a className="btn btn-ghost btn-sm" href={`/api/v2/compliance-pack/file/${f.id}?povId=${encodeURIComponent(povId)}`} data-packfile={f.id}>⬇ Download</a></div>)}
         </div>
@@ -3389,13 +3539,19 @@
       const stamp = new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-');
       return (
         <div className="card" data-step="report">
-          <div className="card-header"><h2>Summary report</h2><p>Everything this session changed in ZIA, ZCC and ZPA, the rule decisions, warnings and manual follow-ups — ready to hand to the customer.</p></div>
+          <div className="card-header"><h2>Summary report</h2><p>Everything this session changed in ZIA, ZCC and ZPA, the rule decisions, the posture score at the start and end, customer rules that decide first, inspection coverage, warnings and manual follow-ups — ready to hand to the customer.</p></div>
           {runs && <div className="form-hint">Runs recorded this session: ZIA {runs.zia} · ZCC {runs.zcc} · ZPA {runs.zpa}</div>}
           {rep && rep.containsSecret && <div className="alert alert-danger" data-reportsecret><span>🔑 This report contains the ZPA provisioning key. Treat the file as a secret.</span></div>}
           {rep && (<>
             <div className="btn-group" style={{justifyContent:'flex-start'}}>
               <button className="btn btn-primary" onClick={() => download(rep.markdown, `zscaler-pov-summary-${stamp}${rep.containsSecret ? '-SENSITIVE' : ''}.md`, 'text/markdown')} data-dlmd>⬇ Markdown</button>
               <button className="btn btn-primary" onClick={() => download(rep.html, `zscaler-pov-summary-${stamp}${rep.containsSecret ? '-SENSITIVE' : ''}.html`, 'text/html')} data-dlhtml>⬇ HTML</button>
+              <button className="btn btn-primary" onClick={async () => {
+                try {
+                  const r = await fetch('/api/v2/report/docx', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Session-Id': api.sessionId || '' }, body: '{}' });
+                  if (!r.ok) throw new Error(`HTTP ${r.status}`);
+                  download(await r.blob(), `zscaler-pov-summary-${stamp}${rep.containsSecret ? '-SENSITIVE' : ''}.docx`, 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+                } catch (e) { setError('Word download failed: ' + e.message); } }} data-dldocx>⬇ Word</button>
               <button className="btn btn-ghost" onClick={openHtml}>Open printable page (Save as PDF)</button>
               <button className="btn btn-ghost" onClick={load}>↻ Refresh</button>
             </div>

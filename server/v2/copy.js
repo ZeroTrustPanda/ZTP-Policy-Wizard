@@ -10,6 +10,8 @@ module.exports = {
       dlpMonitor: { label: 'Inline Data Loss Prevention: Monitor Mode', desc: 'Allow-only DLP rules using Zscaler\'s built-in DLP engines for the framework you pick (for example HIPAA → HIPAA engine).' },
       dlpBlock: { label: 'Inline Data Loss Prevention: Block Mode', desc: 'Creates custom dictionaries and engines from the framework\'s sensitive-data definitions, then DLP rules that block by default (each rule can be switched to Allow).' },
       endpointDlp: { label: 'Endpoint Data Protection', desc: 'Endpoint DLP rules for USB / removable storage, personal cloud storage and printing, in Monitor mode, for Windows and macOS.' },
+      saasDlp: { label: 'SaaS Data Protection', desc: 'SaaS Security API DLP rules (monitor: report incidents) for each SaaS app the customer has onboarded, using this profile\'s DLP engines. Needs at least one SaaS application tenant.' },
+      emailDlp: { label: 'Email Data Protection', desc: 'Outbound Email DLP rule (monitor: deliver and log) using this profile\'s DLP engines. Needs the Email DLP subscription and mail routed through Zscaler.' },
       sandboxStandard: { label: 'Zscaler Cloud Sandbox: Standard', desc: 'Sandbox rules for .exe and .dll files, Allow and Scan on first download.' },
       sandboxAdvanced: { label: 'Zscaler Cloud Sandbox: Advanced', desc: 'AI Instant Verdict on every rule across expanded file types: high-risk types are quarantined on first download, lower-risk types are allowed and scanned.' },
       aiPromptCapture: { label: 'Zscaler AI Prompt Capture', desc: 'Turns on prompt capture for the GenAI and UCaaS apps listed on the next pages.' },

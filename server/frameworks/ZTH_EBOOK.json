@@ -253,6 +253,52 @@
         "controls": [
           "CIS-3.13"
         ]
+      },
+      {
+        "key": "PHI-Sensitive",
+        "label": "PHI-Sensitive",
+        "why": "A specially protected condition (substance use, HIV, psychotherapy, genetic) together with a patient identifier.",
+        "dictionaries": [
+          "custom:PHI_SENSITIVE",
+          "custom:MRN",
+          "custom:DOB_LABEL",
+          "custom:MBI",
+          "custom:HEALTH_PLAN_ID"
+        ],
+        "expression": "(({PHI_SENSITIVE} > 0) AND (({MRN} > 0) OR ({DOB_LABEL} > 0) OR ({MBI} > 0) OR ({HEALTH_PLAN_ID} > 0)))",
+        "controls": [
+          "CIS-3.13"
+        ]
+      },
+      {
+        "key": "PHI-Narrative",
+        "label": "PHI-Narrative",
+        "why": "Clinical note wording together with a patient identifier (discharge summaries, progress notes).",
+        "dictionaries": [
+          "custom:CLINICAL_NOTES",
+          "custom:MRN",
+          "custom:DOB_LABEL",
+          "custom:HEALTH_PLAN_ID"
+        ],
+        "expression": "(({CLINICAL_NOTES} > 2) AND (({MRN} > 0) OR ({DOB_LABEL} > 0) OR ({HEALTH_PLAN_ID} > 0)))",
+        "controls": [
+          "CIS-3.13"
+        ]
+      },
+      {
+        "key": "PHI-Bulk",
+        "label": "PHI-Bulk",
+        "why": "Fifty or more patient identifiers in one transfer: a bulk export, whatever the destination.",
+        "dictionaries": [
+          "custom:MRN",
+          "custom:MBI",
+          "predefined:SSN",
+          "custom:DOB_LABEL"
+        ],
+        "expression": "(({MRN} > 49) OR ({MBI} > 49) OR ({SSN} > 49) OR ({DOB_LABEL} > 49))",
+        "controls": [
+          "CIS-3.13"
+        ]
       }
     ],
     "endpointChannels": [
