@@ -1,0 +1,368 @@
+{
+  "id": "ISO_27001",
+  "type": "compliance",
+  "vertical": "GENERAL",
+  "name": "ISO/IEC 27001",
+  "fullName": "ISO/IEC 27001:2022 Annex A (information security controls)",
+  "description": "Organizations certified to ISO/IEC 27001:2022; the Annex A controls for malware, web filtering, data leakage prevention, network security and monitoring.",
+  "version": "2026.10.30",
+  "researchedAt": "2026-10-30",
+  "baseTier": "BALANCED",
+  "complianceKey": "ISO_27001",
+  "sources": [
+    {
+      "id": "iso27001",
+      "title": "ISO/IEC 27001:2022 Information security management systems — Requirements (Annex A)",
+      "url": "https://www.iso.org/standard/27001"
+    },
+    {
+      "id": "iso27002",
+      "title": "ISO/IEC 27002:2022 Information security controls",
+      "url": "https://www.iso.org/standard/75652.html"
+    },
+    {
+      "id": "zs-sandbox",
+      "title": "Zscaler: Recommended Sandbox Policy",
+      "url": "https://help.zscaler.com/zia/recommended-sandbox-policy"
+    },
+    {
+      "id": "zs-edlp",
+      "title": "Zscaler: Configuring Endpoint DLP Policy Rules",
+      "url": "https://help.zscaler.com/zia/configuring-endpoint-dlp-policy-rules"
+    },
+    {
+      "id": "zs-api-adv-url",
+      "title": "Zscaler SDK (Go): URL & Cloud App advanced settings incl. GenAI prompt capture flags",
+      "url": "https://github.com/zscaler/zscaler-sdk-go/blob/master/zscaler/zia/services/urlfilteringpolicies/urlfilteringpolicies.go"
+    }
+  ],
+  "controls": [
+    {
+      "id": "8.7",
+      "name": "Protection against malware",
+      "source": "iso27001"
+    },
+    {
+      "id": "8.23",
+      "name": "Web filtering",
+      "source": "iso27001"
+    },
+    {
+      "id": "5.10",
+      "name": "Acceptable use of information and other associated assets",
+      "source": "iso27001"
+    },
+    {
+      "id": "8.20",
+      "name": "Networks security",
+      "source": "iso27001"
+    },
+    {
+      "id": "8.22",
+      "name": "Segregation of networks",
+      "source": "iso27001"
+    },
+    {
+      "id": "5.14",
+      "name": "Information transfer",
+      "source": "iso27001"
+    },
+    {
+      "id": "5.23",
+      "name": "Information security for use of cloud services",
+      "source": "iso27001"
+    },
+    {
+      "id": "8.12",
+      "name": "Data leakage prevention",
+      "source": "iso27001"
+    },
+    {
+      "id": "8.16",
+      "name": "Monitoring activities",
+      "source": "iso27001"
+    },
+    {
+      "id": "7.10",
+      "name": "Storage media",
+      "source": "iso27001"
+    },
+    {
+      "id": "5.34",
+      "name": "Privacy and protection of PII",
+      "source": "iso27001"
+    },
+    {
+      "id": "8.21",
+      "name": "Security of network services",
+      "source": "iso27001"
+    },
+    {
+      "id": "8.17",
+      "name": "Clock synchronization",
+      "source": "iso27001"
+    },
+    {
+      "id": "8.3",
+      "name": "Information access restriction",
+      "source": "iso27001"
+    },
+    {
+      "id": "8.5",
+      "name": "Secure authentication",
+      "source": "iso27001"
+    },
+    {
+      "id": "8.26",
+      "name": "Application security requirements",
+      "source": "iso27001"
+    }
+  ],
+  "areas": {
+    "urlFiltering": {
+      "controls": [
+        "8.23",
+        "8.7",
+        "5.10"
+      ],
+      "rationale": "Derived from the rule-level objective mapping (v2.8)."
+    },
+    "cloudAppControl": {
+      "controls": [
+        "5.14",
+        "5.23"
+      ],
+      "rationale": "Derived from the rule-level objective mapping (v2.8)."
+    },
+    "fileTypeControl": {
+      "controls": [
+        "8.20",
+        "8.7"
+      ],
+      "rationale": "Derived from the rule-level objective mapping (v2.8)."
+    },
+    "advancedThreatProtection": {
+      "controls": [
+        "8.7",
+        "8.23"
+      ],
+      "rationale": "Derived from the rule-level objective mapping (v2.8)."
+    },
+    "firewallFiltering": {
+      "controls": [
+        "8.20",
+        "8.22"
+      ],
+      "rationale": "Derived from the rule-level objective mapping (v2.8)."
+    },
+    "dnsSecurity": {
+      "controls": [
+        "8.21",
+        "8.23"
+      ],
+      "rationale": "Derived from the rule-level objective mapping (v2.8)."
+    },
+    "sslInspection": {
+      "controls": [
+        "8.16",
+        "8.20"
+      ],
+      "rationale": "Derived from the rule-level objective mapping (v2.8)."
+    },
+    "dlpMonitor": {
+      "controls": [
+        "8.12",
+        "8.16"
+      ],
+      "rationale": "Derived from the rule-level objective mapping (v2.8)."
+    },
+    "dlpBlock": {
+      "controls": [
+        "8.12"
+      ],
+      "rationale": "Derived from the rule-level objective mapping (v2.8)."
+    },
+    "endpointDlp": {
+      "controls": [
+        "7.10",
+        "8.12"
+      ],
+      "rationale": "Derived from the rule-level objective mapping (v2.8)."
+    },
+    "sandbox": {
+      "controls": [
+        "8.7"
+      ],
+      "rationale": "Derived from the rule-level objective mapping (v2.8)."
+    },
+    "aiPromptCapture": {
+      "controls": [
+        "8.12",
+        "8.16",
+        "5.23"
+      ],
+      "rationale": "Derived from the rule-level objective mapping (v2.8)."
+    },
+    "saasDlp": {
+      "controls": [
+        "8.12",
+        "8.16"
+      ],
+      "rationale": "Derived from the rule-level objective mapping (v2.8)."
+    },
+    "emailDlp": {
+      "controls": [
+        "8.12",
+        "8.16"
+      ],
+      "rationale": "Derived from the rule-level objective mapping (v2.8)."
+    }
+  },
+  "dlp": {
+    "monitorEngines": [
+      "PCI",
+      "GLBA"
+    ],
+    "blockRules": [
+      {
+        "key": "PII",
+        "label": "PII",
+        "dictionaries": [
+          "predefined:SSN",
+          "predefined:TIN_LEAKAGE",
+          "predefined:USDL_LEAKAGE"
+        ],
+        "controls": [
+          "8.12"
+        ]
+      },
+      {
+        "key": "Payment-Cards",
+        "label": "Payment-Cards",
+        "dictionaries": [
+          "predefined:CREDIT_CARD"
+        ],
+        "controls": [
+          "8.12"
+        ]
+      },
+      {
+        "key": "Credentials",
+        "label": "Credentials",
+        "dictionaries": [
+          "predefined:CRED_LEAKAGE",
+          "custom:SECRETS_KEYS"
+        ],
+        "expression": "(({CRED_LEAKAGE} > 1) OR ({SECRETS_KEYS} > 0))",
+        "why": "Passwords in clear text, private keys and cloud or SaaS access tokens.",
+        "controls": [
+          "8.12",
+          "8.5"
+        ]
+      },
+      {
+        "key": "Source-Code",
+        "label": "Source-Code",
+        "defaultAction": "ALLOW",
+        "severity": "RULE_SEVERITY_MEDIUM",
+        "why": "Program source (structure and statements together) leaving the organization, for example pasted into AI apps or personal repositories. Monitor by default.",
+        "dictionaries": [
+          "custom:SRC_SIGNAL",
+          "custom:SRC_ANCHOR"
+        ],
+        "expression": "(({SRC_SIGNAL} > 4) AND ({SRC_ANCHOR} > 0))",
+        "controls": [
+          "8.12"
+        ]
+      }
+    ],
+    "endpointChannels": [
+      "REMOVABLE_DRIVE_TRANSFER",
+      "PERSONAL_CLOUD_STORAGE",
+      "PRINTING"
+    ]
+  },
+  "objectives": {
+    "MALWARE": [
+      "8.7"
+    ],
+    "THREAT_SITES": [
+      "8.23",
+      "8.7"
+    ],
+    "ACCEPTABLE_USE": [
+      "5.10",
+      "8.23"
+    ],
+    "PRODUCTIVITY": [
+      "5.10"
+    ],
+    "LEAST_FUNCTION": [
+      "8.20"
+    ],
+    "BOUNDARY": [
+      "8.20",
+      "8.22"
+    ],
+    "ALLOW_EXCEPTION": [
+      "8.20"
+    ],
+    "INFO_FLOW": [
+      "5.14",
+      "5.23"
+    ],
+    "DATA_LOSS": [
+      "8.12"
+    ],
+    "DATA_MONITOR": [
+      "8.12",
+      "8.16"
+    ],
+    "MEDIA": [
+      "7.10",
+      "8.12"
+    ],
+    "INSPECT_TLS": [
+      "8.16",
+      "8.20"
+    ],
+    "PRIVACY_EXEMPT": [
+      "5.34"
+    ],
+    "DNS": [
+      "8.21",
+      "8.23"
+    ],
+    "DNS_TUNNEL": [
+      "8.16",
+      "8.12"
+    ],
+    "SANDBOX": [
+      "8.7"
+    ],
+    "ISOLATION": [
+      "8.23",
+      "8.7"
+    ],
+    "MOBILE_CODE": [
+      "8.7"
+    ],
+    "AI_GOV": [
+      "5.23",
+      "8.12"
+    ],
+    "TIME_SYNC": [
+      "8.17"
+    ],
+    "REMOTE_ACCESS": [
+      "8.3",
+      "8.5"
+    ],
+    "SESSION": [
+      "8.5"
+    ],
+    "APP_PROTECT": [
+      "8.26"
+    ]
+  }
+}

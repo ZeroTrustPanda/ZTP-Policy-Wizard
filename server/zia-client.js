@@ -39,6 +39,9 @@ const ZIDENTITY_TOKEN_PATH = '/oauth2/v1/token';
 const redactBody = (s) => String(s).replace(/("[^"]*(?:password|secret|provisioningKey|token|apiKey)[^"]*"\s*:\s*)"[^"]*"/gi, '$1"<redacted>"');
 const SESSION_ENDED = /Resource Access Blocked|SESSION_NOT_VALID|Session already invalidated/i;
 
+const ZIA_WRITE_LIMITS = { hourly: 400, heavyHourly: 40, heavyPerMinute: 10 };
+const ZIA_HEAVY = /webApplicationRules|endPointDlpRules|status\/activate/;
+
 class ZIAClient {
   constructor() {
     this.authMode = null; // 'legacy' or 'oneapi'
@@ -465,7 +468,37 @@ class ZIAClient {
     return new Promise(resolve => setTimeout(resolve, ms));
   }
 
+  /**
+   * v2.8: ZIA write budget, after Zscaler's published API limits: about 1 write a second and 400 an hour per admin; Cloud App
+   * Control, Endpoint DLP rules and activation about 10 a minute and 40 an hour. Counted here so a run stops with a clear
+   * message (and the dry run can forecast) instead of meeting a long 429.
+   */
+  writeBudget() {
+    const now = Date.now();
+    this._writes = (this._writes || []).filter(t => now - t < 3600e3);
+    this._heavy = (this._heavy || []).filter(t => now - t < 3600e3);
+    return { hourly: ZIA_WRITE_LIMITS.hourly, used: this._writes.length, remaining: Math.max(0, ZIA_WRITE_LIMITS.hourly - this._writes.length),
+      heavyHourly: ZIA_WRITE_LIMITS.heavyHourly, heavyUsed: this._heavy.length, heavyRemaining: Math.max(0, ZIA_WRITE_LIMITS.heavyHourly - this._heavy.length) };
+  }
+  async _countWrite(method, path) {
+    if (method === 'GET' || /\/urlLookup|\/availableActions|\/lookup\b/.test(path)) return;   // reads sent as POST
+    const b = this.writeBudget();
+    if (b.remaining <= 0) {
+      const mins = Math.ceil((this._writes[0] + 3600e3 - Date.now()) / 60e3);
+      throw Object.assign(new Error(`ZIA API write budget reached (about ${ZIA_WRITE_LIMITS.hourly} changes an hour). Nothing more was sent; run it again in about ${mins} minute${mins === 1 ? '' : 's'} and the wizard carries on where it stopped.`), { status: 429, rateLimited: true });
+    }
+    // Cloud App Control, Endpoint DLP and activation have a lower limit: counted for the dry-run forecast and paced to
+    // about 10 a minute; ZIA itself decides the hourly limit (a 429 is still handled below).
+    if (ZIA_HEAVY.test(path)) {
+      const lastMinute = this._heavy.filter(t => Date.now() - t < 60e3);
+      if (lastMinute.length >= ZIA_WRITE_LIMITS.heavyPerMinute) await this._sleep(lastMinute[0] + 60e3 - Date.now() + 250);
+      this._heavy.push(Date.now());
+    }
+    this._writes.push(Date.now());
+  }
+
   async apiCall(method, path, body = null, retryCount = 0) {
+    if (!retryCount) await this._countWrite(method, path);
     // Rate limiting: enforce minimum 1.1 seconds between requests
     const now = Date.now();
     if (this._lastRequestTime && (now - this._lastRequestTime) < 1100) {
@@ -606,4 +639,4 @@ class ZIAClient {
   }
 }
 
-module.exports = { ZIAClient, ZIA_CLOUDS, ZIA_ADMIN_URLS };
+module.exports = { ZIAClient, ZIA_CLOUDS, ZIA_ADMIN_URLS, ZIA_WRITE_LIMITS };

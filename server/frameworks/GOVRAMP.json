@@ -265,8 +265,26 @@
         "key": "Credentials",
         "label": "Credentials",
         "dictionaries": [
-          "predefined:CRED_LEAKAGE"
+          "predefined:CRED_LEAKAGE",
+          "custom:SECRETS_KEYS"
         ],
+        "controls": [
+          "AC-4"
+        ],
+        "expression": "(({CRED_LEAKAGE} > 1) OR ({SECRETS_KEYS} > 0))",
+        "why": "Passwords in clear text, private keys and cloud or SaaS access tokens."
+      },
+      {
+        "key": "Source-Code",
+        "label": "Source-Code",
+        "defaultAction": "ALLOW",
+        "severity": "RULE_SEVERITY_MEDIUM",
+        "why": "Program source (structure and statements together) leaving the organization, for example pasted into AI apps or personal repositories. Monitor by default.",
+        "dictionaries": [
+          "custom:SRC_SIGNAL",
+          "custom:SRC_ANCHOR"
+        ],
+        "expression": "(({SRC_SIGNAL} > 4) AND ({SRC_ANCHOR} > 0))",
         "controls": [
           "AC-4"
         ]

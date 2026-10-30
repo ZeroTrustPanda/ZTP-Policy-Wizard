@@ -53,7 +53,7 @@ function register(app, requireAuth, { v2 }) {
       const b = req.body || {};
       const p = povs.create({ customerName: b.customerName, prefix: b.prefix, tenant: sessionTenant(req.session), guide: b.guide || null, templateId: b.templateId || null });
       const st = v2(req.session);
-      Object.assign(st, { povId: p.id, runs: povs.emptyRuns(), testResults: {}, prefix: p.prefix || st.prefix });
+      Object.assign(st, { povId: p.id, runs: povs.emptyRuns(), testResults: {}, posture: null, lastShadow: null, coverageSummary: null, prefix: p.prefix || st.prefix });
       req.session.logger.log('POV_CREATE', { id: p.id, customer: p.customerName });
       res.json({ pov: p });
     } catch (e) { fail(res, e); }
@@ -61,7 +61,7 @@ function register(app, requireAuth, { v2 }) {
 
   app.post('/api/v2/povs/close', requireAuth, (req, res) => {
     const st = v2(req.session);
-    Object.assign(st, { povId: null, runs: povs.emptyRuns(), testResults: {} });
+    Object.assign(st, { povId: null, runs: povs.emptyRuns(), testResults: {}, posture: null, lastShadow: null, coverageSummary: null });
     res.json({ closed: true });
   });
 
@@ -97,7 +97,7 @@ function register(app, requireAuth, { v2 }) {
       if (!povs.tenantKey(p.tenant)) { p.tenant = have; povs.save(p); }   // imported without a tenant: bind it now
       const st = v2(req.session);
       const runs = { ...povs.emptyRuns(), ...(p.runs || {}) };
-      Object.assign(st, { povId: p.id, runs, testResults: p.testResults || {}, intake: p.intake || null, prefix: p.prefix || st.prefix });
+      Object.assign(st, { povId: p.id, runs, testResults: p.testResults || {}, intake: p.intake || null, prefix: p.prefix || st.prefix, posture: p.posture || null, lastShadow: p.shadow || null, coverageSummary: p.coverage || null });
       req.session.logger.log('POV_OPEN', { id: p.id, customer: p.customerName });
       res.json({ pov: p });
     } catch (e) { fail(res, e); }
@@ -106,7 +106,7 @@ function register(app, requireAuth, { v2 }) {
   app.delete('/api/v2/povs/:id', localOrAuth, (req, res) => {
     try {
       const st = req.session && req.session.v2;
-      if (st && st.povId === req.params.id) Object.assign(st, { povId: null, runs: povs.emptyRuns(), testResults: {} });
+      if (st && st.povId === req.params.id) Object.assign(st, { povId: null, runs: povs.emptyRuns(), testResults: {}, posture: null, lastShadow: null, coverageSummary: null });
       res.json(povs.archive(req.params.id));
     } catch (e) { fail(res, e); }
   });

@@ -8,6 +8,8 @@ const SCOPE_ITEMS = [
   { key: 'dlpMonitor', id: 'SCP-10', default: false, group: 'dlp' },
   { key: 'dlpBlock', id: 'SCP-11', default: false, group: 'dlp' },
   { key: 'endpointDlp', id: 'SCP-12', default: false },
+  { key: 'saasDlp', id: 'SCP-12a', default: false },
+  { key: 'emailDlp', id: 'SCP-12b', default: false },
   { key: 'sandboxStandard', id: 'SCP-13', default: false, group: 'sandbox' },
   { key: 'sandboxAdvanced', id: 'SCP-14', default: false, group: 'sandbox' },
   { key: 'aiPromptCapture', id: 'SCP-15', default: false },
@@ -63,6 +65,8 @@ async function detectLicensing({ client, zccClient }) {
     }
   }
 
+  // v2.8 Email DLP: the smarthost subscription has no read check; ZIA answers NOT_SUBSCRIBED when the rule is created
+  if (!items.emailDlp) items.emailDlp = { licensed: null, reason: 'Checked when the rule is created (needs the Email DLP smarthost subscription and mail routed through Zscaler).' };
   // SCP-32: Endpoint DLP must be enabled in Mobile Admin first
   let endpointDlpEnabledInZcc = null;
   if (zccClient) {

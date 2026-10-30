@@ -18,11 +18,11 @@ function loadAll() {
 
 // Order on the Baseline Framework page: the tool's existing compliance list (FWK-02), then the non-mapped tiers (FWK-03)
 const COMPLIANCE_ORDER = ['HIPAA', 'HITRUST', 'NIST_800_53', 'NIST_800_171', 'PCI', 'CJIS', 'SOX', 'FERPA', 'GDPR',
-  'FEDRAMP_MOD', 'FEDRAMP_HIGH', 'CMMC_L2', 'FED_ZT', 'IRS_1075', 'GOVRAMP'];
+  'FEDRAMP_MOD', 'FEDRAMP_HIGH', 'CMMC_L2', 'FED_ZT', 'IRS_1075', 'GOVRAMP', 'GLBA', 'SOC2', 'ISO_27001', 'NIST_CSF_2'];
 // v2.7: which vertical each compliance profile belongs to (the onboarding pane groups the profiles by vertical)
 const VERTICAL_OF = { HIPAA: 'HEALTHCARE', HITRUST: 'HEALTHCARE', PCI: 'FINANCE', SOX: 'FINANCE', GDPR: 'GENERAL', FERPA: 'EDUCATION',
   NIST_800_53: 'FEDERAL', NIST_800_171: 'FEDERAL', CJIS: 'FEDERAL', FEDRAMP_MOD: 'FEDERAL', FEDRAMP_HIGH: 'FEDERAL', CMMC_L2: 'FEDERAL',
-  FED_ZT: 'FEDERAL', IRS_1075: 'FEDERAL', GOVRAMP: 'FEDERAL' };
+  FED_ZT: 'FEDERAL', IRS_1075: 'FEDERAL', GOVRAMP: 'FEDERAL', GLBA: 'FINANCE', SOC2: 'GENERAL', ISO_27001: 'GENERAL', NIST_CSF_2: 'GENERAL' };
 const NON_MAPPED_ORDER = ['STRICT', 'BALANCED', 'PERMISSIVE', 'ZTH_EBOOK'];
 
 function listBaselines() {
@@ -48,6 +48,7 @@ const POLICY_LABELS = {
   urlFiltering: 'URL Filtering', cloudAppControl: 'Cloud App Control', fileTypeControl: 'File Type Control',
   advancedThreatProtection: 'Advanced Threat Protection', firewallFiltering: 'Cloud Firewall', dnsSecurity: 'DNS Security',
   sslInspection: 'SSL Inspection', dlp: 'Inline Data Loss Prevention', endpointDlp: 'Endpoint Data Protection',
+  saasDlp: 'SaaS Data Protection (SaaS Security API)', emailDlp: 'Email Data Protection',
   sandbox: 'Cloud Sandbox', aiPromptCapture: 'AI Prompt Capture', ucaas: 'Unified Communications as a Service (UCaaS)'
 };
 const SINGLETON_TYPES = new Set(['advancedThreatProtection', 'aiPromptCapture', 'ucaas']);
@@ -65,6 +66,8 @@ function inScopeTypes(scope) {
   if (s.sslInspection) t.add('sslInspection');
   if (s.dlpMonitor || s.dlpBlock) t.add('dlp');
   if (s.endpointDlp) t.add('endpointDlp');
+  if (s.saasDlp) t.add('saasDlp');
+  if (s.emailDlp) t.add('emailDlp');
   if (s.sandboxStandard || s.sandboxAdvanced) t.add('sandbox');
   if (s.aiPromptCapture) t.add('aiPromptCapture');
   if (t.size) t.add('ucaas');   // UCaaS apps are switched on for every ZIA run
@@ -132,6 +135,8 @@ function build(opts, withChoices) {
     }
   }
   if (types.has('endpointDlp')) policies.endpointDlp = areas.endpointDlpRules(prefix, fw);
+  if (types.has('saasDlp')) policies.saasDlp = areas.saasDlpRules(prefix, fw, !!scope.dlpBlock);
+  if (types.has('emailDlp')) policies.emailDlp = areas.emailDlpRules(prefix, fw, !!scope.dlpBlock);
   if (types.has('aiPromptCapture')) {
     // SCP-54: every app on by default; each can be switched off
     policies.aiPromptCapture = { name: `${prefix}-AI-Prompt-Capture`, settings: areas.AI_PROMPT_APPS.map(a => ({ ...a, value: true, toggleKey: `aiPromptCapture:${a.key}` })) };
@@ -141,7 +146,7 @@ function build(opts, withChoices) {
   }
 
   // 3. New rule types: names within 31 characters (stable, so re-runs match by name), defaults, on/off and DLP Allow / Block
-  for (const type of ['sandbox', 'dlp', 'endpointDlp']) {
+  for (const type of ['sandbox', 'dlp', 'endpointDlp', 'saasDlp', 'emailDlp']) {
     const rules = policies[type];
     if (!rules) continue;
     for (const r of rules) {
@@ -167,6 +172,7 @@ function build(opts, withChoices) {
   for (const d of objects.dlpDictionaries) d.name = shortRuleName(d.name, prefix);
   for (const e of objects.dlpEngines) { e.name = shortRuleName(e.name, prefix); e.dictRefs = e.dictRefs.map(r => r.custom ? { custom: shortRuleName(r.custom, prefix) } : r); }
   for (const r of (policies.dlp || [])) if (r.engineRef && r.engineRef.custom) r.engineRef.custom = shortRuleName(r.engineRef.custom, prefix);
+  for (const t of ['saasDlp', 'emailDlp']) for (const r of (policies[t] || [])) r.engineRefs = r.engineRefs.map(x => x.custom ? { custom: shortRuleName(x.custom, prefix) } : x);
 
   // 4. Settings (ATP, AI prompt capture): per-setting values and switches
   for (const type of SINGLETON_TYPES) {
@@ -187,7 +193,8 @@ function build(opts, withChoices) {
 
   // DLP block: drop engines / dictionaries no remaining rule uses
   if (objects.dlpEngines.length) {
-    const used = new Set((policies.dlp || []).map(r => r.engineRef && r.engineRef.custom).filter(Boolean));
+    const used = new Set([...(policies.dlp || []).map(r => r.engineRef && r.engineRef.custom),
+      ...['saasDlp', 'emailDlp'].flatMap(t => (policies[t] || []).flatMap(r => r.engineRefs.map(x => x.custom)))].filter(Boolean));
     objects.dlpEngines = objects.dlpEngines.filter(e => used.has(e.name));
     const dUsed = new Set(objects.dlpEngines.flatMap(e => e.dictRefs.map(d => d.custom).filter(Boolean)));
     objects.dlpDictionaries = objects.dlpDictionaries.filter(d => dUsed.has(d.name));

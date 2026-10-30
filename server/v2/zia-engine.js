@@ -51,12 +51,21 @@ function details(changes, want, existing) {
 }
 const strip = (o) => { const c = JSON.parse(JSON.stringify(o || {})); for (const k of ['lastModifiedTime', 'lastModifiedBy', 'accessControl', 'creationTime', 'modifiedTime', 'modifiedBy']) delete c[k]; return c; };
 
-// ZIA rejects descriptions over 255 bytes on several object types (e.g. DLP dictionaries).
+// v2.8: provenance tag. Every object the wizard writes carries it at the end of its description, so the shadow check,
+// the posture score and cleanup can tell the wizard's objects from the customer's even when a prefix is reused.
+const TAG = '[ZTP POV]';
+const isOurs = (o, prefix) => !!o && ((prefix && typeof o.name === 'string' && o.name.startsWith(`${prefix}-`)) ||
+  (typeof o.configuredName === 'string' && prefix && o.configuredName.startsWith(`${prefix}-`)) || (typeof o.description === 'string' && o.description.includes(TAG)));
+
+// ZIA rejects descriptions over 255 bytes on several object types (e.g. DLP dictionaries). The tag is kept when trimming.
 function clampDescription(b) {
-  if (!b || typeof b.description !== 'string' || Buffer.byteLength(b.description) <= 255) return b;
-  let d = b.description;
-  while (Buffer.byteLength(d + '…') > 255) d = d.slice(0, -1);
-  return { ...b, description: d.trimEnd() + '…' };
+  if (!b || typeof b.description !== 'string') return b;
+  const base = b.description.replace(/\s*\[ZTP POV\]\s*$/, '').trimEnd();
+  let d = base ? `${base} ${TAG}` : TAG;
+  if (Buffer.byteLength(d) <= 255) return { ...b, description: d };
+  let t = base;
+  while (Buffer.byteLength(t + '… ' + TAG) > 255) t = t.slice(0, -1);
+  return { ...b, description: t.trimEnd() + '… ' + TAG };
 }
 
 class ZiaEngine {
@@ -70,6 +79,22 @@ class ZiaEngine {
     this.wrote = false;
     this.seq = 0;
     this.undo = [];   // v2.2 snapshot: how to put every change back (create → delete, update → previous body)
+    this.planned = []; // v2.8: every rule body the run creates or keeps, for the shadow check
+  }
+
+  /** v2.8: what the dry run saw of the tenant — id, order, state and modified time of every object list it read. */
+  fingerprint() {
+    const out = {};
+    for (const [k, v] of Object.entries(this.cache)) {
+      if (!Array.isArray(v) || k.startsWith('order:')) continue;
+      out[k] = v.map(o => [o.id, o.order, o.state, o.lastModifiedTime || o.modifiedTime || 0, o.name || o.configuredName]).sort((a, b) => String(a[0]).localeCompare(String(b[0])));
+    }
+    return out;
+  }
+  lists() {
+    const out = {};
+    for (const [k, v] of Object.entries(this.cache)) if (Array.isArray(v) && !k.startsWith('order:')) out[k] = v;
+    return out;
   }
 
   record(entry) {
@@ -125,6 +150,7 @@ class ZiaEngine {
     } catch (e) {
       return this.record({ category, name, action: 'FAILED', error: `Could not read existing ${category}: ${e.message}` });
     }
+    if (spec.build) this.planned.push({ category, listPath: spec.listPath, body: existing ? { ...body, order: existing.order } : body });
     if (existing) {
       const want = spec.adjust ? spec.adjust(body, existing) : body;
       const changes = diff(want, existing);
@@ -138,6 +164,16 @@ class ZiaEngine {
       if (!changes.length) return this.record({ category, name, action: 'NO_CHANGE', id: existing.id });
       const det = details(changes, want, existing);
       if (this.dryRun) return this.record({ category, name, action: 'UPDATE', id: existing.id, changes, details: det });
+      // v2.8: read the object again just before writing it; if someone changed it since the run read it, leave it alone
+      const when = (o) => o && (o.lastModifiedTime || o.modifiedTime);
+      if (when(existing)) {
+        try {
+          const now = await this.client.apiCall('GET', spec.updatePath(existing.id));
+          if (now && when(now) && when(now) !== when(existing)) {
+            return this.record({ category, name, action: 'SKIPPED', id: existing.id, changes, error: 'Changed in the ZIA portal after this run read it; left as it is. Run the dry run again to see the new state.' });
+          }
+        } catch (e) { /* the object cannot be read singly: carry on with the list copy */ }
+      }
       const merged = clampDescription({ ...existing, ...want, id: existing.id });
       if (existing.order !== undefined) merged.order = moveTo || existing.order;   // re-runs only move a catch-all back to the bottom
       for (const k of READ_ONLY) delete merged[k];
@@ -163,11 +199,24 @@ class ZiaEngine {
       const createBody = spec.build ? clampDescription(spec.build(takenOrder)) : clampDescription(body);
       try { created = await this.client.apiCall('POST', spec.createPath, createBody); }
       catch (e) {
+        // v2.8: a create that timed out may still have been made. Look for it by name before trying again, so it is never made twice.
+        if (/Request timeout/.test(String(e.message))) {
+          this.cache[spec.listPath] = null;
+          const again = (await this.get(spec.listPath).catch(() => [])).find(spec.match || (o => o && (o.name === name || o.configuredName === name)));
+          if (again) {
+            this.wrote = true;
+            this.undo.push({ op: 'DELETE', path: spec.updatePath(again.id), label: `${category}: ${name}` });
+            this.cache[spec.listPath] = null;
+            return this.record({ category, name, action: 'CREATE', id: again.id, note: 'The request timed out, but the object was made; found by name.' });
+          }
+          created = await this.client.apiCall('POST', spec.createPath, createBody);
+        } else {
         if (!spec.createFallback) throw e;
         const retry = spec.createFallback(e, createBody);
         if (!retry) throw e;
         if (retry.warning) this.warnings.push(`${name}: ${retry.warning}`);
         created = await this.client.apiCall('POST', spec.createPath, retry.body);
+        }
       }
       this.wrote = true;
       if (created && created.id !== undefined) this.undo.push({ op: 'DELETE', path: spec.updatePath(created.id), label: `${category}: ${name}` });
@@ -305,7 +354,7 @@ async function runZia(client, template, { dryRun, logger }) {
       if (hit) { catIds[nm] = hit.id; eng.record({ category: 'URL Category', name: nm, action: 'NO_CHANGE', id: hit.id }); continue; }
       if (dryRun) { eng.record({ category: 'URL Category', name: nm, action: 'CREATE' }); continue; }
       try {
-        const c = await client.apiCall('POST', '/api/v1/urlCategories', { configuredName: nm, superCategory: 'USER_DEFINED', urls: ['placeholder.example.com'], customCategory: true, description: 'Custom category created by the Zscaler Policy Wizard' });
+        const c = await client.apiCall('POST', '/api/v1/urlCategories', { configuredName: nm, superCategory: 'USER_DEFINED', urls: ['placeholder.example.com'], customCategory: true, description: `Custom category created by the Zscaler Policy Wizard ${TAG}` });
         catIds[nm] = c.id; eng.wrote = true; eng.undo.push({ op: 'DELETE', path: `/api/v1/urlCategories/${c.id}`, label: `URL Category: ${nm}` }); eng.record({ category: 'URL Category', name: nm, action: 'CREATE', id: c.id });
       } catch (e) { eng.record({ category: 'URL Category', name: nm, action: 'FAILED', error: e.message }); }
     }
@@ -334,7 +383,7 @@ async function runZia(client, template, { dryRun, logger }) {
       if (svcIds[c.name]) { eng.record({ category: 'Network Service', name: c.name, action: 'NO_CHANGE', id: svcIds[c.name].id }); continue; }
       if (dryRun) { eng.record({ category: 'Network Service', name: c.name, action: 'CREATE' }); svcIds[c.name] = { id: 'new' }; continue; }
       try {
-        const n = await client.apiCall('POST', '/api/v1/networkServices', { name: c.name, type: 'CUSTOM', description: 'Created by the Zscaler Policy Wizard (Cloud Firewall Standard)',
+        const n = await client.apiCall('POST', '/api/v1/networkServices', { name: c.name, type: 'CUSTOM', description: `Created by the Zscaler Policy Wizard (Cloud Firewall Standard) ${TAG}`,
           destTcpPorts: (c.tcp || []).map(p => ({ start: p })), destUdpPorts: (c.udp || []).map(p => ({ start: p })) });
         svcIds[c.name] = { id: n.id }; eng.wrote = true;
         eng.undo.push({ op: 'DELETE', path: `/api/v1/networkServices/${n.id}`, label: `Network Service: ${c.name}` });
@@ -420,7 +469,7 @@ async function runZia(client, template, { dryRun, logger }) {
   }
 
   // DLP: dictionaries → engines → rules (FWK-20/22: reuse predefined, update ours by name)
-  if (P.dlp || P.endpointDlp) await runDlp(eng, template);
+  if (P.dlp || P.endpointDlp || P.saasDlp || P.emailDlp) await runDlp(eng, template);
 
   // ATP defaults (GET → merge → PUT). Some tenants refuse fields behind feature flags: those fields are dropped and reported.
   if (P.advancedThreatProtection) {
@@ -442,7 +491,7 @@ async function runZia(client, template, { dryRun, logger }) {
   }
 
   const activated = await eng.activate();
-  return { ledger: eng.ledger, warnings: eng.warnings, activated, undo: eng.undo };
+  return { ledger: eng.ledger, warnings: eng.warnings, activated, undo: eng.undo, planned: eng.planned, lists: eng.lists(), fingerprint: eng.fingerprint() };
 }
 
 /** PUT ATP; if a feature flag blocks some fields, drop them and retry once; still refused → skipped (not failed). */
@@ -488,9 +537,21 @@ async function runDlp(eng, template) {
       if (ref.custom) { if (failed.has(ref.custom)) missing.push(ref.custom); else ids.push(dictIds[ref.custom]); }
       else { const pd = predefinedDict(ref.predefined); if (pd) ids.push(pd.id); else missing.push(ref.predefined); }
     }
-    if (missing.length) eng.warnings.push(`${en.name}: dictionaries not available, left out: ${missing.join(', ')}`);
-    if (!ids.length) { failed.add(en.name); eng.record({ category: 'DLP Engine', name: en.name, action: 'SKIPPED', error: 'No usable dictionaries' }); continue; }
-    const expr = '(' + ids.map(id => `(D${String(id).startsWith('new:') ? 'NEW' : id}.S> 1)`).join(' OR ') + ')';
+    const Did = (id) => `D${String(id).startsWith('new:') ? 'NEW' : id}.S`;
+    let expr;
+    if (en.expression) {
+      // v2.8: a combined engine needs every dictionary it names; one missing would change what it means, so it is not created
+      if (missing.length) { failed.add(en.name); eng.record({ category: 'DLP Engine', name: en.name, action: 'SKIPPED', error: `Needs dictionaries this tenant does not have: ${missing.join(', ')}` }); continue; }
+      const idOf = {};
+      for (const [tok, ref] of Object.entries(en.tokens || {})) idOf[tok] = ref.custom ? dictIds[ref.custom] : (predefinedDict(ref.predefined) || {}).id;
+      const bad = [];
+      expr = en.expression.replace(/\{([A-Z0-9_]+)\}/g, (m, tok) => { if (idOf[tok] === undefined) { bad.push(tok); return m; } return Did(idOf[tok]); });
+      if (bad.length) { failed.add(en.name); eng.record({ category: 'DLP Engine', name: en.name, action: 'SKIPPED', error: `Expression names unknown dictionaries: ${bad.join(', ')}` }); continue; }
+    } else {
+      if (missing.length) eng.warnings.push(`${en.name}: dictionaries not available, left out: ${missing.join(', ')}`);
+      if (!ids.length) { failed.add(en.name); eng.record({ category: 'DLP Engine', name: en.name, action: 'SKIPPED', error: 'No usable dictionaries' }); continue; }
+      expr = '(' + ids.map(id => `(${Did(id)}> 1)`).join(' OR ') + ')';
+    }
     const e = await eng.upsert({ category: 'DLP Engine', name: en.name, listPath: '/api/v1/dlpEngines', createPath: '/api/v1/dlpEngines',
       updatePath: id => `/api/v1/dlpEngines/${id}`, body: { name: en.name, description: en.description, customDlpEngine: true, engineExpression: expr },
       match: o => o.customDlpEngine && o.name === en.name });
@@ -522,6 +583,71 @@ async function runDlp(eng, template) {
       resources: resources.map(x => ({ id: x.id })), dlpEngines: engIds });
     await eng.upsert({ category: 'Endpoint DLP', name: r.name, listPath: '/api/v1/endPointDlpRules', createPath: '/api/v1/endPointDlpRules', updatePath: id => `/api/v1/endPointDlpRules/${id}`, build: body });
   }
+
+  // v2.8: engines for the SaaS and Email channels (predefined by name, ours by the id made above)
+  const channelEngines = (r) => {
+    const out = [], missing = [];
+    for (const x of r.engineRefs || []) {
+      if (x.predefined) { const pe = predefinedEngine(x.predefined); if (pe) out.push({ id: pe.id }); else missing.push(x.predefined); }
+      else if (engineIds[x.custom] !== undefined && !failed.has(x.custom)) out.push({ id: engineIds[x.custom] }); else missing.push(x.custom);
+    }
+    return { out, missing };
+  };
+  const notLicensed = (e, what) => {
+    if (e && e.action === 'FAILED' && /NOT_SUBSCRIBED|subscription/i.test(String(e.error))) { e.action = 'SKIPPED'; e.error = `${what} is not licensed on this tenant (${String(e.error).match(/"message":"([^"]+)"/) ? RegExp.$1 : 'not subscribed'}).`; }
+    return e;
+  };
+  // SaaS Security API DLP: one monitor rule per onboarded SaaS app type; ZIA requires a cloud app tenant on each rule
+  for (const r of P.saasDlp || []) {
+    const { out: engs, missing } = channelEngines(r);
+    if (missing.length) eng.warnings.push(`${r.name}: engines not available, left out: ${missing.join(', ')}`);
+    if (!engs.length) { eng.record({ category: 'SaaS DLP', name: r.name, action: 'SKIPPED', error: 'No usable DLP engines.' }); continue; }
+    let tenants = [];
+    try { tenants = list(await client.apiCall('GET', '/api/v1/casbTenant/lite')); }
+    catch (e) { notLicensed(eng.record({ category: 'SaaS DLP', name: r.name, action: 'FAILED', error: e.message }), 'SaaS Security (CASB)'); continue; }
+    const byType = new Map();
+    for (const t of tenants) {
+      const type = saasRuleType(t);
+      if (!type) continue;
+      if (!byType.has(type)) byType.set(type, []);
+      byType.get(type).push({ id: t.tenantId !== undefined ? t.tenantId : t.id });
+    }
+    if (!byType.size) { eng.record({ category: 'SaaS DLP', name: r.name, action: 'SKIPPED', error: 'No SaaS application tenants are onboarded on this tenant (Administration › SaaS Application Tenants). Onboard the customer\'s Microsoft 365, Google Workspace, Box or other SaaS tenant first.' }); continue; }
+    for (const [type, ids] of byType) {
+      const nm = `${r.name}-${SAAS_SUFFIX[type] || 'App'}`.slice(0, 31);
+      const body = (order) => ({ name: nm, description: r.description, order, rank: 7, state: 'ENABLED', type, action: 'OFLCASB_DLP_REPORT_INCIDENT', severity: r.severity,
+        dlpEngines: engs, cloudAppTenants: ids, collaborationScope: ['ANY'], withoutContentInspection: false });
+      notLicensed(await eng.upsert({ category: 'SaaS DLP', name: nm, listPath: `/api/v1/casbDlpRules?ruleType=${type}`, createPath: '/api/v1/casbDlpRules',
+        updatePath: id => `/api/v1/casbDlpRules/${id}?ruleType=${type}`, orderPath: `/api/v1/casbDlpRules?ruleType=${type}`, build: body }), 'SaaS Security (CASB) DLP');
+    }
+  }
+  // Outbound Email DLP (monitor: allow and log)
+  for (const r of P.emailDlp || []) {
+    const { out: engs, missing } = channelEngines(r);
+    if (missing.length) eng.warnings.push(`${r.name}: engines not available, left out: ${missing.join(', ')}`);
+    if (!engs.length) { eng.record({ category: 'Email DLP', name: r.name, action: 'SKIPPED', error: 'No usable DLP engines.' }); continue; }
+    const body = (order) => ({ name: r.name, description: r.description, order, rank: 7, state: 'ENABLED', action: 'ALLOW', severity: r.severity, dlpEngines: engs });
+    notLicensed(await eng.upsert({ category: 'Email DLP', name: r.name, listPath: '/api/v1/emailDlpRules', createPath: '/api/v1/emailDlpRules', updatePath: id => `/api/v1/emailDlpRules/${id}`, build: body }), 'Email DLP (smarthost)');
+  }
 }
 
-module.exports = { runZia, ZiaEngine, diff, isSslCatchAll };
+// SaaS app → SaaS Security DLP rule type
+const SAAS_TYPES = [
+  ['OFLCASB_DLP_FILE', /BOX|DROPBOX|GDRIVE|GOOGLE_?DRIVE|ONE_?DRIVE|SHAREPOINT|EGNYTE|CITRIX_?SHAREFILE/],
+  ['OFLCASB_DLP_EMAIL', /GMAIL|GOOGLE_?MAIL|EXCHANGE|OUTLOOK|OFFICE_?365_?MAIL/],
+  ['OFLCASB_DLP_COLLAB', /SLACK|TEAMS|WEBEX|ZOOM|CONFLUENCE|GOOGLE_?CHAT/],
+  ['OFLCASB_DLP_CRM', /SALESFORCE|HUBSPOT|DYNAMICS/],
+  ['OFLCASB_DLP_ITSM', /SERVICENOW|SERVICE_?NOW|JIRA|ZENDESK|FRESH/],
+  ['OFLCASB_DLP_REPO', /GITHUB|GITLAB|BITBUCKET|AZURE_?DEVOPS/],
+  ['OFLCASB_DLP_STORAGE', /AWS|S3|AZURE_?BLOB|AZURE_?STORAGE|GCP|GOOGLE_?CLOUD/],
+  ['OFLCASB_DLP_GENAI', /CHATGPT|OPENAI|GEMINI|COPILOT|CLAUDE|ANTHROPIC/]
+];
+const SAAS_SUFFIX = { OFLCASB_DLP_FILE: 'Files', OFLCASB_DLP_EMAIL: 'Mail', OFLCASB_DLP_COLLAB: 'Collab', OFLCASB_DLP_CRM: 'CRM', OFLCASB_DLP_ITSM: 'ITSM',
+  OFLCASB_DLP_REPO: 'Repo', OFLCASB_DLP_STORAGE: 'Storage', OFLCASB_DLP_GENAI: 'GenAI' };
+function saasRuleType(t) {
+  const app = String(t.saasApplication || t.application || t.appName || t.type || '').toUpperCase().replace(/[\s-]+/g, '_');
+  for (const [type, re] of SAAS_TYPES) if (re.test(app)) return type;
+  return null;
+}
+
+module.exports = { runZia, ZiaEngine, diff, isSslCatchAll, TAG, isOurs, clampDescription };
