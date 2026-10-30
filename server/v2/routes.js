@@ -7,7 +7,8 @@ const COPY = require('./copy');
 const { SCOPE_ITEMS, EXCLUSIVE_GROUPS, normalizeScope, detectLicensing, scopeWarnings } = require('./scope');
 const fw = require('./frameworks');
 const areas = require('./zia-areas');
-const { runZia } = require('./zia-engine');
+const { runZia, isOurs } = require('./zia-engine');
+const shadow = require('./shadow');
 const { parseBulkCsv, validateBulkApps, ZPAClient, runZpa, validateZpaInput, APP_SEGMENT_DEFAULTS, SAN_JOSE, POLICY_DEFAULTS, listZpaObjects, deleteZpaObjects, DELETE_ORDER } = require('./zpa');
 const { buildReport } = require('./report');
 const { LIST_KEYS, LIST_LABELS, validateProfileLists } = require('./validate');
@@ -22,17 +23,66 @@ function v2(session) {
   if (!session.v2) session.v2 = { plans: {}, runs: { zia: [], zcc: [], zpa: [] }, licensing: null };
   return session.v2;
 }
-function rememberPlan(session, kind, input) {
+function rememberPlan(session, kind, input, tenant) {
   const id = `${kind}-${hash(input)}`;
-  v2(session).plans[id] = Date.now();
+  v2(session).plans[id] = tenant ? { at: Date.now(), tenant } : Date.now();
   return id;
 }
 function checkPlan(session, kind, input, planId) {
   const id = `${kind}-${hash(input)}`;
-  const t = v2(session).plans[id];
+  const p = v2(session).plans[id];
+  const t = p && typeof p === 'object' ? p.at : p;
   if (!planId || planId !== id || !t) return 'Run the dry run first. Changes are only applied after you have reviewed a dry run of exactly these settings.';
   if (Date.now() - t > 60 * 60 * 1000) return 'The dry run is more than an hour old. Run it again before applying.';
   return null;
+}
+/**
+ * v2.8: the plan also covers the tenant. The dry run records what it saw (every object list it read: ids, order, state,
+ * modified time) and the actions it planned. Before applying, the run is planned again; if the tenant or the plan changed in
+ * between (another admin edited a rule, a rule was added above), nothing is written and the differences are listed.
+ */
+const LIST_NAMES = { '/api/v1/urlFilteringRules': 'URL Filtering rules', '/api/v1/firewallFilteringRules': 'Cloud Firewall rules', '/api/v1/sslInspectionRules': 'SSL Inspection rules',
+  '/api/v1/firewallDnsRules': 'DNS rules', '/api/v1/fileTypeRules': 'File Type Control rules', '/api/v1/sandboxRules': 'Sandbox rules', '/api/v1/webDlpRules': 'web DLP rules',
+  '/api/v1/endPointDlpRules': 'Endpoint DLP rules', '/api/v1/dlpEngines': 'DLP engines', '/api/v1/dlpDictionaries': 'DLP dictionaries', '/api/v1/casbDlpRules': 'SaaS DLP rules', '/api/v1/emailDlpRules': 'Email DLP rules' };
+/** v2.8: how many ZIA writes the apply makes, against the hourly API budget. */
+function writeForecast(client, ledger) {
+  const writes = (ledger || []).filter(e => e.action === 'CREATE' || e.action === 'UPDATE').length;
+  const heavy = (ledger || []).filter(e => (e.action === 'CREATE' || e.action === 'UPDATE') && /Cloud App Control|Endpoint DLP/.test(e.category)).length + (writes ? 1 : 0);
+  const b = typeof client.writeBudget === 'function' ? client.writeBudget() : null;
+  const total = writes + (writes ? 1 : 0) + (ledger || []).filter(e => e.action === 'UPDATE').length;   // + activation + a re-read per update
+  return { writes: writes + (writes ? 1 : 0), heavy, seconds: Math.ceil(total * 1.2), budget: b,
+    fits: !b || (b.remaining >= writes + 1 && b.heavyRemaining >= heavy),
+    text: !writes ? 'Nothing to write.' : `About ${writes + 1} changes to ZIA (including activation), roughly ${Math.max(1, Math.round(total * 1.2 / 60))} minute(s) at the API's pace.${b ? ` ${b.remaining} of about ${b.hourly} changes an hour left for this API client.` : ''}` };
+}
+/** v2.8: what the API could not write, as steps to finish in the portal (also shown in the POV report). */
+function manualSteps(template, run) {
+  const out = [];
+  for (const e of (run.ledger || []).filter(x => x.action === 'SKIPPED' && x.error)) out.push({ area: e.category, step: `${e.name}: ${e.error}` });
+  const P = (template && template.policies) || {};
+  if ((P.urlFiltering || []).some(r => r.action === 'ISOLATE')) out.push({ area: 'Browser Isolation', step: 'Smart Browser Isolation (the one-click isolation of risky sites) cannot be switched on through the API; turn it on in Policy › Smart Browser Isolation if the POV shows it.' });
+  if (P.sslInspection) out.push({ area: 'SSL Inspection', step: 'Install the tenant\'s root (or your intermediate) certificate on test machines that are not managed by Client Connector, so inspected sites do not show certificate errors.' });
+  return out;
+}
+function tenantSignature(run) {
+  return { lists: run.fingerprint || {}, actions: (run.ledger || []).map(e => `${e.category}|${e.name}|${e.action}|${(e.changes || []).join(',')}`) };
+}
+function tenantChanges(before, after) {
+  const out = [];
+  for (const k of new Set([...Object.keys(before.lists || {}), ...Object.keys(after.lists || {})])) {
+    const a = new Map((before.lists[k] || []).map(x => [String(x[0]), JSON.stringify(x)]));
+    const b = new Map((after.lists[k] || []).map(x => [String(x[0]), JSON.stringify(x)]));
+    let added = 0, removed = 0, edited = 0;
+    for (const [id, v] of b) { if (!a.has(id)) added++; else if (a.get(id) !== v) edited++; }
+    for (const id of a.keys()) if (!b.has(id)) removed++;
+    if (added || removed || edited) {
+      const label = LIST_NAMES[k] || (k.startsWith('/api/v1/webApplicationRules/') ? `Cloud App Control rules (${k.split('/').pop()})` : k.replace('/api/v1/', ''));
+      out.push(`${label}: ${[added && `${added} added`, edited && `${edited} edited or moved`, removed && `${removed} removed`].filter(Boolean).join(', ')}`);
+    }
+  }
+  const pa = new Set(before.actions || []), pb = new Set(after.actions || []);
+  const newActs = [...pb].filter(x => !pa.has(x)).map(x => x.split('|').slice(0, 3).join(' '));
+  if (newActs.length) out.push(`Planned changes now differ: ${newActs.slice(0, 5).join('; ')}${newActs.length > 5 ? '…' : ''}`);
+  return out;
 }
 
 function registerV2Routes(app, requireAuth) {
@@ -90,10 +140,13 @@ function registerV2Routes(app, requireAuth) {
       const template = fw.generate(input);
       const resolved = await resolveForTenant(client, template, { cbiProfile: input.cbiProfile });
       const run = await runZia(client, resolved.template, { dryRun: true, logger });
-      const planId = rememberPlan(req.session, 'zia', input);
-      logger.log('V2_ZIA_DRY_RUN', { baseline: input.baseline, scope: input.scope, counts: countActions(run.ledger) });
+      const planId = rememberPlan(req.session, 'zia', input, tenantSignature(run));
+      const shadows = shadow.analyze(run.planned, run.lists, (o) => isOurs(o, input.prefix));
+      const forecast = writeForecast(client, run.ledger);
+      v2(req.session).lastShadow = { at: new Date().toISOString(), ...shadows };
+      logger.log('V2_ZIA_DRY_RUN', { baseline: input.baseline, scope: input.scope, counts: countActions(run.ledger), shadowed: shadows.findings.length });
       res.json({
-        planId, ledger: run.ledger, counts: countActions(run.ledger),
+        planId, ledger: run.ledger, counts: countActions(run.ledger), shadow: shadows, forecast, manualSteps: manualSteps(resolved.template, run),
         warnings: [...scopeWarnings(input.scope, lic).map(w => w.text), ...resolved.warnings, ...run.warnings, ...template.generationNotes],
         errors: resolved.errors, resolved: resolved.info, template: resolved.template
       });
@@ -108,13 +161,35 @@ function registerV2Routes(app, requireAuth) {
       if (bad) return res.status(409).json({ error: bad });
       const template = fw.generate(input);
       const resolved = await resolveForTenant(client, template, { cbiProfile: input.cbiProfile });
+      // v2.8: plan again and compare with the reviewed dry run; any change on the tenant in between stops the apply
+      const stored = v2(req.session).plans[req.body.planId];
+      if (stored && typeof stored === 'object' && stored.tenant) {
+        const again = await runZia(client, JSON.parse(JSON.stringify(resolved.template)), { dryRun: true });
+        const changed = tenantChanges(stored.tenant, tenantSignature(again));
+        if (changed.length) {
+          logger.log('V2_ZIA_APPLY_STOPPED', { reason: 'tenant changed since the dry run', changed });
+          return res.status(409).json({ error: 'The tenant changed since your dry run, so nothing was applied. Run the dry run again and review it.', changed });
+        }
+      }
       const run = await runZia(client, resolved.template, { dryRun: false, logger });   // GLB-04: activates when anything was written
       const lic = v2(req.session).licensing;
       const warnings = [...scopeWarnings(input.scope, lic).map(w => w.text), ...resolved.warnings, ...run.warnings];
       const snapshot = snapshots.save({ product: 'zia', prefix: input.prefix || v2(req.session).prefix, undo: run.undo, tenant: client.vanityDomain || client.baseUrl });
-      v2(req.session).runs.zia.push({ at: new Date().toISOString(), template: resolved.template, ledger: run.ledger, warnings, activated: run.activated, snapshot });
+      const steps = manualSteps(resolved.template, run);
+      // v2.8: read the tenant again and confirm every object matches the plan (after zs-config's post-push consistency check)
+      let verify = null;
+      if (run.ledger.some(e => e.action === 'CREATE' || e.action === 'UPDATE')) {
+        try {
+          const check = await runZia(client, JSON.parse(JSON.stringify(resolved.template)), { dryRun: true });
+          const wrote = new Set(run.ledger.filter(e => e.action === 'CREATE' || e.action === 'UPDATE').map(e => `${e.category}|${e.name}`));
+          const differ = check.ledger.filter(e => wrote.has(`${e.category}|${e.name}`) && e.action !== 'NO_CHANGE')
+            .map(e => ({ category: e.category, name: e.name, why: e.action === 'CREATE' ? 'not found after the apply' : `differs: ${(e.changes || []).join(', ')}` }));
+          verify = { checked: wrote.size, differ, text: differ.length ? `Checked after apply: ${differ.length} of ${wrote.size} changed object(s) do not match the plan.` : `Checked after apply: all ${wrote.size} changed object(s) match the plan.` };
+        } catch (e) { verify = { checked: 0, differ: [], text: `Could not read the tenant back after the apply: ${e.message}` }; }
+      }
+      v2(req.session).runs.zia.push({ at: new Date().toISOString(), template: resolved.template, ledger: run.ledger, warnings, activated: run.activated, snapshot, manualSteps: steps, verify });
       logger.log('V2_ZIA_APPLY', { baseline: input.baseline, counts: countActions(run.ledger), activated: run.activated });
-      res.json({ ledger: run.ledger, counts: countActions(run.ledger), warnings, activated: run.activated, snapshot });
+      res.json({ ledger: run.ledger, counts: countActions(run.ledger), warnings, activated: run.activated, snapshot, manualSteps: steps, verify });
     } catch (e) { res.status(e.status || 502).json({ error: e.message }); }
   });
 
@@ -285,14 +360,30 @@ function registerV2Routes(app, requireAuth) {
   });
 
   // ---------- Report (§9) ----------
-  app.post('/api/v2/report', requireAuth, (req, res) => {
+  const reportFor = (req) => {
     const s = v2(req.session);
     const lic = s.licensing;
-    const report = buildReport({ runs: s.runs, prefix: s.prefix || '', tenant: req.session.client.vanityDomain || req.session.client.baseUrl,
+    return buildReport({ runs: s.runs, prefix: s.prefix || '', tenant: req.session.client.vanityDomain || req.session.client.baseUrl,
       licensing: lic, endpointWarning: lic ? lic.endpointDlpEnabledInZcc !== true : true, includeSecrets: (req.body || {}).includeSecrets !== false,
-      tests: require('./pov-tests').runbook(s.runs, s.testResults || {}) });
+      tests: require('./pov-tests').runbook(s.runs, s.testResults || {}), posture: s.posture || null, shadow: s.lastShadow || null, coverage: s.coverageSummary || null });
+  };
+  app.post('/api/v2/report', requireAuth, (req, res) => {
+    const report = reportFor(req);
     req.session.logger.log('V2_REPORT', { containsSecret: report.containsSecret });
     res.json(report);
+  });
+  // v2.8: the same report as a Word document
+  app.post('/api/v2/report/docx', requireAuth, (req, res) => {
+    try {
+      const report = reportFor(req);
+      const docx = require('./docx');
+      const doc = docx.fromMarkdown(report.markdown);
+      const buf = docx.build({ ...doc, landscape: true });
+      const name = `${(v2(req.session).prefix || 'pov').toLowerCase()}-pov-report.docx`;
+      req.session.logger.log('V2_REPORT', { containsSecret: report.containsSecret, format: 'docx' });
+      res.set({ 'Content-Type': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'Content-Disposition': `attachment; filename="${name}"` });
+      res.send(buf);
+    } catch (e) { res.status(500).json({ error: e.message }); }
   });
   require('./routes22').register(app, requireAuth, { v2, rememberPlan, checkPlan, zpaOf, countActions, runZia, runZpa });
   require('./routes25').register(app, requireAuth, { v2, rememberPlan, checkPlan, countActions });

@@ -35,13 +35,26 @@ const SAMPLE = {
   'Payment-Cards': () => [['Customer', 'Card number', 'Expiry'], ...NAMES.map((n, i) => [n, CARDS[i % CARDS.length], `${pad(1 + rnd(12), 2)}/3${rnd(9)}`])],
   'Card-Track-Data': () => [['Terminal', 'Track 1', 'Track 2'], ...[0, 1, 2].map(i => [`POS-${i + 1}`, `%B4111111111111111^TEST/CARD^3012101000000000?`, `;4111111111111111=30121010000000000000?`])],
   'Bank-Routing': () => [['Customer', 'ABA routing', 'Account number'], ...NAMES.map(n => [n, aba(), pad(rnd(1e10), 10)])],
-  'Credentials': () => [['System', 'Credential'], ['Example AWS key (AWS documentation sample)', 'aws_access_key_id = AKIAIOSFODNN7EXAMPLE'], ['Example secret (AWS documentation sample)', 'aws_secret_access_key = wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY'], ['Database', 'password=Zpov-Test-Only-123!']],
-  'CUI-Markings': () => [['Banner', 'Document'], ['CUI//SP-PRVCY', 'Personnel roster (test)'], ['CONTROLLED UNCLASSIFIED INFORMATION', 'Contract technical data (test)'], ['CUI//SP-CTI', 'Export-controlled drawing (test)']],
+  'Credentials': () => [['System', 'Credential'], ['Example AWS key (AWS documentation sample)', 'aws_access_key_id = AKIAIOSFODNN7EXAMPLE'], ['Example secret (AWS documentation sample)', 'aws_secret_access_key = wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY'], ['Database', 'password=Zpov-Test-Only-123!'],
+    ['Example private key header (not a real key)', '-----BEGIN PRIVATE KEY----- ZPOVTESTONLYNOTAREALKEY -----END PRIVATE KEY-----'], ['Example GitHub token format (not a real token)', `ghp_ZPOVTEST${'0'.repeat(28)}`]],
+  'CUI-Markings': () => [['Banner', 'Document'], ['CUI//SP-PRVCY', 'Personnel roster (test)'], ['CONTROLLED UNCLASSIFIED INFORMATION', 'Contract technical data (test)'], ['CUI//SP-CTI', 'Export-controlled drawing (test)'],
+    ['FOR OFFICIAL USE ONLY', 'Legacy memo (test)'], ['DISTRIBUTION STATEMENT C', 'Technical report (test)']],
   'PII': () => [['Name', 'SSN', 'Driver license', 'Taxpayer ID'], ...NAMES.map(n => [n, ssn(), `D${pad(rnd(1e7), 7)}`, `9${pad(rnd(100), 2)}-7${rnd(10)}-${pad(rnd(1e4), 4)}`])],
   'CJI-Records': () => [['Subject', 'Record', 'Reference'], ...NAMES.slice(0, 4).map((n, i) => [n, phrases('CJI_TERMS')[i % phrases('CJI_TERMS').length] || 'criminal history record information', `FBI Number ${pad(rnd(1e6), 6)}AB${rnd(10)}`])],
   'Financial-Statements': () => [['Document', 'Status'], ...phrases('MNPI').slice(0, 5).map(p => [`Q3 consolidated statement of operations — ${p}`, 'Do not distribute'])],
   'Student-Records': () => [['Student', 'Field', 'Value'], ...NAMES.slice(0, 5).map((n, i) => [n, phrases('STUDENT_RECORDS')[i % phrases('STUDENT_RECORDS').length], `S${pad(rnd(1e8), 8)} / SSN ${ssn()}`])],
   'EU-Identifiers': () => [['Name', 'IBAN', 'UK National Insurance number'], ['Alex Sample', 'GB82 WEST 1234 5698 7654 32', 'QQ 12 34 56 C'], ['Jordan Example', 'DE89 3704 0044 0532 0130 00', 'QQ 12 34 56 C'], ['Taylor Demo', 'FR14 2004 1010 0505 0001 3M02 606', 'QQ 12 34 56 C']],
+  // v2.8 combined rules: each file satisfies its engine (identifier + condition, notes + identifier, 50+ records, code structure + statements)
+  'PHI-Sensitive': () => [['Patient', 'Medical record', 'Date of birth', 'Note'], ...NAMES.map((n, i) => [n, `MRN: ${pick('ABCDEFGH')}${pad(rnd(1e7), 7)}`, `DOB: ${pad(1 + rnd(12), 2)}/${pad(1 + rnd(28), 2)}/19${50 + rnd(49)}`,
+    phrases('PHI_SENSITIVE')[i % phrases('PHI_SENSITIVE').length]])],
+  'PHI-Narrative': () => [['Patient', 'Medical record', 'Document'], ...NAMES.map(n => [n, `MRN: ${pick('ABCDEFGH')}${pad(rnd(1e7), 7)}`,
+    `Discharge summary. Chief complaint: chest pain. History of present illness: two days. Assessment and plan: follow up. Medication list attached.`])],
+  'PHI-Bulk': () => [['Row', 'Patient', 'Medical record', 'Date of birth'], ...Array.from({ length: 60 }, (_, i) => [i + 1, `Test Patient ${i + 1}`, `MRN: Z${pad(1000000 + i * 7919, 7)}`,
+    `DOB: ${pad(1 + (i % 12), 2)}/${pad(1 + (i % 28), 2)}/19${pad(40 + (i % 59), 2)}`])],
+  'Source-Code': () => [['Line', 'Source (sample Java)'], ...[
+    'import java.util.List;', 'import java.io.IOException;', 'public class PovSample {', '  public static int total(List<Integer> xs) throws IOException {', '    int t = 0;',
+    '    for (int i = 0; i < xs.size(); i++) {', '      if (xs.get(i) > 0) {', '        t += xs.get(i);', '      } else {', '        t -= 1;', '      }', '    }',
+    '    try {', '      check(t);', '    } catch (IllegalStateException e) {', '      throw new IOException(e);', '    }', '    return t;', '  }', '}'].map((l, i) => [i + 1, l])],
   'FTI': () => [['Taxpayer', 'SSN', 'Form', 'Marking'], ...NAMES.map(n => [n, ssn(), `Form 1040 return information, tax year 202${rnd(5)}`, 'Contains FTI — Federal Tax Information protected by IRC 6103'])]
 };
 const NOTE = { 'Self-Harm': 'Use the sample text in Zscaler\'s cyberbullying engine documentation; the wizard does not generate this content.' };
@@ -87,6 +100,21 @@ function mappingRows(tpl, f, disabled = {}) {
   return rows;
 }
 
+/**
+ * v2.8: how much of the profile the POV policy addresses: the share of the profile's controls that at least one switched-on
+ * ZIA rule or setting maps to. Aligned 80% or more, Partial 50% or more, otherwise Gaps. This measures what the POV
+ * configures, not an audit result; the wording says so. (The Aligned / Partial / Gaps scale follows Zscaler Made Easy.)
+ */
+function alignment(rows, f) {
+  const all = (f.controls || []).map(c => c.id);
+  const covered = new Set(rows.filter(r => r.product === 'ZIA' && r.state === 'On' && r.controls).flatMap(r => r.controls.split('; ')));
+  const hit = all.filter(id => covered.has(id));
+  const pct = all.length ? Math.round(hit.length / all.length * 100) : null;
+  return { total: all.length, covered: hit.length, pct, status: pct === null ? 'Not mapped' : pct >= 80 ? 'Aligned' : pct >= 50 ? 'Partial' : 'Gaps',
+    missing: all.filter(id => !covered.has(id)).map(id => ({ id, name: ((f.controls || []).find(c => c.id === id) || {}).name || id })),
+    text: pct === null ? 'This profile has no control catalog.' : `${hit.length} of ${all.length} ${f.name} controls are addressed by at least one rule or setting in this POV (${pct}%). This shows what the POV configures, not an audit result.` };
+}
+
 // POV tests → objectives (the test plan groups them by the profile's controls)
 const TEST_OBJECTIVES = {
   'url-block': ['ACCEPTABLE_USE', 'THREAT_SITES'], 'url-caution': ['PRODUCTIVITY', 'THREAT_SITES'], 'url-isolate': ['ISOLATION'], 'ssl-inspect': ['INSPECT_TLS'],
@@ -123,21 +151,25 @@ function page(title, sub, body) {
   return `<!doctype html><html><head><meta charset="utf-8"><title>${esc(title)}</title><style>
 body{font:12px/1.45 -apple-system,Segoe UI,Helvetica,Arial,sans-serif;color:#1d2433;margin:24px}h1{font-size:18px;margin:0 0 4px}h2{font-size:14px;margin:18px 0 6px}
 .sub{color:#5b6475;margin-bottom:14px}table{border-collapse:collapse;width:100%;margin-bottom:10px}th,td{border:1px solid #c9ced8;padding:4px 6px;text-align:left;vertical-align:top}
-th{background:#eef2f8}.r{color:#8a4b00}.k{font-family:monospace;font-size:11px;color:#5b6475}@media print{body{margin:10mm}}</style></head><body>
+th{background:#eef2f8}.r{color:#8a4b00}.al{padding:8px 10px;border-radius:4px;margin:8px 0 12px;background:#eef2f8}.al-aligned{background:#e3f5ea}.al-partial{background:#fff4dc}.al-gaps{background:#fde7e4}.k{font-family:monospace;font-size:11px;color:#5b6475}@media print{body{margin:10mm}}</style></head><body>
 <h1>${esc(title)}</h1><div class="sub">${sub}</div>${body}<p class="sub">Generated by the ZTP Policy Wizard. Control text is summarized; see the profile's sources for the authoritative wording.</p></body></html>`;
 }
 
 /** The pack for a POV: list of files, and each file's content. */
 function list(input) {
   const f = frameworkOf(input.baseline);
-  return { profile: { id: f.id, name: f.name, fullName: f.fullName, sources: f.sources },
+  let align = null;
+  try { align = alignment(mappingRows(templateFor(input), f, input.disabledRules || {}), f); } catch (e) { align = null; }
+  return { profile: { id: f.id, name: f.name, fullName: f.fullName, sources: f.sources }, alignment: align,
     files: [
       { id: 'mapping-csv', label: 'Control mapping report (CSV)', why: 'Every rule and setting → the profile\'s controls, or why it is not mapped.' },
       { id: 'mapping-html', label: 'Control mapping report (printable)', why: 'Same report as a page to print or save as PDF for the customer\'s auditors.' },
+      { id: 'mapping-docx', label: 'Control mapping report (Word)', why: 'Same report as a Word document to edit and send.' },
       { id: 'policy-json', label: 'Policy export (JSON)', why: 'The rule set the wizard builds for this POV, to review before Apply.' },
       { id: 'policy-csv', label: 'Policy export (CSV)', why: 'One row per rule: area, name, action, state, controls.' },
       { id: 'testplan-csv', label: 'Test plan by control (CSV)', why: 'POV tests grouped by the controls they prove, with Prove it targets.' },
-      { id: 'testplan-html', label: 'Test plan by control (printable)', why: 'Same plan as a page to print.' }
+      { id: 'testplan-html', label: 'Test plan by control (printable)', why: 'Same plan as a page to print.' },
+      { id: 'testplan-docx', label: 'Test plan by control (Word)', why: 'Same plan as a Word document, with a Result column to fill in.' }
     ],
     testFiles: profileFiles(f) };
 }
@@ -147,13 +179,24 @@ function build(id, input) {
   const slug = `${(input.prefix || 'pov').toLowerCase()}-${f.id.toLowerCase()}`;
   const tpl = templateFor(input);
   const disabled = input.disabledRules || {};
-  if (id === 'mapping-csv' || id === 'mapping-html') {
+  if (id === 'mapping-csv' || id === 'mapping-html' || id === 'mapping-docx') {
     const rows = mappingRows(tpl, f, disabled);
+    const al = alignment(rows, f);
+    if (id === 'mapping-docx') {
+      const blocks = [{ p: `**${al.status}.** ${al.text}` }];
+      if (al.missing.length) blocks.push({ p: 'Controls this POV does not address:' }, { bullets: al.missing.map(m => `${m.id} ${m.name}`) });
+      for (const a of [...new Set(rows.map(r => r.area))]) {
+        blocks.push({ h: 1, text: a }, { table: { head: ['Rule or setting', 'State', 'Controls, or why not mapped', 'Objectives'], widths: [28, 8, 40, 24],
+          rows: rows.filter(r => r.area === a).map(r => [`${r.name}\n${r.key}`, r.state, r.controls ? r.controlNames : r.reason, r.objectives]) } });
+      }
+      return { name: `${slug}-control-mapping.docx`, type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', binary: true,
+        content: require('./docx').build({ title: `Control mapping — ${f.fullName || f.name}`, subtitle: `${input.customerName || input.prefix || ''} · ${new Date().toISOString().slice(0, 10)}`, blocks, landscape: true }) };
+    }
     if (id === 'mapping-csv') return { name: `${slug}-control-mapping.csv`, type: 'text/csv',
       content: [['Product', 'Area', 'Rule or setting', 'Key', 'State', 'Default action', 'Objectives', 'Controls', 'Control names', 'Reason when not mapped'].map(csvCell).join(','),
         ...rows.map(r => [r.product, r.area, r.name, r.key, r.state, r.action, r.objectives, r.controls, r.controlNames, r.reason].map(csvCell).join(','))].join('\r\n') + '\r\n' };
     const mapped = rows.filter(r => r.controls).length;
-    const body = [...new Set(rows.map(r => r.area))].map(a => `<h2>${esc(a)}</h2><table><tr><th>Rule or setting</th><th>State</th><th>Controls</th><th>Objectives</th></tr>${rows.filter(r => r.area === a).map(r =>
+    const body = `<div class="al al-${al.status.toLowerCase().replace(/\s+/g, '-')}"><strong>${esc(al.status)}.</strong> ${esc(al.text)}${al.missing.length ? `<div class="k">Not addressed: ${al.missing.map(m => esc(`${m.id} ${m.name}`)).join('; ')}</div>` : ''}</div>` + [...new Set(rows.map(r => r.area))].map(a => `<h2>${esc(a)}</h2><table><tr><th>Rule or setting</th><th>State</th><th>Controls</th><th>Objectives</th></tr>${rows.filter(r => r.area === a).map(r =>
       `<tr><td>${esc(r.name)}<div class="k">${esc(r.key)}</div></td><td>${esc(r.state)}</td><td>${r.controls ? esc(r.controlNames) : `<span class="r">${esc(r.reason)}</span>`}</td><td>${esc(r.objectives)}</td></tr>`).join('')}</table>`).join('');
     return { name: `${slug}-control-mapping.html`, type: 'text/html', content: page(`Control mapping — ${f.fullName || f.name}`,
       `${esc(input.customerName || input.prefix || '')} · ${rows.length} rules, settings and ZPA policies · ${mapped} mapped to ${esc(f.name)} controls · ${rows.length - mapped} with a stated reason · ${new Date().toISOString().slice(0, 10)}`, body) };
@@ -171,8 +214,14 @@ function build(id, input) {
     }
     return { name: `${slug}-policy-export.csv`, type: 'text/csv', content: [['Area', 'Name', 'Key', 'State', 'Action or value', 'Description', 'Controls', 'Reason when not mapped'].map(csvCell).join(','), ...rows.map(r => r.map(csvCell).join(','))].join('\r\n') + '\r\n' };
   }
-  if (id === 'testplan-csv' || id === 'testplan-html') {
+  if (id === 'testplan-csv' || id === 'testplan-html' || id === 'testplan-docx') {
     const plan = testPlan(f, input.products);
+    if (id === 'testplan-docx') {
+      const blocks = plan.flatMap(c => [{ h: 1, text: `${c.control} — ${c.name}` }, { table: { head: ['Test', 'Steps', 'Expected', 'Prove it', 'Result'], widths: [20, 34, 24, 14, 8],
+        rows: c.tests.map(t => [`${t.title}\n${t.product}`, t.steps, t.expect, t.prove, '']) } }]);
+      return { name: `${slug}-test-plan.docx`, type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', binary: true,
+        content: require('./docx').build({ title: `POV test plan by control — ${f.fullName || f.name}`, subtitle: `${input.customerName || input.prefix || ''} · ${plan.length} controls`, blocks, landscape: true }) };
+    }
     if (id === 'testplan-csv') return { name: `${slug}-test-plan.csv`, type: 'text/csv',
       content: [['Control', 'Control name', 'Test', 'Product', 'Steps', 'Expected result', 'Prove it', 'Result'].map(csvCell).join(','),
         ...plan.flatMap(c => c.tests.map(t => [c.control, c.name, t.title, t.product, t.steps, t.expect, t.prove, ''].map(csvCell).join(',')))].join('\r\n') + '\r\n' };
@@ -183,4 +232,4 @@ function build(id, input) {
   throw Object.assign(new Error('Unknown file.'), { status: 404 });
 }
 
-module.exports = { list, build, profileFiles, profileFile, mappingRows, testPlan, TEST_OBJECTIVES, SAMPLE };
+module.exports = { alignment, list, build, profileFiles, profileFile, mappingRows, testPlan, TEST_OBJECTIVES, SAMPLE };

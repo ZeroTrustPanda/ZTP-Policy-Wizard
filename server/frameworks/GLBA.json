@@ -1,0 +1,286 @@
+{
+  "id": "GLBA",
+  "type": "compliance",
+  "vertical": "FINANCE",
+  "name": "GLBA",
+  "fullName": "Gramm-Leach-Bliley Act: FTC Safeguards Rule (16 CFR 314.4)",
+  "description": "Financial institutions under FTC jurisdiction (lenders, brokers, tax preparers, auto dealers and others) protecting customer information; the 2021 amended Safeguards Rule elements.",
+  "version": "2026.10.30",
+  "researchedAt": "2026-10-30",
+  "baseTier": "BALANCED",
+  "complianceKey": "GLBA",
+  "sources": [
+    {
+      "id": "glba",
+      "title": "16 CFR 314.4: Elements of an information security program (FTC Safeguards Rule)",
+      "url": "https://www.ecfr.gov/current/title-16/chapter-I/subchapter-C/part-314/section-314.4"
+    },
+    {
+      "id": "zs-sandbox",
+      "title": "Zscaler: Recommended Sandbox Policy",
+      "url": "https://help.zscaler.com/zia/recommended-sandbox-policy"
+    },
+    {
+      "id": "zs-edlp",
+      "title": "Zscaler: Configuring Endpoint DLP Policy Rules",
+      "url": "https://help.zscaler.com/zia/configuring-endpoint-dlp-policy-rules"
+    },
+    {
+      "id": "zs-api-adv-url",
+      "title": "Zscaler SDK (Go): URL & Cloud App advanced settings incl. GenAI prompt capture flags",
+      "url": "https://github.com/zscaler/zscaler-sdk-go/blob/master/zscaler/zia/services/urlfilteringpolicies/urlfilteringpolicies.go"
+    }
+  ],
+  "controls": [
+    {
+      "id": "314.4(c)",
+      "name": "Design and implement safeguards to control identified risks",
+      "source": "glba"
+    },
+    {
+      "id": "314.4(c)(1)",
+      "name": "Access controls, including technical controls, to customer information",
+      "source": "glba"
+    },
+    {
+      "id": "314.4(c)(2)",
+      "name": "Identify and manage data, personnel, devices and systems",
+      "source": "glba"
+    },
+    {
+      "id": "314.4(c)(8)",
+      "name": "Monitor and log the activity of authorized users; detect unauthorized access",
+      "source": "glba"
+    },
+    {
+      "id": "314.4(d)(2)",
+      "name": "Continuous monitoring or periodic penetration testing",
+      "source": "glba"
+    },
+    {
+      "id": "314.4(c)(5)",
+      "name": "Multi-factor authentication for information systems",
+      "source": "glba"
+    }
+  ],
+  "areas": {
+    "urlFiltering": {
+      "controls": [
+        "314.4(c)"
+      ],
+      "rationale": "Derived from the rule-level objective mapping (v2.8)."
+    },
+    "cloudAppControl": {
+      "controls": [
+        "314.4(c)(1)",
+        "314.4(c)(2)"
+      ],
+      "rationale": "Derived from the rule-level objective mapping (v2.8)."
+    },
+    "fileTypeControl": {
+      "controls": [
+        "314.4(c)"
+      ],
+      "rationale": "Derived from the rule-level objective mapping (v2.8)."
+    },
+    "advancedThreatProtection": {
+      "controls": [
+        "314.4(c)"
+      ],
+      "rationale": "Derived from the rule-level objective mapping (v2.8)."
+    },
+    "firewallFiltering": {
+      "controls": [
+        "314.4(c)(1)"
+      ],
+      "rationale": "Derived from the rule-level objective mapping (v2.8)."
+    },
+    "dnsSecurity": {
+      "controls": [
+        "314.4(c)"
+      ],
+      "rationale": "Derived from the rule-level objective mapping (v2.8)."
+    },
+    "sslInspection": {
+      "controls": [
+        "314.4(c)(8)"
+      ],
+      "rationale": "Derived from the rule-level objective mapping (v2.8)."
+    },
+    "dlpMonitor": {
+      "controls": [
+        "314.4(c)(8)",
+        "314.4(d)(2)"
+      ],
+      "rationale": "Derived from the rule-level objective mapping (v2.8)."
+    },
+    "dlpBlock": {
+      "controls": [
+        "314.4(c)(1)"
+      ],
+      "rationale": "Derived from the rule-level objective mapping (v2.8)."
+    },
+    "endpointDlp": {
+      "controls": [
+        "314.4(c)(1)"
+      ],
+      "rationale": "Derived from the rule-level objective mapping (v2.8)."
+    },
+    "sandbox": {
+      "controls": [
+        "314.4(c)"
+      ],
+      "rationale": "Derived from the rule-level objective mapping (v2.8)."
+    },
+    "aiPromptCapture": {
+      "controls": [
+        "314.4(c)(8)",
+        "314.4(d)(2)",
+        "314.4(c)(1)"
+      ],
+      "rationale": "Derived from the rule-level objective mapping (v2.8)."
+    },
+    "saasDlp": {
+      "controls": [
+        "314.4(c)(1)",
+        "314.4(c)(8)",
+        "314.4(d)(2)"
+      ],
+      "rationale": "Derived from the rule-level objective mapping (v2.8)."
+    },
+    "emailDlp": {
+      "controls": [
+        "314.4(c)(1)",
+        "314.4(c)(8)",
+        "314.4(d)(2)"
+      ],
+      "rationale": "Derived from the rule-level objective mapping (v2.8)."
+    }
+  },
+  "dlp": {
+    "monitorEngines": [
+      "GLBA",
+      "PCI"
+    ],
+    "blockRules": [
+      {
+        "key": "PII",
+        "label": "PII",
+        "dictionaries": [
+          "predefined:SSN",
+          "predefined:TIN_LEAKAGE",
+          "predefined:USDL_LEAKAGE"
+        ],
+        "controls": [
+          "314.4(c)(1)"
+        ]
+      },
+      {
+        "key": "Bank-Routing",
+        "label": "Bank-Routing",
+        "dictionaries": [
+          "predefined:ABA_LEAKAGE",
+          "predefined:CREDIT_CARD"
+        ],
+        "controls": [
+          "314.4(c)(1)"
+        ]
+      },
+      {
+        "key": "Payment-Cards",
+        "label": "Payment-Cards",
+        "dictionaries": [
+          "predefined:CREDIT_CARD"
+        ],
+        "controls": [
+          "314.4(c)(1)"
+        ]
+      },
+      {
+        "key": "Credentials",
+        "label": "Credentials",
+        "dictionaries": [
+          "predefined:CRED_LEAKAGE",
+          "custom:SECRETS_KEYS"
+        ],
+        "expression": "(({CRED_LEAKAGE} > 1) OR ({SECRETS_KEYS} > 0))",
+        "why": "Passwords in clear text, private keys and cloud or SaaS access tokens.",
+        "controls": [
+          "314.4(c)(1)"
+        ]
+      }
+    ],
+    "endpointChannels": [
+      "REMOVABLE_DRIVE_TRANSFER",
+      "PERSONAL_CLOUD_STORAGE",
+      "PRINTING"
+    ]
+  },
+  "objectives": {
+    "MALWARE": [
+      "314.4(c)"
+    ],
+    "THREAT_SITES": [
+      "314.4(c)"
+    ],
+    "ACCEPTABLE_USE": [],
+    "PRODUCTIVITY": [],
+    "LEAST_FUNCTION": [
+      "314.4(c)"
+    ],
+    "BOUNDARY": [
+      "314.4(c)(1)"
+    ],
+    "ALLOW_EXCEPTION": [
+      "314.4(c)(1)"
+    ],
+    "INFO_FLOW": [
+      "314.4(c)(1)",
+      "314.4(c)(2)"
+    ],
+    "DATA_LOSS": [
+      "314.4(c)(1)"
+    ],
+    "DATA_MONITOR": [
+      "314.4(c)(8)",
+      "314.4(d)(2)"
+    ],
+    "MEDIA": [
+      "314.4(c)(1)"
+    ],
+    "INSPECT_TLS": [
+      "314.4(c)(8)"
+    ],
+    "PRIVACY_EXEMPT": [],
+    "DNS": [
+      "314.4(c)"
+    ],
+    "DNS_TUNNEL": [
+      "314.4(c)(8)"
+    ],
+    "SANDBOX": [
+      "314.4(c)"
+    ],
+    "ISOLATION": [
+      "314.4(c)"
+    ],
+    "MOBILE_CODE": [
+      "314.4(c)"
+    ],
+    "AI_GOV": [
+      "314.4(c)(1)",
+      "314.4(c)(8)"
+    ],
+    "TIME_SYNC": [],
+    "REMOTE_ACCESS": [
+      "314.4(c)(1)",
+      "314.4(c)(5)"
+    ],
+    "SESSION": [
+      "314.4(c)(1)"
+    ],
+    "APP_PROTECT": [
+      "314.4(c)"
+    ]
+  }
+}

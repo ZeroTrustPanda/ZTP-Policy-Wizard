@@ -1,20 +1,28 @@
-# 🐼 ZeroTrustPanda — ZTP Policy Wizard v2.7.0
+# 🐼 ZeroTrustPanda — ZTP Policy Wizard v2.8.0
 
 Proof-of-value automation for Zscaler SEs: Zscaler Internet Access (ZIA), Zscaler Client Connector (ZCC), Zscaler Private Access (ZPA) and Zscaler Digital Experience (ZDX), all with one set of OneAPI (ZIdentity) client credentials.
 
-## ⬇️ Download v2.7.0 (nothing to install)
+## ⬇️ Download v2.8.0 (nothing to install)
 
 | Computer | Download (click to download) |
 |---|---|
-| **Mac with Apple silicon (M1–M4)** | [**ZTP-Wizard-2.7.0-macos-arm64.zip**](https://github.com/ZeroTrustPanda/ZTP-Policy-Wizard/raw/standalone/standalone/release/ZTP-Wizard-2.7.0-macos-arm64.zip) |
-| Windows 10/11 (64-bit) | [ZTP-Wizard-2.7.0-windows-x64.zip](https://github.com/ZeroTrustPanda/ZTP-Policy-Wizard/raw/standalone/standalone/release/ZTP-Wizard-2.7.0-windows-x64.zip) |
-| Intel Mac | [ZTP-Wizard-2.7.0-macos-x64.zip](https://github.com/ZeroTrustPanda/ZTP-Policy-Wizard/raw/standalone/standalone/release/ZTP-Wizard-2.7.0-macos-x64.zip) |
+| **Mac with Apple silicon (M1–M4)** | [**ZTP-Wizard-2.8.0-macos-arm64.zip**](https://github.com/ZeroTrustPanda/ZTP-Policy-Wizard/raw/standalone/standalone/release/ZTP-Wizard-2.8.0-macos-arm64.zip) |
+| Windows 10/11 (64-bit) | [ZTP-Wizard-2.8.0-windows-x64.zip](https://github.com/ZeroTrustPanda/ZTP-Policy-Wizard/raw/standalone/standalone/release/ZTP-Wizard-2.8.0-windows-x64.zip) |
+| Intel Mac | [ZTP-Wizard-2.8.0-macos-x64.zip](https://github.com/ZeroTrustPanda/ZTP-Policy-Wizard/raw/standalone/standalone/release/ZTP-Wizard-2.8.0-macos-x64.zip) |
 
 Unzip and double-click `ZTP-Wizard`. Your browser opens the wizard at `http://127.0.0.1:3000`, and your API credentials stay on your computer. The builds aren't code-signed yet. On a Mac, right-click → *Open* → *Open* the first time. On Windows, SmartScreen → *More info* → *Run anyway*.
 
-**Release notes (2.0 → 2.7.0):** [docs/release-notes/v2.7.0.md](docs/release-notes/v2.7.0.md) · **Change log:** [CHANGELOG.md](CHANGELOG.md) · **Releases:** [GitHub releases](https://github.com/ZeroTrustPanda/ZTP-Policy-Wizard/releases)
+**Release notes (2.0 → 2.8.0):** [docs/release-notes/v2.8.0.md](docs/release-notes/v2.8.0.md) · **Change log:** [CHANGELOG.md](CHANGELOG.md) · **Releases:** [GitHub releases](https://github.com/ZeroTrustPanda/ZTP-Policy-Wizard/releases)
 
-## What's in 2.x (2.0 → 2.7.0)
+## What's in 2.x (2.0 → 2.8.0)
+
+- **Proof that holds up on a customer tenant (2.8):**
+  - The dry run shows customer rules above the POV rules that decide their traffic first (certain matches only).
+  - Prove it explains why (Client Connector and PAC bypasses, SSL inspection, the deciding rule) and checks the expected result.
+  - A POV posture score at the start and the end, and a list of everything ZIA cannot see.
+  - Safer writes: the apply stops if the tenant changed since the dry run, each object is read again before it changes, everything carries a `[ZTP POV]` tag, an API budget forecast and a check after apply.
+  - New DLP content (sensitive PHI, clinical notes, bulk PHI, CUI with decontrol, keys and tokens, source code), SaaS and Email DLP, GLBA, SOC 2, ISO/IEC 27001 and NIST CSF 2.0 profiles, Word downloads.
+  - With thanks to Jason Smith (DLP content and assessment approach) and Mike Preissner (zs-config); see About › Credits.
 
 - **AI Guard (2.5):**
   - A fourth product toggle; it needs ZIA, so turning it on turns ZIA on.
@@ -93,7 +101,7 @@ Unzip and double-click `ZTP-Wizard`. Your browser opens the wizard at `http://12
   - A layout that fits any window size.
   - An update badge.
 
-The full feature list, by product and by version, is in the [release notes](docs/release-notes/v2.7.0.md).
+The full feature list, by product and by version, is in the [release notes](docs/release-notes/v2.8.0.md).
 
 ## 1.9 flows (still available)
 
@@ -287,6 +295,7 @@ The DLP module uses a **dictionary-first** approach:
 
 | Version | Changes |
 |---------|---------|
+| **2.8.0** | Shadow check; Prove it why-trace and expected result; posture score start/end; inspection coverage; tenant-aware apply, provenance tag, API budget, check after apply; combined DLP engines, SaaS and Email DLP; GLBA, SOC 2, ISO 27001, NIST CSF 2.0; Word downloads. Credits: Jason Smith, Mike Preissner. |
 | **2.7.0** | One compliance pane; Federal vertical and six federal profiles; every rule mapped or a stated reason; compliance pack per POV. |
 | **2.6.1** | Core ZIA prerequisites; Not licensed in the scope; Cloud Firewall Standard rule set; DNS tunnel rules need Advanced Firewall; ZDX tier choice. |
 | **2.6.0** | API keys per POV in memory with tenant switching; Prove it for every web test type; test kit by POV scope and vertical; ZPA bulk delete order and dependency flags; API permissions and SKU printout in readiness. |

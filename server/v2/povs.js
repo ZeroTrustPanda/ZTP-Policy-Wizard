@@ -123,6 +123,10 @@ function syncFromSession(id, st) {
   p.runs = scrub(st.runs) || emptyRuns();
   p.testResults = scrub(st.testResults) || {};
   if (st.intake) p.intake = scrub(st.intake);
+  // v2.8: posture score at the start and end, the last shadow check and the coverage headline travel with the POV
+  if (st.posture) p.posture = scrub(st.posture);
+  if (st.lastShadow) p.shadow = scrub({ at: st.lastShadow.at, summary: st.lastShadow.summary, note: st.lastShadow.note, findings: (st.lastShadow.findings || []).slice(0, 40) });
+  if (st.coverageSummary) p.coverage = scrub(st.coverageSummary);
   if (st.prefix && !p.prefix) p.prefix = st.prefix;
   // wizard follow-ups from the latest ZPA run, added once
   const zpa = (p.runs.zpa || []).slice(-1)[0];

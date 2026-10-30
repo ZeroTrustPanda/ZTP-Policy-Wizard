@@ -23,4 +23,9 @@ module.exports = [
   require('./FED_ZT.json'),
   require('./IRS_1075.json'),
   require('./GOVRAMP.json'),
+  // v2.8
+  require('./SOC2.json'),
+  require('./ISO_27001.json'),
+  require('./NIST_CSF_2.json'),
+  require('./GLBA.json'),
 ];

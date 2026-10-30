@@ -1,0 +1,343 @@
+{
+  "id": "NIST_CSF_2",
+  "type": "compliance",
+  "vertical": "GENERAL",
+  "name": "NIST CSF 2.0",
+  "fullName": "NIST Cybersecurity Framework (CSF) 2.0",
+  "description": "Organizations of any sector using the NIST Cybersecurity Framework 2.0 to describe outcomes; the Protect and Detect subcategories for data, platform and network security and continuous monitoring.",
+  "version": "2026.10.30",
+  "researchedAt": "2026-10-30",
+  "baseTier": "BALANCED",
+  "complianceKey": "NIST_CSF_2",
+  "sources": [
+    {
+      "id": "csf2",
+      "title": "NIST CSWP 29: The NIST Cybersecurity Framework (CSF) 2.0 (February 2024)",
+      "url": "https://nvlpubs.nist.gov/nistpubs/CSWP/NIST.CSWP.29.pdf"
+    },
+    {
+      "id": "zs-sandbox",
+      "title": "Zscaler: Recommended Sandbox Policy",
+      "url": "https://help.zscaler.com/zia/recommended-sandbox-policy"
+    },
+    {
+      "id": "zs-edlp",
+      "title": "Zscaler: Configuring Endpoint DLP Policy Rules",
+      "url": "https://help.zscaler.com/zia/configuring-endpoint-dlp-policy-rules"
+    },
+    {
+      "id": "zs-api-adv-url",
+      "title": "Zscaler SDK (Go): URL & Cloud App advanced settings incl. GenAI prompt capture flags",
+      "url": "https://github.com/zscaler/zscaler-sdk-go/blob/master/zscaler/zia/services/urlfilteringpolicies/urlfilteringpolicies.go"
+    }
+  ],
+  "controls": [
+    {
+      "id": "DE.CM-09",
+      "name": "Hardware, software, runtime environments and their data are monitored",
+      "source": "csf2"
+    },
+    {
+      "id": "PR.PS-05",
+      "name": "Installation and execution of unauthorized software are prevented",
+      "source": "csf2"
+    },
+    {
+      "id": "PR.IR-01",
+      "name": "Networks are protected from unauthorized logical access and usage",
+      "source": "csf2"
+    },
+    {
+      "id": "DE.CM-01",
+      "name": "Networks and network services are monitored",
+      "source": "csf2"
+    },
+    {
+      "id": "GV.PO-01",
+      "name": "Policy for managing cybersecurity risks is established and enforced",
+      "source": "csf2"
+    },
+    {
+      "id": "PR.PS-01",
+      "name": "Configuration management practices are applied",
+      "source": "csf2"
+    },
+    {
+      "id": "PR.DS-02",
+      "name": "Data in transit is protected",
+      "source": "csf2"
+    },
+    {
+      "id": "PR.DS-10",
+      "name": "Data in use is protected",
+      "source": "csf2"
+    },
+    {
+      "id": "PR.PS-04",
+      "name": "Log records are generated for continuous monitoring",
+      "source": "csf2"
+    },
+    {
+      "id": "PR.DS-01",
+      "name": "Data at rest is protected",
+      "source": "csf2"
+    },
+    {
+      "id": "DE.AE-02",
+      "name": "Potentially adverse events are analyzed",
+      "source": "csf2"
+    },
+    {
+      "id": "PR.AA-05",
+      "name": "Access permissions are defined, managed, enforced and reviewed (least privilege)",
+      "source": "csf2"
+    }
+  ],
+  "areas": {
+    "urlFiltering": {
+      "controls": [
+        "PR.IR-01",
+        "DE.CM-01",
+        "GV.PO-01"
+      ],
+      "rationale": "Derived from the rule-level objective mapping (v2.8)."
+    },
+    "cloudAppControl": {
+      "controls": [
+        "PR.DS-02",
+        "PR.IR-01"
+      ],
+      "rationale": "Derived from the rule-level objective mapping (v2.8)."
+    },
+    "fileTypeControl": {
+      "controls": [
+        "PR.PS-01",
+        "PR.PS-05",
+        "DE.CM-09"
+      ],
+      "rationale": "Derived from the rule-level objective mapping (v2.8)."
+    },
+    "advancedThreatProtection": {
+      "controls": [
+        "DE.CM-09",
+        "PR.PS-05",
+        "PR.IR-01"
+      ],
+      "rationale": "Derived from the rule-level objective mapping (v2.8)."
+    },
+    "firewallFiltering": {
+      "controls": [
+        "PR.IR-01"
+      ],
+      "rationale": "Derived from the rule-level objective mapping (v2.8)."
+    },
+    "dnsSecurity": {
+      "controls": [
+        "PR.IR-01",
+        "DE.CM-01"
+      ],
+      "rationale": "Derived from the rule-level objective mapping (v2.8)."
+    },
+    "sslInspection": {
+      "controls": [
+        "DE.CM-01"
+      ],
+      "rationale": "Derived from the rule-level objective mapping (v2.8)."
+    },
+    "dlpMonitor": {
+      "controls": [
+        "DE.CM-01",
+        "PR.PS-04"
+      ],
+      "rationale": "Derived from the rule-level objective mapping (v2.8)."
+    },
+    "dlpBlock": {
+      "controls": [
+        "PR.DS-02",
+        "PR.DS-10"
+      ],
+      "rationale": "Derived from the rule-level objective mapping (v2.8)."
+    },
+    "endpointDlp": {
+      "controls": [
+        "PR.DS-01",
+        "PR.DS-10"
+      ],
+      "rationale": "Derived from the rule-level objective mapping (v2.8)."
+    },
+    "sandbox": {
+      "controls": [
+        "DE.CM-09",
+        "DE.AE-02"
+      ],
+      "rationale": "Derived from the rule-level objective mapping (v2.8)."
+    },
+    "aiPromptCapture": {
+      "controls": [
+        "DE.CM-01",
+        "PR.PS-04",
+        "PR.DS-10"
+      ],
+      "rationale": "Derived from the rule-level objective mapping (v2.8)."
+    },
+    "saasDlp": {
+      "controls": [
+        "PR.DS-02",
+        "PR.DS-10",
+        "DE.CM-01"
+      ],
+      "rationale": "Derived from the rule-level objective mapping (v2.8)."
+    },
+    "emailDlp": {
+      "controls": [
+        "PR.DS-02",
+        "PR.DS-10",
+        "DE.CM-01"
+      ],
+      "rationale": "Derived from the rule-level objective mapping (v2.8)."
+    }
+  },
+  "dlp": {
+    "monitorEngines": [
+      "PCI",
+      "GLBA",
+      "HIPAA"
+    ],
+    "blockRules": [
+      {
+        "key": "PII",
+        "label": "PII",
+        "dictionaries": [
+          "predefined:SSN",
+          "predefined:TIN_LEAKAGE",
+          "predefined:USDL_LEAKAGE"
+        ],
+        "controls": [
+          "PR.DS-02"
+        ]
+      },
+      {
+        "key": "Payment-Cards",
+        "label": "Payment-Cards",
+        "dictionaries": [
+          "predefined:CREDIT_CARD"
+        ],
+        "controls": [
+          "PR.DS-02"
+        ]
+      },
+      {
+        "key": "Credentials",
+        "label": "Credentials",
+        "dictionaries": [
+          "predefined:CRED_LEAKAGE",
+          "custom:SECRETS_KEYS"
+        ],
+        "expression": "(({CRED_LEAKAGE} > 1) OR ({SECRETS_KEYS} > 0))",
+        "why": "Passwords in clear text, private keys and cloud or SaaS access tokens.",
+        "controls": [
+          "PR.DS-02"
+        ]
+      },
+      {
+        "key": "Source-Code",
+        "label": "Source-Code",
+        "defaultAction": "ALLOW",
+        "severity": "RULE_SEVERITY_MEDIUM",
+        "why": "Program source (structure and statements together) leaving the organization, for example pasted into AI apps or personal repositories. Monitor by default.",
+        "dictionaries": [
+          "custom:SRC_SIGNAL",
+          "custom:SRC_ANCHOR"
+        ],
+        "expression": "(({SRC_SIGNAL} > 4) AND ({SRC_ANCHOR} > 0))",
+        "controls": [
+          "PR.DS-02",
+          "PR.DS-10"
+        ]
+      }
+    ],
+    "endpointChannels": [
+      "REMOVABLE_DRIVE_TRANSFER",
+      "PERSONAL_CLOUD_STORAGE",
+      "PRINTING"
+    ]
+  },
+  "objectives": {
+    "MALWARE": [
+      "DE.CM-09",
+      "PR.PS-05"
+    ],
+    "THREAT_SITES": [
+      "PR.IR-01",
+      "DE.CM-01"
+    ],
+    "ACCEPTABLE_USE": [
+      "GV.PO-01"
+    ],
+    "PRODUCTIVITY": [],
+    "LEAST_FUNCTION": [
+      "PR.PS-01",
+      "PR.PS-05"
+    ],
+    "BOUNDARY": [
+      "PR.IR-01"
+    ],
+    "ALLOW_EXCEPTION": [
+      "PR.IR-01"
+    ],
+    "INFO_FLOW": [
+      "PR.DS-02",
+      "PR.IR-01"
+    ],
+    "DATA_LOSS": [
+      "PR.DS-02",
+      "PR.DS-10"
+    ],
+    "DATA_MONITOR": [
+      "DE.CM-01",
+      "PR.PS-04"
+    ],
+    "MEDIA": [
+      "PR.DS-01",
+      "PR.DS-10"
+    ],
+    "INSPECT_TLS": [
+      "DE.CM-01"
+    ],
+    "PRIVACY_EXEMPT": [],
+    "DNS": [
+      "PR.IR-01",
+      "DE.CM-01"
+    ],
+    "DNS_TUNNEL": [
+      "DE.CM-01",
+      "DE.AE-02"
+    ],
+    "SANDBOX": [
+      "DE.CM-09",
+      "DE.AE-02"
+    ],
+    "ISOLATION": [
+      "PR.IR-01"
+    ],
+    "MOBILE_CODE": [
+      "DE.CM-09"
+    ],
+    "AI_GOV": [
+      "PR.DS-10",
+      "PR.DS-02"
+    ],
+    "TIME_SYNC": [],
+    "REMOTE_ACCESS": [
+      "PR.AA-05",
+      "PR.IR-01"
+    ],
+    "SESSION": [
+      "PR.AA-05"
+    ],
+    "APP_PROTECT": [
+      "PR.IR-01",
+      "DE.CM-09"
+    ]
+  }
+}

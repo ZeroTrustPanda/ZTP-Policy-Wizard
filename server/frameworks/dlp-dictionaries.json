@@ -1,7 +1,7 @@
 {
-  "version": "2026.10.1",
-  "researchedAt": "2026-10-16",
-  "notes": "Custom dictionaries created by the wizard as <prefix>-Dict-<key>. Predefined Zscaler dictionaries are referenced as predefined:<internal name>. NPI uses Zscaler's predefined NPI dictionary (NPI_LEAKAGE) instead of a custom one (FWK-20 reuse).",
+  "version": "2026.10.2",
+  "researchedAt": "2026-10-30",
+  "notes": "Custom dictionaries created by the wizard as <prefix>-Dict-<key>. Predefined Zscaler dictionaries are referenced as predefined:<internal name>. NPI uses Zscaler's predefined NPI dictionary (NPI_LEAKAGE) instead of a custom one (FWK-20 reuse). v2.8: engines can combine dictionaries (AND, OR, AND NOT, match counts); ZIA does not accept a sum of dictionaries, so bulk tiers count each identifier on its own. The structure of these additions (labelled identifiers, condition markers used only with an identifier, bulk tiers, source code structure plus statements, decontrol exclusions) follows Jason Smith's DLP content in Zscaler Made Easy; the patterns and phrases here are written for the wizard.",
   "custom": {
     "ICD10": {
       "name": "ICD10-Diagnosis",
@@ -154,6 +154,180 @@
       "source": {
         "title": "IRS Publication 1075 (Rev. 11-2021)",
         "url": "https://www.irs.gov/pub/irs-pdf/p1075.pdf"
+      }
+    },
+    "DOB_LABEL": {
+      "name": "Date-of-Birth",
+      "description": "Dates of birth with a DOB / Date of Birth label (a HIPAA identifier). Label and value must both be present.",
+      "customPhraseMatchType": "MATCH_ANY_CUSTOM_PHRASE_PATTERN_DICTIONARY",
+      "patterns": [
+        "\\b(DOB|D\\.O\\.B\\.?|Date of Birth|Birth ?Date)\\s*[:#]?\\s*(0?[1-9]|1[0-2])[/.-](0?[1-9]|[12][0-9]|3[01])[/.-](19|20)[0-9]{2}\\b",
+        "\\b(DOB|Date of Birth|Birth ?Date)\\s*[:#]?\\s*(19|20)[0-9]{2}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])\\b"
+      ],
+      "phrases": [],
+      "source": {
+        "title": "45 CFR 164.514(b)(2)(i)(C): dates directly related to an individual, including birth date",
+        "url": "https://www.ecfr.gov/current/title-45/subtitle-A/subchapter-C/part-164/subpart-E/section-164.514"
+      }
+    },
+    "HEALTH_PLAN_ID": {
+      "name": "Health-Plan-Member-ID",
+      "description": "Health plan member, subscriber or group numbers with their label (a HIPAA identifier).",
+      "customPhraseMatchType": "MATCH_ANY_CUSTOM_PHRASE_PATTERN_DICTIONARY",
+      "patterns": [
+        "\\b(Member|Subscriber|Beneficiary|Health Plan)\\s*(ID|No\\.?|Number|#)\\s*[:#]?\\s*[A-Z]{0,3}[0-9][A-Z0-9]{5,14}\\b",
+        "\\b(Group|Policy)\\s*(No\\.?|Number|#)\\s*[:#]?\\s*[A-Z0-9]{5,15}\\b"
+      ],
+      "phrases": [],
+      "source": {
+        "title": "45 CFR 164.514(b)(2)(i)(J): health plan beneficiary numbers",
+        "url": "https://www.ecfr.gov/current/title-45/subtitle-A/subchapter-C/part-164/subpart-E/section-164.514"
+      }
+    },
+    "PHI_SENSITIVE": {
+      "name": "PHI-Sensitive-Conditions",
+      "description": "Conditions with extra legal protection: substance use disorder (42 CFR Part 2), HIV, psychotherapy notes and genetic test results.",
+      "customPhraseMatchType": "MATCH_ANY_CUSTOM_PHRASE_PATTERN_DICTIONARY",
+      "patterns": [],
+      "phrases": [
+        "substance use disorder",
+        "opioid treatment program",
+        "42 CFR Part 2",
+        "methadone maintenance",
+        "buprenorphine",
+        "HIV positive",
+        "HIV viral load",
+        "antiretroviral therapy",
+        "psychotherapy notes",
+        "psychiatric evaluation",
+        "genetic test result",
+        "BRCA1",
+        "BRCA2"
+      ],
+      "source": {
+        "title": "42 CFR Part 2 (SUD records); 45 CFR 164.501 (psychotherapy notes); GINA Title II (genetic information)",
+        "url": "https://www.ecfr.gov/current/title-42/chapter-I/subchapter-A/part-2"
+      }
+    },
+    "CLINICAL_NOTES": {
+      "name": "Clinical-Note-Terms",
+      "description": "Words that appear in clinical notes and discharge documents. Used together with an identifier, never alone.",
+      "customPhraseMatchType": "MATCH_ANY_CUSTOM_PHRASE_PATTERN_DICTIONARY",
+      "patterns": [],
+      "phrases": [
+        "discharge summary",
+        "history of present illness",
+        "chief complaint",
+        "assessment and plan",
+        "progress note",
+        "admitting diagnosis",
+        "attending physician",
+        "medication list",
+        "allergies",
+        "lab results",
+        "vital signs",
+        "treatment plan"
+      ],
+      "source": {
+        "title": "HL7 C-CDA document and section types (Discharge Summary, Progress Note, Assessment and Plan)",
+        "url": "https://www.hl7.org/implement/standards/product_brief.cfm?product_id=492"
+      }
+    },
+    "CUI_LEGACY": {
+      "name": "CUI-Legacy-Markings",
+      "description": "Legacy markings that CUI replaced but documents still carry: FOUO, LES, SBU, and distribution statements B to F.",
+      "customPhraseMatchType": "MATCH_ANY_CUSTOM_PHRASE_PATTERN_DICTIONARY",
+      "patterns": [
+        "\\bDISTRIBUTION STATEMENT [B-F]\\b"
+      ],
+      "phrases": [
+        "FOR OFFICIAL USE ONLY",
+        "LAW ENFORCEMENT SENSITIVE",
+        "SENSITIVE BUT UNCLASSIFIED",
+        "LIMITED OFFICIAL USE",
+        "(FOUO)",
+        "(LES)",
+        "(SBU)"
+      ],
+      "source": {
+        "title": "32 CFR 2002 and DoDI 5200.48 (legacy markings, distribution statements)",
+        "url": "https://www.ecfr.gov/current/title-32/subtitle-B/chapter-XX/part-2002"
+      }
+    },
+    "CUI_DECONTROL": {
+      "name": "CUI-Decontrolled",
+      "description": "Markings that show a document has been decontrolled; used to exclude those documents from the CUI rule.",
+      "customPhraseMatchType": "MATCH_ANY_CUSTOM_PHRASE_PATTERN_DICTIONARY",
+      "patterns": [],
+      "phrases": [
+        "DECONTROLLED",
+        "Decontrolled on",
+        "Decontrol date",
+        "Approved for public release",
+        "Distribution Statement A"
+      ],
+      "source": {
+        "title": "32 CFR 2002.18 (decontrolling CUI); DoDI 5230.24 (Distribution Statement A)",
+        "url": "https://www.ecfr.gov/current/title-32/subtitle-B/chapter-XX/part-2002/subpart-B/section-2002.18"
+      }
+    },
+    "SRC_ANCHOR": {
+      "name": "Source-Code-Structure",
+      "description": "Lines that only appear in program source: imports, includes, function and class declarations (Java, C, C#, Python, Go, Rust, JavaScript).",
+      "customPhraseMatchType": "MATCH_ANY_CUSTOM_PHRASE_PATTERN_DICTIONARY",
+      "patterns": [
+        "\\bimport\\s+(java|javax|org|com)\\.[a-z][\\w.]*(\\.\\*)?;",
+        "#include\\s*[<\"][\\w./]+\\.(h|hpp)[>\"]",
+        "\\busing\\s+System(\\.\\w+)*;",
+        "\\bdef\\s+\\w+\\s*\\([^)]*\\)\\s*(->\\s*[\\w\\[\\], ]+)?:",
+        "\\bfunc\\s+(\\(\\w+\\s+\\*?\\w+\\)\\s+)?\\w+\\s*\\([^)]*\\)",
+        "\\bfn\\s+\\w+\\s*(<[^>]*>)?\\s*\\([^)]*\\)\\s*(->\\s*[\\w<>&']+\\s*)?\\{",
+        "\\b(const|let|var)\\s+\\w+\\s*=\\s*require\\(['\"][\\w@./-]+['\"]\\)",
+        "\\b(public|private|protected)\\s+(static\\s+)?(final\\s+)?[\\w<>\\[\\]]+\\s+\\w+\\s*\\([^)]*\\)\\s*(throws\\s+[\\w, ]+)?\\{"
+      ],
+      "phrases": [],
+      "source": {
+        "title": "Language references: Java SE (import), ISO C (#include), C# (using), Python (def), Go (func), Rust (fn), Node.js (require)",
+        "url": "https://docs.oracle.com/javase/specs/jls/se21/html/jls-7.html"
+      }
+    },
+    "SRC_SIGNAL": {
+      "name": "Source-Code-Statements",
+      "description": "Statements common to most C-family and scripting languages (return, if, for, try / catch, throw). Counted together with the structure dictionary.",
+      "customPhraseMatchType": "MATCH_ANY_CUSTOM_PHRASE_PATTERN_DICTIONARY",
+      "patterns": [
+        "\\breturn\\s+[A-Za-z0-9_.()\\[\\]]+;",
+        "\\bif\\s*\\([^)]+\\)\\s*\\{",
+        "\\bfor\\s*\\([^;]*;[^;]*;[^)]*\\)",
+        "\\}\\s*else\\s*\\{",
+        "\\btry\\s*\\{",
+        "\\bcatch\\s*\\(\\s*\\w+",
+        "\\bthrow\\s+new\\s+\\w+",
+        "\\)\\s*=>\\s*\\{"
+      ],
+      "phrases": [],
+      "source": {
+        "title": "Common statement syntax (ECMA-262, Java SE, C#)",
+        "url": "https://tc39.es/ecma262/"
+      }
+    },
+    "SECRETS_KEYS": {
+      "name": "Secrets-and-Keys",
+      "description": "Private keys and cloud or SaaS access tokens with a fixed, recognisable format.",
+      "customPhraseMatchType": "MATCH_ANY_CUSTOM_PHRASE_PATTERN_DICTIONARY",
+      "patterns": [
+        "-----BEGIN (RSA |EC |DSA |OPENSSH |ENCRYPTED |PGP )?PRIVATE KEY( BLOCK)?-----",
+        "\\b(AKIA|ASIA)[0-9A-Z]{16}\\b",
+        "\\bgh[pousr]_[A-Za-z0-9]{36,255}\\b",
+        "\\bxox[abprs]-[A-Za-z0-9-]{10,72}\\b",
+        "\\bAIza[0-9A-Za-z_-]{35}\\b",
+        "\\b(sk|rk)_live_[0-9A-Za-z]{24,99}\\b",
+        "\\bglpat-[0-9A-Za-z_-]{20}\\b"
+      ],
+      "phrases": [],
+      "source": {
+        "title": "Published token formats: AWS access keys, GitHub tokens, Slack tokens, Google API keys, Stripe and GitLab keys; RFC 7468 (PEM)",
+        "url": "https://www.rfc-editor.org/rfc/rfc7468"
       }
     }
   }

@@ -15,7 +15,7 @@ function collect(runs) {
 }
 
 /** runs: { zia:[{at, template, ledger, warnings, activated}], zcc:[{at, ledger, warnings}], zpa:[{at, ledger, warnings, secrets, names}] } */
-function buildReport({ runs, prefix, tenant, licensing, endpointWarning, includeSecrets = true, tests = [] }) {
+function buildReport({ runs, prefix, tenant, licensing, endpointWarning, includeSecrets = true, tests = [], posture = null, shadow = null, coverage = null }) {
   const rows = collect(runs);
   const zia = (runs.zia || [])[runs.zia ? runs.zia.length - 1 : 0];
   const zpa = (runs.zpa || [])[runs.zpa ? runs.zpa.length - 1 : 0];
@@ -35,6 +35,11 @@ function buildReport({ runs, prefix, tenant, licensing, endpointWarning, include
   if ((runs.zcc || []).some(r => (r.manualSteps || []).some(m => m.key === 'modernUi'))) followUps.push(COPY.report.followUps.modernUi);
   if (zia && zia.template && (zia.template.generationNotes || []).length) warnings.push(...zia.template.generationNotes);
   if (zia && zia.activated === false) followUps.push('Activate the pending ZIA changes in the ZIA admin portal (automatic activation failed).');
+  // v2.8: what the API could not write, as portal steps
+  for (const m of (zia && zia.manualSteps) || []) { const t = `${m.area}: ${m.step}`; if (!followUps.includes(t)) followUps.push(t); }
+  const P = require('./posture');
+  const cmp = posture ? P.compare(posture.start, posture.end) : null;
+  const pScore = (r) => (r && r.score !== null && r.score !== undefined ? `${r.score} (${r.maturity})` : (r ? r.maturity : 'not taken'));
 
   const scopeOn = zia ? SCOPE_ITEMS.filter(i => zia.template.metadata.scope[i.key]).map(i => i.label) : [];
   const baseline = zia ? zia.template.metadata.baseline : null;
@@ -68,6 +73,28 @@ function buildReport({ runs, prefix, tenant, licensing, endpointWarning, include
   if (decisions.length) {
     md.push('## Rule decisions (ZIA)', '', '| Area | Rule / setting | Action |', '|---|---|---|');
     for (const d of decisions) md.push(`| ${d.type} | ${d.name} | ${d.action} |`);
+    md.push('');
+  }
+  if (posture && (posture.start || posture.end)) {
+    md.push('## Security posture: start and end of the POV', '', `Start: **${pScore(posture.start)}** · End: **${pScore(posture.end)}**${cmp && cmp.delta !== null ? ` · Change: **${cmp.delta >= 0 ? '+' : ''}${cmp.delta} points**` : ''}`, '');
+    if (cmp && cmp.improved.length) { md.push('Improved during the POV:', ''); for (const i of cmp.improved) md.push(`- ${i.area}: ${i.label}`); md.push(''); }
+    const last = posture.end || posture.start;
+    const open = (last.results || []).filter(r => r.status === 'fail' || r.status === 'review');
+    if (open.length) {
+      md.push('Still open (what was found, what it means, what to do, the outcome):', '', '| Area | Check | Finding |', '|---|---|---|');
+      for (const r of open) md.push(`| ${r.area} | ${r.label} | ${[r.found, r.means, r.do, r.outcome].filter(Boolean).join(' ').replace(/\|/g, '\\|')} |`);
+      md.push('');
+    }
+    md.push((last && last.method) || '', '');
+  }
+  if (shadow && shadow.findings) {
+    md.push('## Customer rules that decide before the POV rules', '', shadow.summary || '', '');
+    if (shadow.findings.length) { md.push('| POV rule | Decided by | Why | Fix |', '|---|---|---|---|'); for (const f of shadow.findings) md.push(`| ${f.rule} | ${f.by.name} (order ${f.by.order}) | ${f.reason.replace(/\|/g, '\\|')} | ${f.fix.replace(/\|/g, '\\|')} |`); md.push(''); }
+    if (shadow.note) md.push(shadow.note, '');
+  }
+  if (coverage && coverage.headline) {
+    md.push('## Inspection coverage', '', coverage.headline, '');
+    for (const i of (coverage.items || []).slice(0, 12)) md.push(`- **${i.area}**: ${i.title}`);
     md.push('');
   }
   if (pk) md.push('## ZPA provisioning key', '', `**${COPY.report.sensitive}**`, '', '```', pk, '```', '', COPY.zpa.keyNote, '');
@@ -122,6 +149,9 @@ ${decisions.length ? `<h2>Rule decisions (ZIA)</h2><table><thead><tr><th>Area</t
 ${pk ? `<h2>ZPA provisioning key</h2><div class="secret">${esc(COPY.report.sensitive)}</div><code class="key">${esc(pk)}</code><p>${esc(COPY.zpa.keyNote)}</p>` : ''}
 ${pw.size ? `<h2>Client Connector tamper protection passwords</h2><div class="secret">${esc(COPY.report.sensitive)}</div>${[...pw].map(([n, v]) => `<p>${esc(n)}</p><code class="key">${esc(v)}</code>`).join('')}<p>${esc(COPY.report.tamperNote)}</p>` : ''}
 ${tests.length ? `<h2>POV tests</h2><table><thead><tr><th>Product</th><th>Test</th><th>Result</th><th>Note</th></tr></thead><tbody>${tests.map(t => `<tr><td>${esc(t.product)}</td><td>${esc(t.title)}</td><td>${t.result ? badge(t.result.status === 'pass' ? 'CREATE' : t.result.status === 'fail' ? 'FAILED' : 'SKIPPED').replace(/>[^<]*</, `>${RES[t.result.status]}<`) : 'Not run'}</td><td>${esc((t.result && t.result.note) || '')}</td></tr>`).join('')}</tbody></table>` : ''}
+${posture && (posture.start || posture.end) ? `<h2>Security posture: start and end of the POV</h2><p>Start: <strong>${esc(pScore(posture.start))}</strong> · End: <strong>${esc(pScore(posture.end))}</strong>${cmp && cmp.delta !== null ? ` · Change: <strong>${cmp.delta >= 0 ? '+' : ''}${cmp.delta} points</strong>` : ''}</p>${cmp && cmp.improved.length ? `<p>Improved during the POV:</p><ul>${cmp.improved.map(i => `<li>${esc(i.area)}: ${esc(i.label)}</li>`).join('')}</ul>` : ''}${(() => { const last = posture.end || posture.start; const open = (last.results || []).filter(r => r.status === 'fail' || r.status === 'review'); return open.length ? `<table><thead><tr><th>Area</th><th>Check</th><th>Finding</th></tr></thead><tbody>${open.map(r => `<tr><td>${esc(r.area)}</td><td>${esc(r.label)}</td><td>${esc([r.found, r.means, r.do, r.outcome].filter(Boolean).join(' '))}</td></tr>`).join('')}</tbody></table><p class="meta">${esc(last.method || '')}</p>` : ''; })()}` : ''}
+${shadow && shadow.findings ? `<h2>Customer rules that decide before the POV rules</h2><p>${esc(shadow.summary || '')}</p>${shadow.findings.length ? `<table><thead><tr><th>POV rule</th><th>Decided by</th><th>Why</th><th>Fix</th></tr></thead><tbody>${shadow.findings.map(f => `<tr><td>${esc(f.rule)}</td><td>${esc(f.by.name)} (order ${esc(f.by.order)})</td><td>${esc(f.reason)}</td><td>${esc(f.fix)}</td></tr>`).join('')}</tbody></table>` : ''}${shadow.note ? `<p class="meta">${esc(shadow.note)}</p>` : ''}` : ''}
+${coverage && coverage.headline ? `<h2>Inspection coverage</h2><p>${esc(coverage.headline)}</p><ul>${(coverage.items || []).slice(0, 12).map(i => `<li><strong>${esc(i.area)}</strong>: ${esc(i.title)}</li>`).join('')}</ul>` : ''}
 ${warnings.length ? `<h2>Warnings</h2><ul class="warn">${warnings.map(w => `<li>${esc(w)}</li>`).join('')}</ul>` : ''}
 <h2>Manual follow-ups</h2>${followUps.length ? `<ol>${followUps.map(f => `<li>${esc(f)}</li>`).join('')}</ol>` : '<p>None.</p>'}
 ${zia && zia.template.metadata.sources ? `<h2>Framework sources</h2><ul>${zia.template.metadata.sources.map(s => `<li><a href="${esc(s.url)}">${esc(s.title)}</a></li>`).join('')}</ul>` : ''}

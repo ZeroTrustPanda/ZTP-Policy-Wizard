@@ -146,12 +146,16 @@ function dlpBlockObjects(prefix, framework) {
       } else refs.push({ predefined: key });
     }
     const engineName = `${prefix}-Eng-${br.key}`;
-    engines.push({ name: engineName, dictRefs: refs, description: `Block mode: ${framework.name} — ${br.label}. Created by the Zscaler Policy Wizard.` });
+    // v2.8: an engine can combine its dictionaries ({KEY} tokens, AND / OR / AND NOT, counts); without one, any dictionary matching more than once
+    const tokens = Object.fromEntries(br.dictionaries.map((d, i) => [d.split(':')[1], refs[i]]).filter(([, r]) => r));
+    const act = br.defaultAction === 'ALLOW' ? 'ALLOW' : 'BLOCK';
+    engines.push({ name: engineName, dictRefs: refs, expression: br.expression || null, tokens: br.expression ? tokens : null,
+      description: `${act === 'BLOCK' ? 'Block' : 'Monitor'} mode: ${framework.name} — ${br.label}.${br.why ? ' ' + br.why : ''} Created by the Zscaler Policy Wizard.` });
     rules.push({
-      name: `${prefix}-DLP-${br.key}`, actionKey: `dlp:DLP-${br.key}`, state: 'ENABLED', action: 'BLOCK', defaultAction: 'BLOCK',
+      name: `${prefix}-DLP-${br.key}`, actionKey: `dlp:DLP-${br.key}`, state: 'ENABLED', action: act, defaultAction: act,
       engineRef: { custom: engineName },
-      description: `Block mode: ${framework.name} — ${br.label}. Dictionaries: ${br.dictionaries.map(x => x.split(':')[1]).join(', ')}.`,
-      severity: 'RULE_SEVERITY_HIGH', controls: br.controls || []
+      description: `${act === 'BLOCK' ? 'Block' : 'Monitor'} mode: ${framework.name} — ${br.label}. ${br.why ? br.why + ' ' : ''}Dictionaries: ${br.dictionaries.map(x => x.split(':')[1]).join(', ')}.`,
+      severity: br.severity || 'RULE_SEVERITY_HIGH', controls: br.controls || []
     });
   }
   return { dictionaries: [...dictionaries.values()], engines, rules };
@@ -170,7 +174,32 @@ function endpointDlpRules(prefix, framework) {
   }));
 }
 
+/**
+ * v2.8: SaaS Security API (out-of-band CASB) DLP and Email DLP. Monitor only: SaaS rules report an incident, Email rules
+ * allow and log. They reuse the profile's engines (its predefined monitor engines, plus its custom engines when DLP Block
+ * mode builds them), at most four per rule. The idea of carrying each web DLP engine to the SaaS and Email channels comes
+ * from Zscaler Made Easy (see About).
+ */
+function channelEngineRefs(prefix, framework, withCustom) {
+  const refs = (framework.dlp.monitorEngines || []).map(e => ({ predefined: e }));
+  if (withCustom) for (const br of framework.dlp.blockRules || []) refs.push({ custom: `${prefix}-Eng-${br.key}` });
+  return refs.slice(0, 4);
+}
+function saasDlpRules(prefix, framework, withCustom) {
+  const engineRefs = channelEngineRefs(prefix, framework, withCustom);
+  if (!engineRefs.length) return [];
+  return [{ name: `${prefix}-SaaS-DLP`, actionKey: 'saasDlp:SaaS-DLP', state: 'ENABLED', action: 'OFLCASB_DLP_REPORT_INCIDENT', allowOnly: true, engineRefs,
+    description: `SaaS data at rest (SaaS Security API), monitor: ${framework.name}. One rule per onboarded SaaS app type; incidents are reported, nothing is changed.`, severity: 'RULE_SEVERITY_MEDIUM' }];
+}
+function emailDlpRules(prefix, framework, withCustom) {
+  const engineRefs = channelEngineRefs(prefix, framework, withCustom);
+  if (!engineRefs.length) return [];
+  return [{ name: `${prefix}-Email-DLP`, actionKey: 'emailDlp:Email-DLP', state: 'ENABLED', action: 'ALLOW', allowOnly: true, engineRefs,
+    description: `Outbound email DLP, monitor: ${framework.name}. Mail is delivered; incidents are logged.`, severity: 'RULE_SEVERITY_MEDIUM' }];
+}
+
 module.exports = {
+  saasDlpRules, emailDlpRules,
   SANDBOX_SUPPORTED, SANDBOX_PROTOCOLS, SANDBOX_ADVANCED_GROUPS, sandboxRules, UCAAS_APPS,
   MALWARE_TO_ATP, ATP_LABELS, atpSettings, AI_PROMPT_APPS,
   dlpMonitorRules, dlpBlockObjects, endpointDlpRules, ENDPOINT_CHANNELS
