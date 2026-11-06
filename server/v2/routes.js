@@ -122,7 +122,7 @@ function registerV2Routes(app, requireAuth) {
     if (!PREFIX_RE.test(prefix)) throw Object.assign(new Error('Set a global prefix first (1–20 letters, numbers, hyphens or underscores).'), { status: 400 });
     if (!b.baseline) throw Object.assign(new Error('Choose a baseline framework.'), { status: 400 });
     return { baseline: b.baseline, scope: normalizeScope(b.scope), prefix, disabledRules: b.disabledRules || {}, actionSettings: b.actionSettings || { policy: {}, rules: {} },
-      settingOverrides: b.settingOverrides || {}, cbiProfile: b.cbiProfile || null, sslCertificate: b.sslCertificate || null,
+      settingOverrides: b.settingOverrides || {}, appActions: (b.appActions && typeof b.appActions === 'object' && !Array.isArray(b.appActions)) ? b.appActions : {}, cbiProfile: b.cbiProfile || null, sslCertificate: b.sslCertificate || null,
       editions: ((v2(session).licensing || {}).editions) || null };
   }
 
@@ -237,7 +237,7 @@ function registerV2Routes(app, requireAuth) {
     const prefix = String(b.prefix || v2(session).prefix || '').trim();
     if (!PREFIX_RE.test(prefix)) throw Object.assign(new Error('Set a global prefix first.'), { status: 400 });
     return { prefix, domains: b.domains || '', tcpPorts: b.tcpPorts ?? '1-52, 54-65535', udpPorts: b.udpPorts ?? '1-52, 54-65535',
-      settings: { ...APP_SEGMENT_DEFAULTS, ...(b.settings || {}) }, connectorGroupId: b.connectorGroupId || null, descriptions: b.descriptions || {},
+      settings: { ...APP_SEGMENT_DEFAULTS, ...(b.settings || {}) }, connectorGroupId: b.connectorGroupId || null, connectorLocation: b.connectorLocation ? require('./zpa').connectorLocation(b.connectorLocation) && b.connectorLocation : null, descriptions: b.descriptions || {},
       policies: { ...POLICY_DEFAULTS, ...(b.policies && typeof b.policies === 'object' ? { access: b.policies.access !== false, timeout: b.policies.timeout !== false, inspection: b.policies.inspection !== false, isolation: b.policies.isolation !== false } : {}) },
       isolationProfile: b.isolationProfile && typeof b.isolationProfile === 'object' ? {
         enabled: b.isolationProfile.enabled !== false,
@@ -390,6 +390,7 @@ function registerV2Routes(app, requireAuth) {
   require('./routes22').register(app, requireAuth, { v2, rememberPlan, checkPlan, zpaOf, countActions, runZia, runZpa });
   require('./routes25').register(app, requireAuth, { v2, rememberPlan, checkPlan, countActions });
   require('./routes29').register(app, requireAuth, { v2, rememberPlan, checkPlan, countActions });
+  require('./routes210').register(app, requireAuth, { v2 });
   app.get('/api/v2/runs', requireAuth, (req, res) => {
     const s = v2(req.session);
     res.json({ prefix: s.prefix || null, zia: s.runs.zia.length, zcc: s.runs.zcc.length, zpa: s.runs.zpa.length });

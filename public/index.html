@@ -643,7 +643,7 @@
     // ========================
     // App Version
     // ========================
-    const APP_VERSION = '2.9.0';
+    const APP_VERSION = '2.10.0';
     const BUILD_DATE = '2026-03-30';
 
     // ========================
@@ -1201,6 +1201,7 @@
                     <summary style={{cursor:'pointer', fontWeight:600, fontSize:'14px'}}>Version history</summary>
                     <div style={{marginTop:'0.75rem', lineHeight:1.7}}>
                     <div style={{paddingLeft:'1rem', fontSize:'12px'}}>
+                      <div><strong>v2.10.0</strong> — Pick each cloud app's actions (Facebook, LinkedIn, X, ChatGPT, Copilot, Gemini, Claude, Google Drive, Dropbox, Box) one operation at a time, from what the customer's tenant offers. Inspect Microsoft Copilot is SSL rule 1, above the Office 365 one-click bypass, with Inspect All after Zscaler's rules and the exemptions. Block-QUIC is firewall rule 1; Allow-Web and Allow-NTP are gone because Zscaler's default rules cover them. ZPA: pick the App Connector Group's city instead of San Jose.</div>
                       <div><strong>v2.9.0</strong> — No more duplicate rules: one outbound geo-block rule instead of an in and an out rule; the dry run lists rules left over from earlier runs (another baseline or prefix, a rule turned off, a rule a newer version renamed) with a Keep box each, and Apply removes the rest (Undo puts them back); AI Guard reuses an existing QUIC block; overlaps inside one run fixed (ZTH eBook new domains and anonymizers, UCaaS vs Allow-Collab, DoH, DLP order). Block Page &amp; Logo: a theme builder for ZIA's block and caution pages (colours, font, words, support contact, extra CSS, live preview), written through the API with a dry run and Undo; any logo is compressed to under 10 KB in your browser, placed on the pages and offered as a download for the portal's Company Logo.</div>
                       <div><strong>v2.8.0</strong> — Shadow check in the dry run (customer rules above the POV rules that decide first, certain matches only). Prove it explains why: Client Connector and PAC bypasses, SSL inspection, then the deciding rule, and whether that agrees with the expected result. POV posture score at the start and end, with the change in the report. What ZIA cannot see: SSL exemptions, Client Connector and PAC bypasses. Safer writes: the apply stops if the tenant changed since the dry run, each object is read again before it is changed, everything created carries a [ZTP POV] tag, ZIA API budget forecast. New DLP content (sensitive conditions, clinical notes and bulk PHI for healthcare; CUI with decontrol exclusion; source code; keys and tokens) and SaaS and Email DLP. SOC 2, ISO/IEC 27001, NIST CSF 2.0 and GLBA profiles, with Aligned / Partial / Gaps in the compliance pack. Word downloads for the report and the compliance pack. With thanks to Jason Smith and Mike Preissner (see Credits).</div>
                       <div><strong>v2.7.0</strong> — One compliance pane on Customer intake (Internet Access no longer asks again; AI Guard follows it). Federal vertical with FedRAMP Moderate and High, CMMC 2.0 Level 2, Federal Zero Trust (M-22-09, CISA ZTMM, TIC 3.0), IRS Pub 1075 and GovRAMP. Every rule and setting maps to the profile's controls or says why not (best practice, differentiating use case, operational, privacy). Compliance pack per POV: profile DLP test files, control mapping report, policy export and test plan by control.</div>
@@ -1273,7 +1274,7 @@
       { id: 'review', label: 'Dry Run' },
       { id: 'done', label: 'Apply & Results' }
     ];
-    const POV_DEFAULT = { scope: null, baseline: null, disabledRules: {}, actionSettings: { policy: {}, rules: {} }, settingOverrides: {}, cbiProfile: null, sslCertificate: null };
+    const POV_DEFAULT = { scope: null, baseline: null, disabledRules: {}, actionSettings: { policy: {}, rules: {} }, settingOverrides: {}, appActions: {}, cbiProfile: null, sslCertificate: null };
     const SCOPE_TO_TYPES = {
       urlFiltering: ['urlFiltering'], cloudAppControl: ['cloudAppControl'], fileTypeControl: ['fileTypeControl'], advancedThreatProtection: ['advancedThreatProtection'],
       firewallFiltering: ['firewallFiltering'], dnsSecurity: ['dnsSecurity'], sslInspection: ['sslInspection'], dlpMonitor: ['dlp'], dlpBlock: ['dlp'],
@@ -1373,7 +1374,7 @@
     // ---------- §2 Baseline Framework ----------
     function BaselineStep({ meta, pov, setPov, setError, onNext, onBack }) {
       const fileRef = useRef(null);
-      const pick = (id) => setPov(prev => (prev.baseline === id ? prev : { ...prev, baseline: id, disabledRules: {}, actionSettings: { policy: {}, rules: {} }, settingOverrides: {} }));
+      const pick = (id) => setPov(prev => (prev.baseline === id ? prev : { ...prev, baseline: id, disabledRules: {}, actionSettings: { policy: {}, rules: {} }, settingOverrides: {}, appActions: {} }));
       const card = (b) => (
         <label key={b.id} className={`tier-card ${pov.baseline === b.id ? 'selected' : ''}`} style={{cursor:'pointer', display:'block', textAlign:'left'}} data-baseline={b.id}>
           <div style={{display:'flex', gap:'8px', alignItems:'center'}}>
@@ -1427,6 +1428,45 @@
 
     // ---------- §2.1 Rule review ----------
     // v2.4: switching POVs can briefly render the rules step with a reset (scope-less) selection; show nothing until it has one
+    // v2.10: choose a cloud app's actions one operation at a time (view, post, upload…), from what ZIA offers for that app
+    const VERB_LABEL = { ALLOW: 'Allow', CAUTION: 'Caution', BLOCK: 'Block', DENY: 'Block', ISOLATE: 'Isolate' };
+    const VERB_CLASS = { ALLOW: 'on-allow', CAUTION: 'on-default', BLOCK: 'on-block', DENY: 'on-block', ISOLATE: 'on-default' };
+    function AppActionsEditor({ rule, info, value, onChange, loading }) {
+      const [open, setOpen] = useState(false);
+      if (loading) return <div className="form-hint" style={{margin:'8px 0 0'}}><span className="spinner"></span> Reading the actions ZIA offers for {rule.appLabel}…</div>;
+      if (!info) return null;
+      const current = value || info.defaults;
+      const set = new Set(current);
+      const chosenFor = (o) => Object.entries(o.verbs).find(([, a]) => set.has(a));
+      const pick = (o, verb) => {
+        const next = current.filter(a => !Object.values(o.verbs).includes(a));
+        if (verb) next.push(o.verbs[verb]);
+        const same = next.length === info.defaults.length && next.every(a => info.defaults.includes(a));
+        onChange(same ? null : next);
+      };
+      const summary = current.length ? info.operations.map(o => { const c = chosenFor(o); return c ? `${o.label}: ${VERB_LABEL[c[0]]}` : null; }).filter(Boolean).join(' · ') : (info.optional ? 'Not created (follows the category rule)' : 'No actions');
+      return (
+        <div style={{margin:'8px 0 0'}} data-appactions={rule.appId}>
+          <div style={{display:'flex', gap:'8px', alignItems:'center', flexWrap:'wrap'}}>
+            <button className="btn btn-ghost btn-sm" onClick={() => setOpen(!open)} data-appactionsopen={rule.appId}>{open ? '▾' : '▸'} Actions</button>
+            <span className="form-hint" style={{margin:0}} data-appactionssummary={rule.appId}>{summary}{value ? ' (changed)' : ''}</span>
+            {value && <button className="btn btn-ghost btn-sm" onClick={() => onChange(null)} data-appactionsreset={rule.appId}>Reset</button>}
+          </div>
+          {open && <div style={{marginTop:'6px'}}>
+            {!info.fromTenant && <div className="form-hint" style={{marginTop:0}}>ZIA lists no app-specific actions for {rule.appLabel} on this tenant, so the whole-app actions of its type are offered.</div>}
+            <table className="diff-table" style={{maxWidth:'560px'}}><tbody>
+              {info.operations.map(o => { const c = chosenFor(o); return (
+                <tr key={o.op} data-appop={`${rule.appId}:${o.op}`}><td style={{width:'150px', fontSize:'12px'}}>{o.label}</td><td>
+                  <div className="ab-seg">
+                    <button className={!c ? 'on-default' : ''} onClick={() => pick(o, null)}>Not set</button>
+                    {['ALLOW', 'CAUTION', 'BLOCK', 'DENY', 'ISOLATE'].filter(v => o.verbs[v]).map(v => <button key={v} className={c && c[0] === v ? VERB_CLASS[v] : ''} onClick={() => pick(o, v)} data-appverb={`${rule.appId}:${o.op}:${v}`}>{VERB_LABEL[v]}</button>)}
+                  </div></td></tr>); })}
+            </tbody></table>
+            <div className="form-hint">"Not set" leaves that operation to the rules below. ZIA only accepts actions it offers for the app; the dry run shows any it refuses.</div>
+          </div>}
+        </div>
+      );
+    }
     function PovRulesStep(props) { return props.pov && props.pov.scope ? <PovRulesStepInner {...props} /> : null; }
     function PovRulesStepInner({ meta, pov, setPov, prefix, auth, setError, onNext, onBack, nextLabel, backLabel }) {
       const [tpl, setTpl] = useState(null);
@@ -1454,6 +1494,10 @@
         return { ...p, actionSettings: { policy, rules } };
       });
       const setRuleAction = (r, v) => setPov(p => ({ ...p, actionSettings: { ...p.actionSettings, rules: { ...p.actionSettings.rules, [r.key]: v } } }));
+      // v2.10: per-app Cloud App Control actions (what this tenant offers for each app)
+      const [cacApps, setCacApps] = useState(null);
+      useEffect(() => { if (pov.scope && pov.scope.cloudAppControl !== false) api.call('GET', '/v2/zia/cac-apps').then(setCacApps).catch(e => setCacApps({ apps: [], error: e.message })); }, []);
+      const setAppActions = (app, acts) => setPov(p => { const a = { ...(p.appActions || {}) }; if (acts === null) delete a[app]; else a[app] = acts; return { ...p, appActions: a }; });
       const effective = (g, r) => {
         const rc = choices.rules[r.key]; if (rc) return rc;
         const pc = choices.policy[g.type]; if (pc === 'ALLOW' || pc === 'BLOCK') return pc;
@@ -1462,7 +1506,7 @@
       };
       const settingValue = (s) => pov.settingOverrides[s.key] !== undefined ? pov.settingOverrides[s.key] : s.defaultValue;
       // 19: search, changed-from-default filter, expand / collapse, keyboard shortcuts
-      const isChanged = (g, r) => !!disabled[r.key] || !!choices.rules[r.key] || !!choices.policy[g.type] || pov.settingOverrides[r.key] !== undefined;
+      const isChanged = (g, r) => !!disabled[r.key] || !!choices.rules[r.key] || !!choices.policy[g.type] || pov.settingOverrides[r.key] !== undefined || !!(r.appId && (pov.appActions || {})[r.appId]);
       const visible = (g, r) => (!q || `${r.name || r.label} ${r.description || ''}`.toLowerCase().includes(q.toLowerCase())) && (!changedOnly || isChanged(g, r));
       const setAllOpen = (v) => tpl && setOpen(Object.fromEntries(tpl.catalog.map(g => [g.type, v])));
       useEffect(() => {
@@ -1489,7 +1533,7 @@
             return <div className="form-hint" style={{marginTop:'-0.25rem', marginBottom:'0.75rem'}} data-compliancesummary>Compliance profile <strong>{tpl.metadata.baseline.name}</strong>{pov.fromIntake ? ' (chosen on Customer intake)' : ''}: {mapped} of {items.length} map to its controls; the rest show why (best practice, differentiating use case, operational, privacy). </div>; })()}
           <div style={{display:'flex', gap:'6px', flexWrap:'wrap', marginBottom:'0.75rem'}} data-rulespack>
             {[['mapping-html', '⬇ Control mapping report'], ['mapping-csv', 'CSV'], ['policy-json', '⬇ Policy export (JSON)'], ['policy-csv', 'CSV'], ['testplan-html', '⬇ Test plan by control'], ['testplan-csv', 'CSV']].map(([id, l]) =>
-              <button key={id} className="btn btn-ghost btn-sm" data-rulespackfile={id} onClick={() => downloadPack(id, { baseline: pov.baseline, scope: pov.scope, prefix, disabledRules: pov.disabledRules, actionSettings: pov.actionSettings, settingOverrides: pov.settingOverrides }).catch(e => setError(e.message))}>{l}</button>)}
+              <button key={id} className="btn btn-ghost btn-sm" data-rulespackfile={id} onClick={() => downloadPack(id, { baseline: pov.baseline, scope: pov.scope, prefix, disabledRules: pov.disabledRules, actionSettings: pov.actionSettings, settingOverrides: pov.settingOverrides, appActions: pov.appActions || {} }).catch(e => setError(e.message))}>{l}</button>)}
           </div>
           {(tpl.generationNotes || []).length > 0 && <div className="alert alert-warning" style={{display:'block'}}>{tpl.generationNotes.map((n, i) => <div key={i}>⚠ {n}</div>)}</div>}
           {(tpl.licenceSkipped || []).length > 0 && (
@@ -1560,9 +1604,12 @@
                               {r.compliance && <div className="ab-row-desc" data-rulecompliance={r.key}>{r.compliance.controls.length
                                 ? <>Maps to {r.compliance.controls.map(c => <span key={c.id} className="badge badge-category" style={{marginRight:'4px'}} title={c.name} data-control={c.id}>{c.id}</span>)}</>
                                 : <><span className="badge badge-risk" style={{marginRight:'6px'}} data-reason={r.compliance.reason.code}>{r.compliance.reason.label}</span>{r.compliance.reason.text}</>}</div>}
+                              {r.appId && !isOff && <AppActionsEditor rule={r} info={cacApps && (cacApps.apps || []).find(a => a.app === r.appId)} loading={!cacApps}
+                                value={(pov.appActions || {})[r.appId]} onChange={(acts) => setAppActions(r.appId, acts)} />}
+
                             </div>
                           </div>
-                          {g.rules && r.canOverride && !r.locked && (
+                          {g.rules && r.canOverride && !r.locked && !r.appId && (
                             <div className="ab-seg">
                               <button disabled={isOff} className={eff === 'ALLOW' ? 'on-allow' : ''} onClick={() => setRuleAction(r, 'ALLOW')}>Allow</button>
                               <button disabled={isOff} className={eff === 'BLOCK' ? 'on-block' : ''} onClick={() => setRuleAction(r, 'BLOCK')}>Block</button>
@@ -1681,7 +1728,7 @@
       const [confirmed, setConfirmed] = useState(false);
       const [keep, setKeep] = useState([]);
       const body = () => ({ baseline: pov.baseline, scope: pov.scope, prefix, disabledRules: pov.disabledRules, actionSettings: pov.actionSettings,
-        settingOverrides: pov.settingOverrides, cbiProfile: pov.cbiProfile, sslCertificate: pov.sslCertificate });
+        settingOverrides: pov.settingOverrides, appActions: pov.appActions || {}, cbiProfile: pov.cbiProfile, sslCertificate: pov.sslCertificate });
       const run = async () => { setBusy(true); setError(null); setPlan(null); try { setPlan(await api.call('POST', '/v2/zia/plan', body())); } catch (e) { setError('Dry run failed: ' + e.message); } setBusy(false); };
       useEffect(() => { run(); }, []);
       const apply = async () => {
@@ -1790,6 +1837,10 @@
       const init = saved ? { domains: saved.domains, apps: saved.apps } : init0;
       const [form, setForm] = useState({ domains: init.domains || '', tcpPorts: (saved && saved.tcpPorts) || '1-52, 54-65535', udpPorts: (saved && saved.udpPorts !== undefined ? saved.udpPorts : '1-52, 54-65535'), connectorGroupId: (saved && saved.connectorGroupId) || '',
         descriptions: { connectorGroup: meta.copy.zpa.connectorGroupDescription, appSegment: meta.copy.zpa.appSegmentDescription, ...((saved || seedZ).descriptions || {}) } });
+      const [loc, setLoc] = useState(() => (saved && saved.connectorLocation) || { id: 'us-sjc' });
+      const [locs, setLocs] = useState(null);
+      useEffect(() => { api.call('GET', '/v2/zpa/locations').then(r => setLocs(r.locations)).catch(() => setLocs([])); }, []);
+      const locLabel = loc.id ? ((locs || []).find(l => l.id === loc.id) || {}).label || 'San Jose, CA, USA' : [loc.city, loc.region, loc.country || loc.countryCode].filter(Boolean).join(', ');
       const [settings, setSettings] = useState({ ...meta.zpaDefaults, ...((saved || seedZ).settings || {}) });
       const [policies, setPolicies] = useState({ access: true, timeout: true, inspection: true, isolation: true, ...((saved || seedZ).policies || {}) });
       const [pra, setPra] = useState({ rdpHost: '', sshHost: '', ...((saved && saved.pra) || {}) });
@@ -1807,13 +1858,13 @@
       const [reveal, setReveal] = useState(false);
       const [confirmed, setConfirmed] = useState(false);
       useEffect(() => { api.call('GET', '/v2/zpa/context').then(setCtx).catch(e => setCtx({ error: e.message })); }, []);
-      useEffect(() => { setPlan(null); setConfirmed(false); }, [JSON.stringify([form, settings, bulk, apps, policies, pra, iso, ba])]);
+      useEffect(() => { setPlan(null); setConfirmed(false); }, [JSON.stringify([form, settings, bulk, apps, policies, pra, iso, ba, loc])]);
       useEffect(() => {
         if (bulk && !apps.length) { setErrors([]); return; }
         const t = setTimeout(() => api.call('POST', '/v2/zpa/validate', bulk ? { apps: apps.map(a => ({ ...a, destinations: destList(a.destinations) })), settings, pra, browserAccess: ba } : { domains: form.domains, tcpPorts: form.tcpPorts, udpPorts: form.udpPorts, settings, pra, browserAccess: ba }).then(r => setErrors(r.errors)).catch(() => {}), 250);
         return () => clearTimeout(t);
       }, [form.domains, form.tcpPorts, form.udpPorts, settings.healthReporting, bulk, JSON.stringify(apps), pra.rdpHost, pra.sshHost, ba.domain, ba.port]);
-      const body = () => ({ prefix, ...(bulk ? { apps: apps.map(a => ({ ...a, destinations: destList(a.destinations) })) } : { domains: form.domains, tcpPorts: form.tcpPorts, udpPorts: form.udpPorts }), settings, connectorGroupId: form.connectorGroupId || null, descriptions: form.descriptions, policies, pra,
+      const body = () => ({ prefix, ...(bulk ? { apps: apps.map(a => ({ ...a, destinations: destList(a.destinations) })) } : { domains: form.domains, tcpPorts: form.tcpPorts, udpPorts: form.udpPorts }), settings, connectorGroupId: form.connectorGroupId || null, connectorLocation: loc, descriptions: form.descriptions, policies, pra,
         isolationProfile: policies.isolation ? iso : { ...iso, enabled: false }, browserAccess: ba.domain.trim() ? ba : {} });
       const downloadTemplate = () => {
         const blob = new Blob([meta.copy.zpa.bulkTemplate], { type: 'text/csv' });
@@ -1843,10 +1894,27 @@
       return (
         <div className="card" data-step="zpa">
           <div className="card-header"><h2>Zscaler Private Access</h2><p>Creates, in order: App Connector Group → Provisioning Key → Segment Group → Server Group → Application Segment → timeout, inspection and isolation policies. Objects that already exist with these names are updated.</p></div>
-          <div className="alert alert-warning" data-zpalocation><span>📍 {meta.copy.zpa.locationBanner}</span></div>
+          <div className="card" style={{padding:'0.9rem', marginBottom:'1rem'}} data-zpalocation>
+            <label className="form-label">📍 App Connector Group location</label>
+            <div style={{display:'flex', gap:'8px', flexWrap:'wrap', alignItems:'center'}}>
+              <select value={loc.id || 'custom'} onChange={e => setLoc(e.target.value === 'custom' ? { city: '', region: '', country: '', countryCode: '', latitude: '', longitude: '' } : { id: e.target.value })} style={{maxWidth:'340px'}} data-zpaloc>
+                {(locs || [{ id: 'us-sjc', label: 'San Jose, CA, USA' }]).map(l => <option key={l.id} value={l.id}>{l.label}</option>)}
+                <option value="custom">Another city (enter it)…</option>
+              </select>
+              {!loc.id && <>
+                <input type="text" placeholder="City" value={loc.city} onChange={e => setLoc({ ...loc, city: e.target.value })} style={{width:'150px'}} data-zpaloccity />
+                <input type="text" placeholder="State / region" value={loc.region} onChange={e => setLoc({ ...loc, region: e.target.value })} style={{width:'110px'}} />
+                <input type="text" placeholder="Country" value={loc.country} onChange={e => setLoc({ ...loc, country: e.target.value })} style={{width:'120px'}} />
+                <input type="text" placeholder="CC" maxLength={2} value={loc.countryCode} onChange={e => setLoc({ ...loc, countryCode: e.target.value.toUpperCase() })} style={{width:'54px'}} data-zpaloccc />
+                <input type="text" placeholder="Latitude" value={loc.latitude} onChange={e => setLoc({ ...loc, latitude: e.target.value.trim() })} style={{width:'110px'}} data-zpaloclat />
+                <input type="text" placeholder="Longitude" value={loc.longitude} onChange={e => setLoc({ ...loc, longitude: e.target.value.trim() })} style={{width:'110px'}} data-zpaloclng />
+              </>}
+            </div>
+            <div className="form-hint">{meta.copy.zpa.locationBanner}</div>
+          </div>
           {ctx && ctx.error && <div className="alert alert-danger"><span>Could not reach ZPA: {ctx.error}</span></div>}
           <table className="diff-table" style={{marginBottom:'1rem'}}><tbody>
-            <tr><td style={{width:'200px'}}>App Connector Group</td><td><code>{n('appconnector-group')}</code> · Connector certificate · San Jose, CA · default upgrade schedule and version</td></tr>
+            <tr><td style={{width:'200px'}}>App Connector Group</td><td><code>{n('appconnector-group')}</code> · Connector certificate · {locLabel || 'location not set'} · default upgrade schedule and version</td></tr>
             <tr><td>Provisioning Key</td><td><code>{n('provisioning-key')}</code> · App Connector · max usage 5</td></tr>
             <tr><td>Segment Group</td><td><code>{n('segment-group')}</code></td></tr>
             <tr><td>Server Group</td><td><code>{n('server-group')}</code> · Dynamic Server Discovery on</td></tr>
@@ -2464,7 +2532,7 @@
       const [confirmed, setConfirmed] = useState(false);
       const [, tick] = useState(0);
       useEffect(() => { const t = setInterval(() => tick(x => x + 1), 1000); return () => clearInterval(t); }, []);
-      const ziaPayload = () => ({ baseline: pov.baseline, scope: pov.scope, prefix, disabledRules: pov.disabledRules, actionSettings: pov.actionSettings, settingOverrides: pov.settingOverrides, cbiProfile: pov.cbiProfile, sslCertificate: pov.sslCertificate });
+      const ziaPayload = () => ({ baseline: pov.baseline, scope: pov.scope, prefix, disabledRules: pov.disabledRules, actionSettings: pov.actionSettings, settingOverrides: pov.settingOverrides, appActions: pov.appActions || {}, cbiProfile: pov.cbiProfile, sslCertificate: pov.sslCertificate });
       const steps = [
         payloads.zcc.windows && { key: 'zccWin', product: 'zcc', stage: 'zcc', label: 'Client Connector (Windows)', platform: 'windows', payload: payloads.zcc.windows },
         payloads.zcc.macos && { key: 'zccMac', product: 'zcc', stage: 'zcc', label: 'Client Connector (macOS)', platform: 'macos', payload: payloads.zcc.macos },

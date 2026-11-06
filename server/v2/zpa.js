@@ -88,6 +88,54 @@ const TIMEOUTS = { reauthTimeout: '28800', reauthIdleTimeout: '3600' };   // sec
 const OWASP_FALLBACK = 'OWASP_CRS/4.8.0';   // live: tenants refuse new profiles on 3.3.0; the current version comes from /inspectionControls/predefined/versions
 const PRA_PROTOCOLS = { rdp: { protocol: 'RDP', port: '3389' }, ssh: { protocol: 'SSH', port: '22' } };
 const SAN_JOSE = { location: 'San Jose, CA, USA', cityCountry: 'San Jose, US', countryCode: 'US', latitude: '37.3382082', longitude: '-121.8863286' };
+// v2.10: App Connector Group locations to pick from (city, region, country, ISO code, latitude, longitude). ZPA uses the
+// location to steer users to the nearest connectors. A custom city with its own coordinates can be entered as well.
+const LOCATIONS = [
+  ['us-sjc', 'San Jose', 'CA', 'USA', 'US', 37.3382082, -121.8863286], ['us-sfo', 'San Francisco', 'CA', 'USA', 'US', 37.7749295, -122.4194155],
+  ['us-lax', 'Los Angeles', 'CA', 'USA', 'US', 34.0522342, -118.2436849], ['us-sea', 'Seattle', 'WA', 'USA', 'US', 47.6062095, -122.3320708],
+  ['us-pdx', 'Portland', 'OR', 'USA', 'US', 45.5152320, -122.6783853], ['us-phx', 'Phoenix', 'AZ', 'USA', 'US', 33.4483771, -112.0740373],
+  ['us-den', 'Denver', 'CO', 'USA', 'US', 39.7392358, -104.9902510], ['us-slc', 'Salt Lake City', 'UT', 'USA', 'US', 40.7607793, -111.8910474],
+  ['us-dfw', 'Dallas', 'TX', 'USA', 'US', 32.7766642, -96.7969879], ['us-hou', 'Houston', 'TX', 'USA', 'US', 29.7604267, -95.3698028],
+  ['us-aus', 'Austin', 'TX', 'USA', 'US', 30.2671530, -97.7430608], ['us-msp', 'Minneapolis', 'MN', 'USA', 'US', 44.9777530, -93.2650108],
+  ['us-chi', 'Chicago', 'IL', 'USA', 'US', 41.8781136, -87.6297982], ['us-stl', 'St. Louis', 'MO', 'USA', 'US', 38.6270025, -90.1994042],
+  ['us-det', 'Detroit', 'MI', 'USA', 'US', 42.3314270, -83.0457538], ['us-cle', 'Cleveland', 'OH', 'USA', 'US', 41.4993200, -81.6943605],
+  ['us-cmh', 'Columbus', 'OH', 'USA', 'US', 39.9611755, -82.9987942], ['us-nsh', 'Nashville', 'TN', 'USA', 'US', 36.1626638, -86.7816016],
+  ['us-atl', 'Atlanta', 'GA', 'USA', 'US', 33.7489954, -84.3879824], ['us-mia', 'Miami', 'FL', 'USA', 'US', 25.7616798, -80.1917902],
+  ['us-orl', 'Orlando', 'FL', 'USA', 'US', 28.5383355, -81.3792365], ['us-tpa', 'Tampa', 'FL', 'USA', 'US', 27.9505750, -82.4571776],
+  ['us-clt', 'Charlotte', 'NC', 'USA', 'US', 35.2270869, -80.8431267], ['us-rdu', 'Raleigh', 'NC', 'USA', 'US', 35.7795897, -78.6381787],
+  ['us-was', 'Washington', 'DC', 'USA', 'US', 38.9071923, -77.0368707], ['us-ash', 'Ashburn', 'VA', 'USA', 'US', 39.0437567, -77.4874416],
+  ['us-phl', 'Philadelphia', 'PA', 'USA', 'US', 39.9525839, -75.1652215], ['us-pit', 'Pittsburgh', 'PA', 'USA', 'US', 40.4406248, -79.9958864],
+  ['us-nyc', 'New York', 'NY', 'USA', 'US', 40.7127753, -74.0059728], ['us-bos', 'Boston', 'MA', 'USA', 'US', 42.3600825, -71.0588801],
+  ['us-pwm', 'Portland', 'ME', 'USA', 'US', 43.6590993, -70.2568189], ['ca-tor', 'Toronto', 'ON', 'Canada', 'CA', 43.6532260, -79.3831843],
+  ['ca-mtl', 'Montreal', 'QC', 'Canada', 'CA', 45.5018869, -73.5673919], ['ca-van', 'Vancouver', 'BC', 'Canada', 'CA', 49.2827291, -123.1207375],
+  ['mx-mex', 'Mexico City', '', 'Mexico', 'MX', 19.4326077, -99.1332080], ['br-sao', 'São Paulo', '', 'Brazil', 'BR', -23.5557714, -46.6395571],
+  ['gb-lon', 'London', '', 'United Kingdom', 'GB', 51.5072178, -0.1275862], ['ie-dub', 'Dublin', '', 'Ireland', 'IE', 53.3498053, -6.2603097],
+  ['nl-ams', 'Amsterdam', '', 'Netherlands', 'NL', 52.3675734, 4.9041389], ['de-fra', 'Frankfurt', '', 'Germany', 'DE', 50.1109221, 8.6821267],
+  ['fr-par', 'Paris', '', 'France', 'FR', 48.8566140, 2.3522219], ['ch-zrh', 'Zurich', '', 'Switzerland', 'CH', 47.3768866, 8.5416940],
+  ['se-sto', 'Stockholm', '', 'Sweden', 'SE', 59.3293235, 18.0685808], ['es-mad', 'Madrid', '', 'Spain', 'ES', 40.4167754, -3.7037902],
+  ['it-mil', 'Milan', '', 'Italy', 'IT', 45.4642035, 9.1899820], ['ae-dxb', 'Dubai', '', 'United Arab Emirates', 'AE', 25.2048493, 55.2707828],
+  ['in-bom', 'Mumbai', '', 'India', 'IN', 19.0759837, 72.8776559], ['in-blr', 'Bengaluru', '', 'India', 'IN', 12.9715987, 77.5945627],
+  ['sg-sin', 'Singapore', '', 'Singapore', 'SG', 1.3520830, 103.8198360], ['jp-tyo', 'Tokyo', '', 'Japan', 'JP', 35.6761919, 139.6503106],
+  ['hk-hkg', 'Hong Kong', '', 'Hong Kong', 'HK', 22.3193039, 114.1693611], ['au-syd', 'Sydney', 'NSW', 'Australia', 'AU', -33.8688197, 151.2092955],
+  ['au-mel', 'Melbourne', 'VIC', 'Australia', 'AU', -37.8136276, 144.9630576], ['za-jnb', 'Johannesburg', '', 'South Africa', 'ZA', -26.2041028, 28.0473051]
+].map(([id, city, region, country, cc, lat, lng]) => ({ id, label: `${city}${region ? `, ${region}` : ''}, ${country}`, city, region, country, countryCode: cc, latitude: lat, longitude: lng }));
+
+/** The connector group location fields for a picked city ({ id }) or a custom one ({ city, region, country, countryCode, latitude, longitude }). */
+function connectorLocation(pick) {
+  if (!pick || typeof pick !== 'object') return null;
+  let p = pick.id ? LOCATIONS.find(l => l.id === pick.id) : null;
+  if (pick.id && !p) throw Object.assign(new Error('Unknown App Connector location.'), { status: 400 });
+  if (!p) {
+    const city = String(pick.city || '').trim(), country = String(pick.country || '').trim(), region = String(pick.region || '').trim();
+    const cc = String(pick.countryCode || '').trim().toUpperCase(), lat = Number(pick.latitude), lng = Number(pick.longitude);
+    if (!city || city.length > 60 || /[<>]/.test(city + country + region)) throw Object.assign(new Error('Custom location: enter a city (up to 60 characters).'), { status: 400 });
+    if (!/^[A-Z]{2}$/.test(cc)) throw Object.assign(new Error('Custom location: country code must be two letters (for example US).'), { status: 400 });
+    if (!(lat >= -90 && lat <= 90) || !(lng >= -180 && lng <= 180) || pick.latitude === '' || pick.longitude === '') throw Object.assign(new Error('Custom location: latitude -90 to 90 and longitude -180 to 180.'), { status: 400 });
+    p = { city, region, country: country || cc, countryCode: cc, latitude: lat, longitude: lng };
+  }
+  return { location: `${p.city}${p.region ? `, ${p.region}` : ''}, ${p.country}`, cityCountry: `${p.city}, ${p.countryCode}`, countryCode: p.countryCode,
+    latitude: String(p.latitude), longitude: String(p.longitude) };
+}
 
 // ---------- validation (ZPA-10..13, VAL-01) ----------
 const FQDN = /^(?=.{1,253}$)(?!-)[A-Za-z0-9-]{1,63}(?<!-)(\.(?!-)[A-Za-z0-9-]{1,63}(?<!-))+$/;
@@ -325,8 +373,9 @@ async function runZpa(zpa, input, { dryRun, logger }) {
   // 1. App Connector Group (ZPA-01) — location San Jose, CA; upgrade schedule and version profile left at defaults
   const cg = await upsert('connectorGroup', 'App Connector Group', names.connectorGroup, {
     name: names.connectorGroup, description: input.descriptions?.connectorGroup || COPY.zpa.connectorGroupDescription, enabled: true,
-    ...SAN_JOSE, ...(certId ? { enrollmentCertId: certId } : {})
-  }, { createOnly: ['location', 'cityCountry', 'countryCode', 'latitude', 'longitude'] });
+    ...(input.connectorLocation ? connectorLocation(input.connectorLocation) : SAN_JOSE), ...(certId ? { enrollmentCertId: certId } : {})
+    // v2.10: a location picked in the wizard is kept in step on re-runs; without one, San Jose is only used when the group is created
+  }, { createOnly: input.connectorLocation ? [] : ['location', 'cityCountry', 'countryCode', 'latitude', 'longitude'] });
   let cgId = dead(cg) ? null : cg.id;
   if (input.connectorGroupId) cgId = input.connectorGroupId;   // ZPA-03 dropdown
 
@@ -779,5 +828,6 @@ async function deleteZpaObjects(zpa, items, { dryRun, logger, prefix } = {}) {
 }
 
 module.exports = {
+  LOCATIONS, connectorLocation,
   parseBulkCsv, validateBulkApps, segmentName, ZPAClient, runZpa, validateZpaInput, classifyEntry, splitEntries, parsePortRanges, APP_SEGMENT_DEFAULTS, SAN_JOSE, POLICY_DEFAULTS, ISOLATION_DEFAULTS, policyRuleDiff,
   listZpaObjects, deleteZpaObjects, DELETE_ORDER, KIND_LABEL, zpaGraph, blockersOf };

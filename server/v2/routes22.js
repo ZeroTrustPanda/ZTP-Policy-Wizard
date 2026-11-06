@@ -173,7 +173,7 @@ function register(app, requireAuth, { v2, rememberPlan, checkPlan, zpaOf, countA
     const baseline = (gd.pov && gd.pov.baseline) || (gd.g && gd.g.baseline) || null;
     if (!baseline) return null;
     return { baseline, scope: (gd.pov && gd.pov.scope) || {}, prefix: (p && p.prefix) || (gd.g && gd.g.prefix) || 'POV', customerName: (p && p.customerName) || (gd.g && gd.g.customerName) || '',
-      disabledRules: (gd.pov && gd.pov.disabledRules) || {}, actionSettings: (gd.pov && gd.pov.actionSettings) || null, settingOverrides: (gd.pov && gd.pov.settingOverrides) || {},
+      disabledRules: (gd.pov && gd.pov.disabledRules) || {}, actionSettings: (gd.pov && gd.pov.actionSettings) || null, settingOverrides: (gd.pov && gd.pov.settingOverrides) || {}, appActions: (gd.pov && gd.pov.appActions) || {},
       products: (gd.g && gd.g.scope) || null, editions: (st && st.licensing && st.licensing.editions) || null };
   }
   const sendFile = (res, f) => { res.setHeader('Content-Type', f.type + (/^text|json/.test(f.type) ? '; charset=utf-8' : '')); res.setHeader('Content-Disposition', `attachment; filename="${f.name}"`); res.setHeader('Cache-Control', 'no-store'); res.send(f.content); };

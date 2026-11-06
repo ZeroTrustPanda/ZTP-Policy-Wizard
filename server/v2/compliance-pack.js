@@ -78,9 +78,9 @@ function profileFile(id) {
 }
 
 /** Generated rule set for a POV (same inputs as the ZIA step). */
-function templateFor({ baseline, scope, prefix, disabledRules, actionSettings, settingOverrides, editions }) {
+function templateFor({ baseline, scope, prefix, disabledRules, actionSettings, settingOverrides, appActions, editions }) {
   return fw.generate({ baseline, scope: scope || {}, prefix: prefix || 'POV', disabledRules: disabledRules || {}, actionSettings: actionSettings || { policy: {}, rules: {} },
-    settingOverrides: settingOverrides || {}, editions: editions || null });
+    settingOverrides: settingOverrides || {}, appActions: appActions || {}, editions: editions || null });
 }
 
 /** Rows: every rule and setting (on and off), plus the ZPA policies, with controls or reason. */
