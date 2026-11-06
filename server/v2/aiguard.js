@@ -3,8 +3,9 @@
  * following Zscaler's "Integrating ZIA with AI Guard" guide:
  *   root certificate (Proxy Chaining) → proxy → proxy gateway (UI only: the API is read-only) → block QUIC →
  *   destination group (wildcard FQDNs of the AI apps) → forwarding rule (Proxy Chaining to the gateway).
- * Added by the wizard because the guide assumes it: an SSL Inspect rule for the AI apps placed above the
- * "Office 365 One Click Rule" bypass (otherwise Microsoft 365 Copilot is never decrypted), and Gen AI prompt capture.
+ * Added by the wizard because the guide assumes it: Microsoft 365 Copilot decrypted above the "Office 365 One Click Rule"
+ * bypass (v2.10.1: by the SSL Inspection policy's shared "<prefix>-SSL-Inspect-Copilot" rule, not a rule of its own), and
+ * Gen AI prompt capture.
  * Same dry-run / apply contract as the other products: the ledger lists Create / Update / No change, undo is recorded.
  */
 'use strict';
@@ -239,57 +240,52 @@ async function runAiGuard(client, input, { dryRun, logger } = {}) {
     } catch (e) { if (!e.reused) rec({ category: 'Firewall Filtering', name: N.quic, action: 'FAILED', error: e.message }); }
   }
 
-  // 6. SSL: inspect the AI apps, above the Microsoft 365 one-click bypass and Zscaler's exemptions
-  if (input.sslInspect !== false && group) {
+  // 6. SSL (v2.10.1): no separate AI Guard rule. Microsoft Copilot is decrypted by the SSL Inspection policy's own
+  // "<prefix>-SSL-Inspect-Copilot" rule at the top (above the Office 365 one-click bypass), shared with the Internet Access run:
+  // whichever runs first creates it, the other finds it. The other AI apps are decrypted by the Inspect All rule.
+  // An "<prefix>-AIG-Inspect" rule left by an earlier version is removed (Undo puts it back).
+  if (input.sslInspect !== false) {
     try {
+      const { copilotSslRule } = require('../templates');
+      const { ZiaEngine, sslBody } = require('./zia-engine');
       const rules = list(await client.apiCall('GET', '/api/v1/sslInspectionRules')).filter(r => !r.defaultRule).sort((a, b) => a.order - b.order);
-      const bypass = rules.find(r => r.predefined && /Office 365 One Click/i.test(r.name)) || rules.find(r => r.predefined && /Recommended Exemptions/i.test(r.name));
-      const ex = rules.find(r => r.name === N.ssl);
-      // the rule only matches the AI destination group, so it goes first: no bypass rule (custom or predefined) can catch the AI apps before it
-      const firstNoDecrypt = rules.filter(r => r !== ex && r.action && r.action.type === 'DO_NOT_DECRYPT' && r.state !== 'DISABLED').sort((a, b) => a.order - b.order)[0];
-      if (domains.some(d => /substrate|copilot/.test(d))) followUps.push('Microsoft 365 Copilot also needs WebSocket inspection: ask Zscaler Support to enable it for the tenant.');
-      // v2.9: an inspect-everything rule that already sits above every Do Not Decrypt rule covers the AI apps too: reuse it.
-      // Usually there is none, because the SSL catch-all belongs at the bottom, below the Microsoft 365 one-click bypass.
-      {
-        const { scopedBy } = require('./shadow');
-        const blank = (v) => !v || (Array.isArray(v) && !v.length);
-        const inspectAll = rules.find(r => r !== ex && !r.predefined && r.state !== 'DISABLED' && r.action && r.action.type === 'DECRYPT' && !scopedBy(r).length &&
-          blank(r.urlCategories) && blank(r.cloudApplications) && blank(r.destIpGroups) && (!firstNoDecrypt || r.order < firstNoDecrypt.order));
-        if (inspectAll && !ex) {
-          rec({ category: 'SSL Inspection', name: inspectAll.name, action: 'NO_CHANGE', note: `"${inspectAll.name}" already inspects all traffic above every Do Not Decrypt rule, so the AI apps are inspected; no separate AI Guard rule is added.` });
-          throw Object.assign(new Error('reused'), { reused: true });
-        }
-      }
-      const targetOrder = rules.length ? 1 : Infinity;
-      const body = { name: N.ssl, description: 'Decrypt AI apps (ChatGPT, Microsoft 365 Copilot, Claude, Gemini…) so ZIA can chain them to AI Guard. Must stay above the Office 365 One Click rule. Created by the ZTP Policy Wizard.',
-        state: 'ENABLED', rank: 7, roadWarriorForKerberos: false, destIpGroups: [{ id: group.id, name: group.name }],
-        action: { type: 'DECRYPT', decryptSubActions: { serverCertificates: 'ALLOW', ocspCheck: true, blockSslTrafficWithNoSniEnabled: true, minClientTLSVersion: 'CLIENT_TLS_1_2', minServerTLSVersion: 'SERVER_TLS_1_2', blockUndecrypt: true, http2Enabled: false },
-          showEUN: false, showEUNATP: false, overrideDefaultCertificate: false } };
-      const order = Number.isFinite(targetOrder) ? targetOrder : (rules.length ? rules[rules.length - 1].order + 1 : 1);
-      if (!ex) {
-        if (!dryRun) {
-          let c;
-          try { c = await client.apiCall('POST', '/api/v1/sslInspectionRules', { ...body, order }); }
-          catch (e) {
-            // some tenants refuse a custom rule above predefined ones: put it right after them and say so
-            if (!/not allowed at order/i.test(e.message)) throw e;
-            const after = Math.max(0, ...rules.filter(r => r.predefined).map(r => r.order)) + 1;
-            c = await client.apiCall('POST', '/api/v1/sslInspectionRules', { ...body, order: after });
-            warnings.push(`ZIA did not allow "${N.ssl}" above its predefined SSL rules. Move it above "${bypass ? bypass.name : 'the Office 365 One Click Rule'}" in the ZIA portal, otherwise Microsoft 365 Copilot is not inspected.`);
-          }
-          undo.push({ op: 'DELETE', path: `/api/v1/sslInspectionRules/${c.id}`, label: `SSL Inspection: ${N.ssl}` });
-        }
-        rec({ category: 'SSL Inspection', name: N.ssl, action: 'CREATE', note: `order ${order}, above every Do Not Decrypt rule${bypass ? ` (including "${bypass.name}")` : ''}` });
+      const cop = copilotSslRule(input.prefix, null, null);
+      const gname = `${input.prefix}-Copilot-Domains`;
+      const preOrders = rules.filter(r => r.predefined).map(r => r.order);
+      const ex = rules.find(r => r.name === cop.name);
+      const atTop = ex && (!preOrders.length || ex.order < Math.min(...preOrders));
+      if (ex && ex.state !== 'DISABLED' && ex.action && ex.action.type === 'DECRYPT' && atTop) {
+        rec({ category: 'SSL Inspection', name: cop.name, action: 'NO_CHANGE', note: 'Copilot is inspected by the SSL Inspection policy\'s rule at the top (shared with Internet Access).' });
       } else {
-        const above = !firstNoDecrypt || ex.order < firstNoDecrypt.order;
-        const okBody = ex.action && ex.action.type === 'DECRYPT' && ex.state !== 'DISABLED' && (ex.destIpGroups || []).some(g => String(g.id) === String(group.id));
-        if (above && okBody) rec({ category: 'SSL Inspection', name: N.ssl, action: 'NO_CHANGE' });
-        else {
-          if (!dryRun) { undo.push({ op: 'PUT', path: `/api/v1/sslInspectionRules/${ex.id}`, body: ex, label: `SSL Inspection: ${N.ssl}` }); await client.apiCall('PUT', `/api/v1/sslInspectionRules/${ex.id}`, { ...body, id: ex.id, order: above ? ex.order : order }); }
-          rec({ category: 'SSL Inspection', name: N.ssl, action: 'UPDATE', changes: [!above && 'order', !okBody && 'action / destination group'].filter(Boolean) });
+        const eng = new ZiaEngine(client, { dryRun, logger });
+        const g = await eng.upsert({ category: 'Destination Group', name: gname, listPath: '/api/v1/ipDestinationGroups', createPath: '/api/v1/ipDestinationGroups',
+          updatePath: id => `/api/v1/ipDestinationGroups/${id}`, body: { name: gname, type: 'DSTN_DOMAIN', addresses: cop.copilotDomains.slice(), description: 'Microsoft Copilot domains, inspected above the Office 365 one-click bypass. Created by the ZTP Policy Wizard.' } });
+        if (g.action !== 'FAILED') {
+          cop.destIpGroups = [{ id: g.id, name: gname }];
+          await eng.upsert({ category: 'SSL Inspection', name: cop.name, listPath: '/api/v1/sslInspectionRules', createPath: '/api/v1/sslInspectionRules',
+            updatePath: id => `/api/v1/sslInspectionRules/${id}`, build: order => sslBody(cop, order), placeFirst: true,
+            // keep the interception certificate the Internet Access run may have set on it
+            adjust: (body, existing) => existing.action && existing.action.overrideDefaultCertificate ? { ...body, action: { ...body.action, overrideDefaultCertificate: true, sslInterceptionCert: existing.action.sslInterceptionCert } } : body });
         }
+        for (const e of eng.ledger) rec({ ...e, note: e.note || (e.category === 'SSL Inspection' ? 'Shared with the SSL Inspection policy (Internet Access).' : undefined) });
+        undo.push(...eng.undo); warnings.push(...eng.warnings);
       }
-    } catch (e) { if (!e.reused) rec({ category: 'SSL Inspection', name: N.ssl, action: 'FAILED', error: e.message }); }
+      // the other AI apps: decrypted by an inspect-everything rule (the wizard's Inspect All, or the customer's)
+      const blank = (v) => !v || (Array.isArray(v) && !v.length) || (Array.isArray(v) && v.length === 1 && v[0] === 'ANY');
+      const inspectAll = rules.find(r => !r.predefined && r.state !== 'DISABLED' && r.action && r.action.type === 'DECRYPT' && blank(r.urlCategories) && blank(r.cloudApplications) && blank(r.destIpGroups) && r.name !== cop.name);
+      if (!inspectAll) warnings.push('No Inspect All rule found in SSL Inspection, so ChatGPT, Claude, Gemini and the other AI apps may not be decrypted and cannot reach AI Guard. Run Internet Access with SSL Inspection in scope (it adds Inspect All), or add one in the ZIA portal.');
+      // an AI Guard SSL rule from an earlier version is no longer needed
+      const old = rules.find(r => r.name === N.ssl);
+      if (old) {
+        if (!dryRun) {
+          await client.apiCall('DELETE', `/api/v1/sslInspectionRules/${old.id}`);
+          const body = JSON.parse(JSON.stringify(old)); for (const k of ['id', 'lastModifiedTime', 'lastModifiedBy', 'accessControl', 'predefined', 'defaultRule']) delete body[k];
+          undo.push({ op: 'POST', path: '/api/v1/sslInspectionRules', body, label: `SSL Inspection: ${N.ssl} (removed)` });
+        }
+        rec({ category: 'SSL Inspection', name: N.ssl, action: 'DELETE', note: 'Not needed any more: Copilot is inspected by the SSL Inspection policy\'s Copilot rule and the other AI apps by Inspect All.' });
+      }
+      if (domains.some(d => /substrate|copilot/.test(d))) followUps.push('Microsoft 365 Copilot also needs WebSocket inspection: ask Zscaler Support to enable it for the tenant.');
+    } catch (e) { rec({ category: 'SSL Inspection', name: `${input.prefix}-SSL-Inspect-Copilot`, action: 'FAILED', error: e.message }); }
   }
 
   // 7. Gen AI prompt capture for the chosen apps (needs the Gen AI Security licence)

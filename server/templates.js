@@ -2346,7 +2346,7 @@ function generateChecklist(template) {
 }
 
 module.exports = {
-  CAC_APPS,
+  CAC_APPS, copilotSslRule, COPILOT_DOMAINS,
   ACTION_POLICY_TYPES,
   RULE_POLICY_TYPES,
   ruleKey,
