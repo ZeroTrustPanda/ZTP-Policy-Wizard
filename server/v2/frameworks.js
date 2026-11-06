@@ -191,6 +191,9 @@ function build(opts, withChoices) {
   // 5. v2.6.1: fit the firewall and DNS rules to the tenant's editions (opts.editions from the licensing check; unknown = keep all)
   const licenceSkipped = fitToEditions(policies, opts.editions, prefix, notes);
 
+  // v2.9: two features doing the same job in one run
+  dedupeOverlaps(policies, notes);
+
   // DLP block: drop engines / dictionaries no remaining rule uses
   if (objects.dlpEngines.length) {
     const used = new Set([...(policies.dlp || []).map(r => r.engineRef && r.engineRef.custom),
@@ -219,6 +222,35 @@ function build(opts, withChoices) {
     licenceSkipped,
     generationNotes: notes
   };
+}
+
+/**
+ * v2.9: settings or rules in the same plan that cover the same traffic.
+ *  - UCaaS one-click (Advanced Settings) already allows and optimises Zoom, Webex, GoTo and RingCentral, so those apps are taken
+ *    out of the firewall's Allow-Collab rule; the rest of the rule (Skype, SIP, RTP…) stays.
+ *  - When the optional Cloud App Control rule that blocks DNS over HTTPS apps is turned on, the DNS rule that inspects DoH and
+ *    blocks only risky lookups is left out: the DoH apps are denied outright.
+ */
+const UCAAS_FW_APPS = { enableUcaasZoom: 'ZOOM', enableUcaasWebex: 'WEBEX', enableUcaasLogMeIn: 'GOTOMEETING', enableUcaasRingCentral: 'RINGCENTRAL' };
+function dedupeOverlaps(policies, notes) {
+  if (policies.ucaas && Array.isArray(policies.firewallFiltering)) {
+    const covered = new Set(policies.ucaas.settings.filter(s => s.value && UCAAS_FW_APPS[s.key]).map(s => UCAAS_FW_APPS[s.key]));
+    for (const r of policies.firewallFiltering) {
+      if (!/Allow-Collab$/.test(r.toggleKey || r.actionKey || r.name || '') || !Array.isArray(r.nwApplications)) continue;
+      const left = r.nwApplications.filter(a => !covered.has(a));
+      if (left.length === r.nwApplications.length) continue;
+      r.nwApplications = left;
+      r.description = `${(r.description || '').replace(/\s*$/, '')} Zoom, Webex, GoTo and RingCentral are handled by the UCaaS settings, so they are not listed here.`.trim();
+    }
+    policies.firewallFiltering = policies.firewallFiltering.filter(r => !Array.isArray(r.nwApplications) || r.nwApplications.length || r.nwServices || r.nwServiceNames || r.customServices);
+  }
+  const cacDoh = (policies.cloudAppControl || []).some(r => /CAC-Block-DoH$/.test(r.toggleKey || r.actionKey || r.name || '') && r.state !== 'DISABLED');
+  if (cacDoh && Array.isArray(policies.dnsSecurity)) {
+    const before = policies.dnsSecurity.length;
+    policies.dnsSecurity = policies.dnsSecurity.filter(r => !/DNS-DoH-Block-Risky$/.test(r.toggleKey || r.actionKey || r.name || ''));
+    if (policies.dnsSecurity.length < before) notes.push('DNS over HTTPS apps are blocked by Cloud App Control (CAC-Block-DoH), so the DNS rule that inspects DoH is left out.');
+    if (!policies.dnsSecurity.length) delete policies.dnsSecurity;
+  }
 }
 
 /** Rule review page data: every rule / setting grouped by policy type (FWK-10, filtered by scope). */

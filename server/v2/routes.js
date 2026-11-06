@@ -46,7 +46,7 @@ const LIST_NAMES = { '/api/v1/urlFilteringRules': 'URL Filtering rules', '/api/v
   '/api/v1/endPointDlpRules': 'Endpoint DLP rules', '/api/v1/dlpEngines': 'DLP engines', '/api/v1/dlpDictionaries': 'DLP dictionaries', '/api/v1/casbDlpRules': 'SaaS DLP rules', '/api/v1/emailDlpRules': 'Email DLP rules' };
 /** v2.8: how many ZIA writes the apply makes, against the hourly API budget. */
 function writeForecast(client, ledger) {
-  const writes = (ledger || []).filter(e => e.action === 'CREATE' || e.action === 'UPDATE').length;
+  const writes = (ledger || []).filter(e => e.action === 'CREATE' || e.action === 'UPDATE' || e.action === 'DELETE').length;
   const heavy = (ledger || []).filter(e => (e.action === 'CREATE' || e.action === 'UPDATE') && /Cloud App Control|Endpoint DLP/.test(e.category)).length + (writes ? 1 : 0);
   const b = typeof client.writeBudget === 'function' ? client.writeBudget() : null;
   const total = writes + (writes ? 1 : 0) + (ledger || []).filter(e => e.action === 'UPDATE').length;   // + activation + a re-read per update
@@ -139,7 +139,7 @@ function registerV2Routes(app, requireAuth) {
       const input = genInput(req.body, req.session);
       const template = fw.generate(input);
       const resolved = await resolveForTenant(client, template, { cbiProfile: input.cbiProfile });
-      const run = await runZia(client, resolved.template, { dryRun: true, logger });
+      const run = await runZia(client, resolved.template, { dryRun: true, logger, cleanup: {} });
       const planId = rememberPlan(req.session, 'zia', input, tenantSignature(run));
       const shadows = shadow.analyze(run.planned, run.lists, (o) => isOurs(o, input.prefix));
       const forecast = writeForecast(client, run.ledger);
@@ -164,14 +164,16 @@ function registerV2Routes(app, requireAuth) {
       // v2.8: plan again and compare with the reviewed dry run; any change on the tenant in between stops the apply
       const stored = v2(req.session).plans[req.body.planId];
       if (stored && typeof stored === 'object' && stored.tenant) {
-        const again = await runZia(client, JSON.parse(JSON.stringify(resolved.template)), { dryRun: true });
+        const again = await runZia(client, JSON.parse(JSON.stringify(resolved.template)), { dryRun: true, cleanup: {} });
         const changed = tenantChanges(stored.tenant, tenantSignature(again));
         if (changed.length) {
           logger.log('V2_ZIA_APPLY_STOPPED', { reason: 'tenant changed since the dry run', changed });
           return res.status(409).json({ error: 'The tenant changed since your dry run, so nothing was applied. Run the dry run again and review it.', changed });
         }
       }
-      const run = await runZia(client, resolved.template, { dryRun: false, logger });   // GLB-04: activates when anything was written
+      // v2.9: leftovers the person chose to keep (a list of "category|name"). Keeping only takes deletions out of the reviewed plan.
+      const keep = (Array.isArray(req.body.keepLeftovers) ? req.body.keepLeftovers : []).filter(x => typeof x === 'string' && x.length < 300).slice(0, 2000);
+      const run = await runZia(client, resolved.template, { dryRun: false, logger, cleanup: { keep } });   // GLB-04: activates when anything was written
       const lic = v2(req.session).licensing;
       const warnings = [...scopeWarnings(input.scope, lic).map(w => w.text), ...resolved.warnings, ...run.warnings];
       const snapshot = snapshots.save({ product: 'zia', prefix: input.prefix || v2(req.session).prefix, undo: run.undo, tenant: client.vanityDomain || client.baseUrl });
@@ -180,7 +182,7 @@ function registerV2Routes(app, requireAuth) {
       let verify = null;
       if (run.ledger.some(e => e.action === 'CREATE' || e.action === 'UPDATE')) {
         try {
-          const check = await runZia(client, JSON.parse(JSON.stringify(resolved.template)), { dryRun: true });
+          const check = await runZia(client, JSON.parse(JSON.stringify(resolved.template)), { dryRun: true, cleanup: { keep } });
           const wrote = new Set(run.ledger.filter(e => e.action === 'CREATE' || e.action === 'UPDATE').map(e => `${e.category}|${e.name}`));
           const differ = check.ledger.filter(e => wrote.has(`${e.category}|${e.name}`) && e.action !== 'NO_CHANGE')
             .map(e => ({ category: e.category, name: e.name, why: e.action === 'CREATE' ? 'not found after the apply' : `differs: ${(e.changes || []).join(', ')}` }));
@@ -387,6 +389,7 @@ function registerV2Routes(app, requireAuth) {
   });
   require('./routes22').register(app, requireAuth, { v2, rememberPlan, checkPlan, zpaOf, countActions, runZia, runZpa });
   require('./routes25').register(app, requireAuth, { v2, rememberPlan, checkPlan, countActions });
+  require('./routes29').register(app, requireAuth, { v2, rememberPlan, checkPlan, countActions });
   app.get('/api/v2/runs', requireAuth, (req, res) => {
     const s = v2(req.session);
     res.json({ prefix: s.prefix || null, zia: s.runs.zia.length, zcc: s.runs.zcc.length, zpa: s.runs.zpa.length });

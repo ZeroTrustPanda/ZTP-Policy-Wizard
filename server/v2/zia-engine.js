@@ -80,6 +80,7 @@ class ZiaEngine {
     this.seq = 0;
     this.undo = [];   // v2.2 snapshot: how to put every change back (create → delete, update → previous body)
     this.planned = []; // v2.8: every rule body the run creates or keeps, for the shadow check
+    this.rulePaths = {}; // v2.9: listPath → { category, createPath, updatePath } of every rule list the run worked on
   }
 
   /** v2.8: what the dry run saw of the tenant — id, order, state and modified time of every object list it read. */
@@ -150,6 +151,7 @@ class ZiaEngine {
     } catch (e) {
       return this.record({ category, name, action: 'FAILED', error: `Could not read existing ${category}: ${e.message}` });
     }
+    if (spec.build && !this.rulePaths[spec.listPath]) this.rulePaths[spec.listPath] = { category, createPath: spec.createPath, updatePath: spec.updatePath };
     if (spec.build) this.planned.push({ category, listPath: spec.listPath, body: existing ? { ...body, order: existing.order } : body });
     if (existing) {
       const want = spec.adjust ? spec.adjust(body, existing) : body;
@@ -250,6 +252,46 @@ class ZiaEngine {
     }
   }
 
+  /**
+   * v2.9: rules the wizard made earlier that are no longer in the plan (a different baseline, a rule turned off, a rule that
+   * was renamed or dropped in a newer version, such as the old inbound geo rule). Only rules named "<prefix>-…" in the lists
+   * this run worked on are removed; the dry run lists each one and the person can keep any of them. AI Guard objects
+   * (<prefix>-AIG-…) are managed by AI Guard and never touched. Rules with the provenance tag but another prefix are only listed.
+   * Each removal is recorded in Undo with the rule's full body, so a restore creates it again.
+   */
+  async cleanup({ prefix, keep = [] } = {}) {
+    if (!prefix) return;
+    const keepSet = new Set(keep);
+    const inPlan = new Set(this.ledger.map(e => `${e.category}|${e.name}`));
+    const others = [];
+    for (const [listPath, p] of Object.entries(this.rulePaths)) {
+      const items = this.cache[listPath] || (await this.get(listPath).catch(() => []));
+      for (const o of items || []) {
+        if (!o || o.defaultRule || o.predefined || typeof o.name !== 'string') continue;
+        if (inPlan.has(`${p.category}|${o.name}`)) continue;
+        if (!o.name.startsWith(`${prefix}-`)) {
+          if (typeof o.description === 'string' && o.description.includes(TAG)) others.push(`${p.category}: ${o.name}`);
+          continue;
+        }
+        if (o.name.startsWith(`${prefix}-AIG-`)) continue;
+        const base = { category: p.category, name: o.name, id: o.id, leftover: true, order: o.order,
+          note: 'Made by the wizard earlier and no longer in this plan.' };
+        if (keepSet.has(`${p.category}|${o.name}`)) { this.record({ ...base, action: 'KEPT', note: 'Not in this plan; kept as you asked.' }); continue; }
+        if (this.dryRun) { this.record({ ...base, action: 'DELETE' }); continue; }
+        try {
+          await this.client.apiCall('DELETE', p.updatePath(o.id));
+          this.wrote = true;
+          const body = strip(o); for (const k of [...READ_ONLY, 'id']) delete body[k];
+          this.undo.push({ op: 'POST', path: p.createPath, body, label: `${p.category}: ${o.name} (removed leftover)` });
+          this.record({ ...base, action: 'DELETE' });
+        } catch (e) {
+          this.record({ ...base, action: 'FAILED', error: `Could not remove: ${e.message}` });
+        }
+      }
+    }
+    if (others.length) this.warnings.push(`${others.length} rule(s) made by the wizard with another prefix are not in this plan and were left alone: ${others.slice(0, 6).join('; ')}${others.length > 6 ? '…' : ''}.`);
+  }
+
   async activate() {
     if (this.dryRun || !this.wrote) return null;
     try { await this.client.apiCall('POST', '/api/v1/status/activate'); return true; }
@@ -338,7 +380,7 @@ const cacBody = (rule, order) => {
  * Execute (or preview) a 2.0 template against ZIA.
  * Returns { ledger, warnings, activated }.
  */
-async function runZia(client, template, { dryRun, logger }) {
+async function runZia(client, template, { dryRun, logger, cleanup = null }) {
   const eng = new ZiaEngine(client, { dryRun, logger });
   const P = template.policies || {};
 
@@ -489,6 +531,9 @@ async function runZia(client, template, { dryRun, logger }) {
     for (const s of P.ucaas.settings) values[s.key] = !!s.value;
     await eng.upsertSettings({ category: 'UCaaS', name: P.ucaas.name, path: '/api/v1/advancedUrlFilterAndCloudAppSettings', values });
   }
+
+  // v2.9: remove the wizard's own rules that this plan no longer has (listed in the dry run; any can be kept)
+  if (cleanup) await eng.cleanup({ prefix: (template.metadata && template.metadata.prefix) || template.prefix, keep: (cleanup && cleanup.keep) || [] });
 
   const activated = await eng.activate();
   return { ledger: eng.ledger, warnings: eng.warnings, activated, undo: eng.undo, planned: eng.planned, lists: eng.lists(), fingerprint: eng.fingerprint() };
