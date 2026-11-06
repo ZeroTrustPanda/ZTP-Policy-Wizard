@@ -114,6 +114,24 @@ function build(opts, withChoices) {
     }
   }
   const off = (base.disabledItems || []).map(d => ({ key: d.key, name: d.name, type: d.policyType }));
+  // v2.10: per-app Cloud App Control actions chosen in the wizard (appActions: { FACEBOOK: ['ALLOW_SOCIAL_NETWORKING_VIEW', …] })
+  if (policies.cloudAppControl) {
+    const chosen = withChoices ? (opts.appActions || {}) : {};
+    policies.cloudAppControl = policies.cloudAppControl.filter(r => {
+      if (!r.appId) return true;
+      const pick = cleanAppActions(chosen[r.appId], r.ruleType || r.type);
+      r.defaultActions = r.actions.slice();
+      if (pick) {
+        r.actions = pick; r.userActions = true; delete r.fallbackActions;
+        const say = { ALLOW: 'allowed', CAUTION: 'cautioned', BLOCK: 'blocked', DENY: 'blocked', ISOLATE: 'isolated' };
+        const parts = pick.map(a => { const m = /^(ALLOW|DENY|BLOCK|CAUTION|ISOLATE)_(.+)$/.exec(a); const op = m ? m[2].replace((r.ruleType || r.type) + '_', '') : a; return m ? `${op.replace(/_/g, ' ').toLowerCase()} ${say[m[1]]}` : a; });
+        r.description = `${r.appLabel}: ${parts.join(', ')} (chosen in the wizard). Exception that sits above the category rule on purpose; other apps fall through to it.`;
+      }
+      r.defaultAction = r.actions.length ? r.actions.join(', ') : 'Not created until you choose actions';
+      return r.actions.length > 0 || !withChoices;   // the catalog lists every app, the plan only apps with actions
+    });
+    if (!policies.cloudAppControl.length) delete policies.cloudAppControl;
+  }
   const objects = { customCategories: base.customCategories || [], dlpDictionaries: [], dlpEngines: [] };
 
   // 2. Areas added in 2.0
@@ -253,6 +271,20 @@ function dedupeOverlaps(policies, notes) {
   }
 }
 
+/** Actions chosen for one app: upper-case action names of the app's rule type, at most one verb per operation. null = none chosen. */
+function cleanAppActions(list, type) {
+  if (!Array.isArray(list)) return null;
+  const out = [], ops = new Set();
+  for (const a of list) {
+    const v = String(a || '');
+    if (!/^[A-Z][A-Z0-9_]{2,80}$/.test(v) || !v.includes(type)) continue;
+    const op = v.replace(/^(ALLOW|DENY|BLOCK|CAUTION|ISOLATE)_/, '');
+    if (ops.has(op)) continue;
+    ops.add(op); out.push(v);
+  }
+  return out;
+}
+
 /** Rule review page data: every rule / setting grouped by policy type (FWK-10, filtered by scope). */
 function buildCatalog(policies) {
   const order = Object.keys(POLICY_LABELS);
@@ -267,6 +299,7 @@ function buildCatalog(policies) {
       rules: p.map(r => ({
         key: r.toggleKey, name: r.name, description: r.description || '', locked: !!r.locked, canOverride: !!r.canOverride,
         allowOnly: !!r.allowOnly, defaultAction: r.defaultAction || '', categoryCount: Array.isArray(r.urlCategories) ? r.urlCategories.length : undefined,
+        ...(r.appId ? { appId: r.appId, appLabel: r.appLabel, ruleType: r.ruleType || r.type, actions: r.actions, defaultActions: r.defaultActions, userActions: !!r.userActions } : {}),
         compliance: r.compliance || null
       }))
     };
