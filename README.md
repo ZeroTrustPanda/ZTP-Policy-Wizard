@@ -1,4 +1,4 @@
-# 🐼 ZeroTrustPanda — ZTP Policy Wizard v2.10.0
+# 🐼 ZeroTrustPanda — ZTP Policy Wizard v2.10.1
 
 Proof-of-value automation for Zscaler SEs: Zscaler Internet Access (ZIA), Zscaler Client Connector (ZCC), Zscaler Private Access (ZPA) and Zscaler Digital Experience (ZDX), all with one set of OneAPI (ZIdentity) client credentials.
 
@@ -8,9 +8,9 @@ No Node.js, no npm, nothing to install. Click your download, unzip it, and doubl
 
 | Computer | Download (click to download) |
 |---|---|
-| **Mac with Apple silicon (M1–M4)** | [**ZTP-Wizard-2.10.0-macos-arm64.zip**](https://github.com/ZeroTrustPanda/ZTP-Policy-Wizard/raw/standalone/standalone/release/ZTP-Wizard-2.10.0-macos-arm64.zip) |
-| Windows 10/11 (64-bit) | [ZTP-Wizard-2.10.0-windows-x64.zip](https://github.com/ZeroTrustPanda/ZTP-Policy-Wizard/raw/standalone/standalone/release/ZTP-Wizard-2.10.0-windows-x64.zip) |
-| Intel Mac | [ZTP-Wizard-2.10.0-macos-x64.zip](https://github.com/ZeroTrustPanda/ZTP-Policy-Wizard/raw/standalone/standalone/release/ZTP-Wizard-2.10.0-macos-x64.zip) |
+| **Mac with Apple silicon (M1–M4)** | [**ZTP-Wizard-2.10.1-macos-arm64.zip**](https://github.com/ZeroTrustPanda/ZTP-Policy-Wizard/raw/standalone/standalone/release/ZTP-Wizard-2.10.1-macos-arm64.zip) |
+| Windows 10/11 (64-bit) | [ZTP-Wizard-2.10.1-windows-x64.zip](https://github.com/ZeroTrustPanda/ZTP-Policy-Wizard/raw/standalone/standalone/release/ZTP-Wizard-2.10.1-windows-x64.zip) |
+| Intel Mac | [ZTP-Wizard-2.10.1-macos-x64.zip](https://github.com/ZeroTrustPanda/ZTP-Policy-Wizard/raw/standalone/standalone/release/ZTP-Wizard-2.10.1-macos-x64.zip) |
 
 The wizard starts on `http://127.0.0.1:3000` (or the next free port), opens your browser, and keeps your API credentials on your computer. Logs go to `ZTP-Wizard/logs` in your home folder.
 
@@ -18,15 +18,16 @@ The wizard starts on `http://127.0.0.1:3000` (or the next free port), opens your
 - **Mac:** right-click `ZTP-Wizard` → *Open* → *Open*. If macOS still refuses, run `xattr -d com.apple.quarantine ZTP-Wizard` in the unzipped folder. If it then reports "killed", also run `codesign --force --sign - ZTP-Wizard`.
 - **Windows:** SmartScreen → *More info* → *Run anyway*.
 
-These are the same features as the v2.10.0 server version on `main`. The UI is compiled ahead of time, with React and fonts built in, so it works without reaching any CDN; only the Zscaler API calls need the network.
+These are the same features as the v2.10.1 server version on `main`. The UI is compiled ahead of time, with React and fonts built in, so it works without reaching any CDN; only the Zscaler API calls need the network.
 
-**Release notes (2.0 → 2.10.0):** [docs/release-notes/v2.10.0.md](docs/release-notes/v2.10.0.md) · **Change log:** [CHANGELOG.md](CHANGELOG.md) · **Releases:** [GitHub releases](https://github.com/ZeroTrustPanda/ZTP-Policy-Wizard/releases)
+**Release notes (2.0 → 2.10.1):** [docs/release-notes/v2.10.1.md](docs/release-notes/v2.10.1.md) · **Change log:** [CHANGELOG.md](CHANGELOG.md) · **Releases:** [GitHub releases](https://github.com/ZeroTrustPanda/ZTP-Policy-Wizard/releases)
 
-## What's in 2.x (2.0 → 2.10.0)
+## What's in 2.x (2.0 → 2.10.1)
 
 - **Per-app cloud controls, Copilot inspection, rule order (2.10):**
   - Pick each app's actions (Facebook, LinkedIn, X, ChatGPT, Copilot, Gemini, Claude, Google Drive, Dropbox, Box) per operation, from what the tenant offers.
   - Inspect Microsoft Copilot is SSL rule 1, above the Office 365 one-click bypass; Inspect All follows Zscaler's rules and the exemptions.
+  - AI Guard uses that same Copilot rule and Inspect All instead of an SSL rule of its own (2.10.1).
   - Block-QUIC is firewall rule 1; Allow-Web and Allow-NTP are gone (Zscaler's default rules cover them).
   - ZPA: pick the App Connector Group's city instead of San Jose.
 
@@ -120,7 +121,7 @@ These are the same features as the v2.10.0 server version on `main`. The UI is c
   - A layout that fits any window size.
   - An update badge.
 
-The full feature list, by product and by version, is in the [release notes](docs/release-notes/v2.10.0.md).
+The full feature list, by product and by version, is in the [release notes](docs/release-notes/v2.10.1.md).
 
 ## 1.9 flows (still available)
 
@@ -314,6 +315,7 @@ The DLP module uses a **dictionary-first** approach:
 
 | Version | Changes |
 |---------|---------|
+| **2.10.1** | AI Guard uses SSL Inspection's Copilot rule and Inspect All; no separate AI Guard SSL rule. |
 | **2.10.0** | Per-app Cloud App Control actions; Inspect Microsoft Copilot at SSL rule 1; Block-QUIC at firewall rule 1, Allow-Web / Allow-NTP removed; ZPA App Connector location picker. |
 | **2.9.0** | One outbound geo-block rule; leftover cleanup with Keep and Undo; AI Guard reuses an existing QUIC block; overlap fixes (ZTH eBook, UCaaS, DoH, DLP order); custom block and caution pages (theme builder, CSS, preview) and a logo compressed to under 10 KB. |
 | **2.8.0** | Shadow check; Prove it why-trace and expected result; posture score start/end; inspection coverage; tenant-aware apply, provenance tag, API budget, check after apply; combined DLP engines, SaaS and Email DLP; GLBA, SOC 2, ISO 27001, NIST CSF 2.0; Word downloads. Credits: Jason Smith, Mike Preissner. |

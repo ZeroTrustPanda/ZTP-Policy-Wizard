@@ -725,4 +725,4 @@ function saasRuleType(t) {
   return null;
 }
 
-module.exports = { runZia, ZiaEngine, diff, isSslCatchAll, TAG, isOurs, clampDescription };
+module.exports = { runZia, ZiaEngine, diff, isSslCatchAll, sslBody, TAG, isOurs, clampDescription };

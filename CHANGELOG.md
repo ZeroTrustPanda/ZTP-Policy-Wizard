@@ -1,8 +1,11 @@
 # Changelog
 
-## v2.0.0 → v2.10.0 — 2026-10-19 to 2026-11-06
+## v2.0.0 → v2.10.1 — 2026-10-19 to 2026-11-06
 
-Release notes for the whole 2.x line: [docs/release-notes/v2.10.0.md](docs/release-notes/v2.10.0.md).
+Release notes for the whole 2.x line: [docs/release-notes/v2.10.1.md](docs/release-notes/v2.10.1.md).
+
+### 2.10.1
+- **AI Guard SSL** (`aiguard.js` step 6): no `<prefix>-AIG-Inspect`. Uses the shared `<prefix>-SSL-Inspect-Copilot` rule and `<prefix>-Copilot-Domains` group (`copilotSslRule`, `sslBody`, engine `placeFirst`); NO_CHANGE when the rule is enabled, DECRYPT and above every predefined rule; keeps an interception certificate set by the Internet Access run. Warns when no Inspect All rule exists. An existing AIG-Inspect is deleted (Undo: POST). Runbook test `aiguard-copilot` matches the shared rule.
 
 ### 2.10.0
 - **Per-app Cloud App Control** (`templates.js` `CAC_APPS`): one rule per app (`CAC-App-Facebook|X|LinkedIn|ChatGPT|Copilot|Gemini|Claude|GDrive|Dropbox|Box`) replaces the grouped granular rules; Slack unchanged. `appActions` input (`{ APP: [actions] }`) in `generate()` (`cleanAppActions`: upper-case names of the rule type, one verb per operation); chosen actions drop the fallback set and get a generated description; Claude (`actions: null`) only in the plan when chosen, always in the catalog. Catalog rows carry `appId`, `ruleType`, `actions`, `defaultActions`.
