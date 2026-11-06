@@ -45,11 +45,11 @@ async function restore(id, { client, zpa, dryRun, logger }) {
   const results = [];
   for (const st of steps) {
     const label = st.label || st.path;
-    if (dryRun) { results.push({ label, action: st.op === 'DELETE' ? 'DELETE' : 'PUT BACK' }); continue; }
+    if (dryRun) { results.push({ label, action: st.op === 'DELETE' ? 'DELETE' : st.op === 'POST' ? 'CREATE AGAIN' : 'PUT BACK' }); continue; }
     try {
       if (st.api === 'aiguard') await require('./aiguard').aiguardCall(client, st.op, st.path, st.op === 'PUT' ? st.body : undefined);
       else if (snap.product === 'zia') {
-        try { await client.apiCall(st.op, st.path, st.op === 'PUT' ? st.body : null); }
+        try { await client.apiCall(st.op, st.path, st.op === 'PUT' || st.op === 'POST' ? st.body : null); }
         catch (e) {
           // some settings fields sit behind tenant feature flags (seen on ATP): put the rest back without them
           if (st.op !== 'PUT' || !/feature flag/i.test(e.message)) throw e;
@@ -58,7 +58,7 @@ async function restore(id, { client, zpa, dryRun, logger }) {
         }
       }
       else await zpa.apiCall(st.op, st.path, st.op === 'PUT' ? st.body : null);
-      results.push({ label, action: st.op === 'DELETE' ? 'DELETED' : 'PUT BACK' });
+      results.push({ label, action: st.op === 'DELETE' ? 'DELETED' : st.op === 'POST' ? 'CREATED AGAIN' : 'PUT BACK' });
       if (logger) logger.logPolicyApply('Restore', label, st.op === 'DELETE' ? 'DELETE' : 'RESTORE', { success: true });
     } catch (e) {
       const gone = /404|not found|NOT_FOUND|resource.not.found/i.test(e.message) && st.op === 'DELETE';

@@ -77,7 +77,6 @@ const RULES = {
   'fileTypeControl:FTC-Block-PW-Archives': R(['MALWARE', 'DATA_LOSS'], 'best_practice', 'Password-protected archives that cannot be inspected.'),
   // Cloud Firewall
   'firewallFiltering:FW-Geo-Block-Out': R(['BOUNDARY'], 'best_practice', 'Remote administration and file transfer to high-risk countries.'),
-  'firewallFiltering:FW-Geo-Block-In': R(['BOUNDARY'], 'best_practice', 'Remote administration and file transfer from high-risk countries.'),
   'firewallFiltering:Block-QUIC': R(['INSPECT_TLS', 'LEAST_FUNCTION'], 'best_practice', 'Forces browsers to TCP so traffic can be inspected.'),
   'firewallFiltering:Allow-Web': R(['ALLOW_EXCEPTION'], 'operational', 'Allows web traffic above the default deny.'),
   'firewallFiltering:Allow-NTP': R(['ALLOW_EXCEPTION', 'TIME_SYNC'], 'operational', 'Allows time synchronization.'),

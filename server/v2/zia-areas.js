@@ -133,7 +133,11 @@ function dlpBlockObjects(prefix, framework) {
   const dictionaries = new Map();
   const engines = [];
   const rules = [];
-  for (const br of framework.dlp.blockRules || []) {
+  // v2.9: DLP rules are evaluated top down and the first match decides, so the specific rules (combined dictionaries, bulk
+  // counts) go above the broad "any identifier" rules; otherwise a broad rule above them catches the same files first.
+  const rank = (br) => (br.expression ? (/bulk/i.test(br.key) ? 0 : 1) : 2);
+  const ordered = (framework.dlp.blockRules || []).map((br, i) => [br, i]).sort((a, b) => rank(a[0]) - rank(b[0]) || a[1] - b[1]).map(x => x[0]);
+  for (const br of ordered) {
     const refs = [];
     for (const d of br.dictionaries) {
       const [kind, key] = d.split(':');

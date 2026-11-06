@@ -215,6 +215,18 @@ async function runAiGuard(client, input, { dryRun, logger } = {}) {
       if (!svc) throw new Error('The predefined QUIC network service was not found on this tenant.');
       const rules = list(await client.apiCall('GET', '/api/v1/firewallFilteringRules'));
       const ex = rules.find(r => r.name === N.quic);
+      // v2.9: reuse a QUIC block that is already there (the wizard's own "<prefix>-Block-QUIC" from the ZIA baseline, or the
+      // customer's) instead of adding a second rule that does the same, as long as it applies to everyone and no broad allow sits above it
+      const { scopedBy } = require('./shadow');
+      const live = (r) => r && !r.defaultRule && !r.predefined && r.state !== 'DISABLED';
+      const blocksQuic = (r) => live(r) && /BLOCK|DROP/.test(r.action || '') && r.name !== N.quic && !scopedBy(r).length && !(r.destCountries || []).length && !(r.destIpCategories || []).length &&
+        ((r.nwServices || []).some(x => String(x.id) === String(svc.id)) || (r.nwApplications || []).includes('QUIC'));
+      const broadAllow = (r, below) => live(r) && (r.order || 0) < below && /^ALLOW/.test(r.action || '') && !scopedBy(r).length && !(r.nwServices || []).length && !(r.nwApplications || []).length && !(r.destCountries || []).length && !(r.destIpCategories || []).length;
+      const existingBlock = rules.filter(blocksQuic).sort((a, b) => a.order - b.order).find(r => !rules.some(x => broadAllow(x, r.order)));
+      if (existingBlock && (!ex || ex.state === 'DISABLED')) {
+        rec({ category: 'Firewall Filtering', name: existingBlock.name, action: 'NO_CHANGE', note: `QUIC is already blocked by "${existingBlock.name}" (order ${existingBlock.order}); no separate AI Guard rule is added.` });
+        throw Object.assign(new Error('reused'), { reused: true });
+      }
       const want = { name: N.quic, order: 1, rank: 7, state: 'ENABLED', action: 'BLOCK_ICMP', nwServices: [{ id: svc.id }], description: 'Drop QUIC (UDP 443) so AI apps use TLS over TCP, which ZIA inspects and chains to AI Guard. Created by the ZTP Policy Wizard.' };
       if (!ex) {
         if (!dryRun) { const c = await client.apiCall('POST', '/api/v1/firewallFilteringRules', want); undo.push({ op: 'DELETE', path: `/api/v1/firewallFilteringRules/${c.id}`, label: `Firewall: ${N.quic}` }); }
@@ -224,7 +236,7 @@ async function runAiGuard(client, input, { dryRun, logger } = {}) {
         if (!dryRun) { undo.push({ op: 'PUT', path: `/api/v1/firewallFilteringRules/${ex.id}`, body: ex, label: `Firewall: ${N.quic}` }); await client.apiCall('PUT', `/api/v1/firewallFilteringRules/${ex.id}`, { ...ex, ...want, order: ex.order, id: ex.id }); }
         rec({ category: 'Firewall Filtering', name: N.quic, action: 'UPDATE', changes: ['action', 'nwServices', 'state'] });
       }
-    } catch (e) { rec({ category: 'Firewall Filtering', name: N.quic, action: 'FAILED', error: e.message }); }
+    } catch (e) { if (!e.reused) rec({ category: 'Firewall Filtering', name: N.quic, action: 'FAILED', error: e.message }); }
   }
 
   // 6. SSL: inspect the AI apps, above the Microsoft 365 one-click bypass and Zscaler's exemptions
@@ -235,6 +247,19 @@ async function runAiGuard(client, input, { dryRun, logger } = {}) {
       const ex = rules.find(r => r.name === N.ssl);
       // the rule only matches the AI destination group, so it goes first: no bypass rule (custom or predefined) can catch the AI apps before it
       const firstNoDecrypt = rules.filter(r => r !== ex && r.action && r.action.type === 'DO_NOT_DECRYPT' && r.state !== 'DISABLED').sort((a, b) => a.order - b.order)[0];
+      if (domains.some(d => /substrate|copilot/.test(d))) followUps.push('Microsoft 365 Copilot also needs WebSocket inspection: ask Zscaler Support to enable it for the tenant.');
+      // v2.9: an inspect-everything rule that already sits above every Do Not Decrypt rule covers the AI apps too: reuse it.
+      // Usually there is none, because the SSL catch-all belongs at the bottom, below the Microsoft 365 one-click bypass.
+      {
+        const { scopedBy } = require('./shadow');
+        const blank = (v) => !v || (Array.isArray(v) && !v.length);
+        const inspectAll = rules.find(r => r !== ex && !r.predefined && r.state !== 'DISABLED' && r.action && r.action.type === 'DECRYPT' && !scopedBy(r).length &&
+          blank(r.urlCategories) && blank(r.cloudApplications) && blank(r.destIpGroups) && (!firstNoDecrypt || r.order < firstNoDecrypt.order));
+        if (inspectAll && !ex) {
+          rec({ category: 'SSL Inspection', name: inspectAll.name, action: 'NO_CHANGE', note: `"${inspectAll.name}" already inspects all traffic above every Do Not Decrypt rule, so the AI apps are inspected; no separate AI Guard rule is added.` });
+          throw Object.assign(new Error('reused'), { reused: true });
+        }
+      }
       const targetOrder = rules.length ? 1 : Infinity;
       const body = { name: N.ssl, description: 'Decrypt AI apps (ChatGPT, Microsoft 365 Copilot, Claude, Gemini…) so ZIA can chain them to AI Guard. Must stay above the Office 365 One Click rule. Created by the ZTP Policy Wizard.',
         state: 'ENABLED', rank: 7, roadWarriorForKerberos: false, destIpGroups: [{ id: group.id, name: group.name }],
@@ -264,8 +289,7 @@ async function runAiGuard(client, input, { dryRun, logger } = {}) {
           rec({ category: 'SSL Inspection', name: N.ssl, action: 'UPDATE', changes: [!above && 'order', !okBody && 'action / destination group'].filter(Boolean) });
         }
       }
-      if (domains.some(d => /substrate|copilot/.test(d))) followUps.push('Microsoft 365 Copilot also needs WebSocket inspection: ask Zscaler Support to enable it for the tenant.');
-    } catch (e) { rec({ category: 'SSL Inspection', name: N.ssl, action: 'FAILED', error: e.message }); }
+    } catch (e) { if (!e.reused) rec({ category: 'SSL Inspection', name: N.ssl, action: 'FAILED', error: e.message }); }
   }
 
   // 7. Gen AI prompt capture for the chosen apps (needs the Gen AI Security licence)
