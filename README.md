@@ -1,4 +1,4 @@
-# 🐼 ZeroTrustPanda — ZTP Policy Wizard v2.8.0
+# 🐼 ZeroTrustPanda — ZTP Policy Wizard v2.9.0
 
 Proof-of-value automation for Zscaler SEs: Zscaler Internet Access (ZIA), Zscaler Client Connector (ZCC), Zscaler Private Access (ZPA) and Zscaler Digital Experience (ZDX), all with one set of OneAPI (ZIdentity) client credentials.
 
@@ -8,9 +8,9 @@ No Node.js, no npm, nothing to install. Click your download, unzip it, and doubl
 
 | Computer | Download (click to download) |
 |---|---|
-| **Mac with Apple silicon (M1–M4)** | [**ZTP-Wizard-2.8.0-macos-arm64.zip**](https://github.com/ZeroTrustPanda/ZTP-Policy-Wizard/raw/standalone/standalone/release/ZTP-Wizard-2.8.0-macos-arm64.zip) |
-| Windows 10/11 (64-bit) | [ZTP-Wizard-2.8.0-windows-x64.zip](https://github.com/ZeroTrustPanda/ZTP-Policy-Wizard/raw/standalone/standalone/release/ZTP-Wizard-2.8.0-windows-x64.zip) |
-| Intel Mac | [ZTP-Wizard-2.8.0-macos-x64.zip](https://github.com/ZeroTrustPanda/ZTP-Policy-Wizard/raw/standalone/standalone/release/ZTP-Wizard-2.8.0-macos-x64.zip) |
+| **Mac with Apple silicon (M1–M4)** | [**ZTP-Wizard-2.9.0-macos-arm64.zip**](https://github.com/ZeroTrustPanda/ZTP-Policy-Wizard/raw/standalone/standalone/release/ZTP-Wizard-2.9.0-macos-arm64.zip) |
+| Windows 10/11 (64-bit) | [ZTP-Wizard-2.9.0-windows-x64.zip](https://github.com/ZeroTrustPanda/ZTP-Policy-Wizard/raw/standalone/standalone/release/ZTP-Wizard-2.9.0-windows-x64.zip) |
+| Intel Mac | [ZTP-Wizard-2.9.0-macos-x64.zip](https://github.com/ZeroTrustPanda/ZTP-Policy-Wizard/raw/standalone/standalone/release/ZTP-Wizard-2.9.0-macos-x64.zip) |
 
 The wizard starts on `http://127.0.0.1:3000` (or the next free port), opens your browser, and keeps your API credentials on your computer. Logs go to `ZTP-Wizard/logs` in your home folder.
 
@@ -18,11 +18,16 @@ The wizard starts on `http://127.0.0.1:3000` (or the next free port), opens your
 - **Mac:** right-click `ZTP-Wizard` → *Open* → *Open*. If macOS still refuses, run `xattr -d com.apple.quarantine ZTP-Wizard` in the unzipped folder. If it then reports "killed", also run `codesign --force --sign - ZTP-Wizard`.
 - **Windows:** SmartScreen → *More info* → *Run anyway*.
 
-These are the same features as the v2.8.0 server version on `main`. The UI is compiled ahead of time, with React and fonts built in, so it works without reaching any CDN; only the Zscaler API calls need the network.
+These are the same features as the v2.9.0 server version on `main`. The UI is compiled ahead of time, with React and fonts built in, so it works without reaching any CDN; only the Zscaler API calls need the network.
 
-**Release notes (2.0 → 2.8.0):** [docs/release-notes/v2.8.0.md](docs/release-notes/v2.8.0.md) · **Change log:** [CHANGELOG.md](CHANGELOG.md) · **Releases:** [GitHub releases](https://github.com/ZeroTrustPanda/ZTP-Policy-Wizard/releases)
+**Release notes (2.0 → 2.9.0):** [docs/release-notes/v2.9.0.md](docs/release-notes/v2.9.0.md) · **Change log:** [CHANGELOG.md](CHANGELOG.md) · **Releases:** [GitHub releases](https://github.com/ZeroTrustPanda/ZTP-Policy-Wizard/releases)
 
-## What's in 2.x (2.0 → 2.8.0)
+## What's in 2.x (2.0 → 2.9.0)
+
+- **No duplicate rules, custom block pages (2.9):**
+  - One outbound geo-block rule; the dry run lists rules left over from earlier runs (another baseline, a rule turned off, a renamed rule) with a Keep box each, Apply removes the rest and Undo puts them back.
+  - AI Guard reuses an existing QUIC block; overlaps inside a run fixed (ZTH eBook, UCaaS vs Allow-Collab, DoH, DLP order).
+  - Block Page & Logo: a theme builder for the block and caution pages (colours, font, words, support contact, extra CSS, preview), written through the API with Undo; any logo compressed to under 10 KB in the browser, placed on the pages and offered for the portal's Company Logo.
 
 - **Proof that holds up on a customer tenant (2.8):**
   - The dry run shows customer rules above the POV rules that decide their traffic first (certain matches only).
@@ -109,7 +114,7 @@ These are the same features as the v2.8.0 server version on `main`. The UI is co
   - A layout that fits any window size.
   - An update badge.
 
-The full feature list, by product and by version, is in the [release notes](docs/release-notes/v2.8.0.md).
+The full feature list, by product and by version, is in the [release notes](docs/release-notes/v2.9.0.md).
 
 ## 1.9 flows (still available)
 
@@ -303,6 +308,7 @@ The DLP module uses a **dictionary-first** approach:
 
 | Version | Changes |
 |---------|---------|
+| **2.9.0** | One outbound geo-block rule; leftover cleanup with Keep and Undo; AI Guard reuses an existing QUIC block; overlap fixes (ZTH eBook, UCaaS, DoH, DLP order); custom block and caution pages (theme builder, CSS, preview) and a logo compressed to under 10 KB. |
 | **2.8.0** | Shadow check; Prove it why-trace and expected result; posture score start/end; inspection coverage; tenant-aware apply, provenance tag, API budget, check after apply; combined DLP engines, SaaS and Email DLP; GLBA, SOC 2, ISO 27001, NIST CSF 2.0; Word downloads. Credits: Jason Smith, Mike Preissner. |
 | **2.7.0** | One compliance pane; Federal vertical and six federal profiles; every rule mapped or a stated reason; compliance pack per POV. |
 | **2.6.1** | Core ZIA prerequisites; Not licensed in the scope; Cloud Firewall Standard rule set; DNS tunnel rules need Advanced Firewall; ZDX tier choice. |

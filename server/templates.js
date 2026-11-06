@@ -308,7 +308,9 @@ function generateUrlFilteringRules(tier, complianceFramework, prefix = 'ZTP') {
 // FIREWALL TEMPLATES
 // ========================
 
-// Countries with high-risk remote-access traffic. Remote admin and file transfer protocols to or from them are dropped.
+// Countries with high-risk remote-access traffic. Remote admin and file transfer protocols to them are dropped.
+// v2.9: one outbound rule only. Inbound connections from the internet do not reach users through ZIA, so the old
+// "-FW-Geo-Block-In" rule never matched; the dry run lists it for removal on tenants that still have it.
 const HIGH_RISK_COUNTRIES = ['COUNTRY_CN', 'COUNTRY_RU', 'COUNTRY_KP', 'COUNTRY_IR'];
 const REMOTE_ACCESS_APPS = ['SSH', 'RDP', 'FTP'];
 function geoFirewallRules(prefix, tier, complianceFramework) {
@@ -317,10 +319,6 @@ function geoFirewallRules(prefix, tier, complianceFramework) {
     { name: `${prefix}-FW-Geo-Block-Out`, state: 'ENABLED', action: 'BLOCK_DROP',
       nwApplications: REMOTE_ACCESS_APPS.slice(), destCountries: HIGH_RISK_COUNTRIES.slice(),
       description: `Drop SSH, RDP and FTP to ${where}. Remote administration and file transfer to high-risk countries is a common exfiltration path.`,
-      tier, complianceMapping: mapToCompliance('fw_geo', complianceFramework) },
-    { name: `${prefix}-FW-Geo-Block-In`, state: 'ENABLED', action: 'BLOCK_DROP',
-      nwApplications: REMOTE_ACCESS_APPS.slice(), sourceCountries: HIGH_RISK_COUNTRIES.slice(),
-      description: `Drop SSH, RDP and FTP coming from ${where}.`,
       tier, complianceMapping: mapToCompliance('fw_geo', complianceFramework) }
   ];
 }
@@ -1233,10 +1231,11 @@ function generateZTHUrlFilteringRules(prefix = 'ZTP') {
     action: 'BLOCK',
     urlCategories: [
       'OTHER_SECURITY', 'ADWARE_OR_SPYWARE', 'ENCR_WEB_CONTENT',
-      'DYNAMIC_DNS', 'NEWLY_REVIVED_DOMAINS', 'NEWLY_REG_DOMAINS'
+      'DYNAMIC_DNS', 'NEWLY_REVIVED_DOMAINS'
     ],
     protocols: ['ANY_RULE'],
-    description: 'Blocks critical security risk categories including spyware, adware, newly registered domains, and dynamic DNS hosts.',
+    // v2.9: newly registered domains are cautioned by Caution-New-Domains below; blocking them here as well meant the caution never showed
+    description: 'Blocks critical security risk categories: spyware, adware, encrypted web content, newly revived domains and dynamic DNS hosts. Newly registered domains get a caution page (next rule).',
     tier: 'ZTH_EBOOK'
   });
 
@@ -1258,9 +1257,9 @@ function generateZTHUrlFilteringRules(prefix = 'ZTP') {
     order: order++,
     state: 'ENABLED',
     action: 'CAUTION',
-    urlCategories: ['NEWLY_REG_DOMAINS', 'NEWLY_REVIVED_DOMAINS'],
+    urlCategories: ['NEWLY_REG_DOMAINS'],
     protocols: ['ANY_RULE'],
-    description: 'Display end-user notification for newly registered or revived domains. Allows user to proceed after acknowledging phishing risk warning.',
+    description: 'Display end-user notification for newly registered domains. Allows user to proceed after acknowledging phishing risk warning. Newly revived domains are blocked by Block-Security-Globally.',
     tier: 'ZTH_EBOOK'
   });
 
@@ -1282,9 +1281,9 @@ function generateZTHUrlFilteringRules(prefix = 'ZTP') {
     order: order++,
     state: 'ENABLED',
     action: 'BLOCK',
-    urlCategories: ['REMOTE_ACCESS', 'ANONYMIZER'],
+    urlCategories: ['REMOTE_ACCESS'],
     protocols: ['ANY_RULE'],
-    description: 'Blocks unauthorized remote access tools commonly exploited in ransomware attacks. IT support staff can override via ZIA admin portal.',
+    description: 'Blocks unauthorized remote access tools commonly exploited in ransomware attacks. IT support staff can override via ZIA admin portal. Anonymizers are blocked by Block-Legal-Liability.',
     tier: 'ZTH_EBOOK'
   });
 
@@ -1747,18 +1746,18 @@ const GRANULAR_CAC_RULES = [
     description: 'Google Drive, Dropbox and Box: users can open and download files but cannot upload, edit or share. Every other file-sharing app falls through to the file-sharing rule below.' },
   { key: 'CAC-Social-ViewNoPost', type: 'SOCIAL_NETWORKING', applications: ['FACEBOOK', 'TWITTER'],
     actions: ['ALLOW_SOCIAL_NETWORKING_VIEW', 'BLOCK_SOCIAL_NETWORKING_POST'],
-    description: 'Facebook and X: reading is allowed, posting is blocked.' },
+    description: 'Exception for Facebook and X: reading is allowed, posting is blocked. Sits above the social networking rule on purpose; other social apps fall through to it.' },
   { key: 'CAC-LinkedIn-ReadOnly', type: 'SOCIAL_NETWORKING', applications: ['LINKEDIN'],
     actions: ['ALLOW_SOCIAL_NETWORKING_VIEW', 'BLOCK_SOCIAL_NETWORKING_POST', 'BLOCK_SOCIAL_NETWORKING_COMMENT', 'BLOCK_SOCIAL_NETWORKING_SHARE', 'BLOCK_SOCIAL_NETWORKING_UPLOAD'],
     fallbackActions: ['ALLOW_SOCIAL_NETWORKING_VIEW', 'BLOCK_SOCIAL_NETWORKING_POST'],
-    description: 'LinkedIn: browsing and recruiting research allowed; posting, commenting, sharing and uploading are blocked.' },
+    description: 'LinkedIn: browsing and recruiting research allowed; posting, commenting, sharing and uploading are blocked. Exception that sits above the social networking rule on purpose.' },
   { key: 'CAC-GenAI-NoUpload', type: 'AI_ML', applications: ['CHATGPT_AI', 'GOOGLE_GEMINI', 'MICROSOFT_COPILOT'],
     actions: ['ALLOW_AI_ML_WEB_USE', 'DENY_AI_ML_UPLOAD'],
-    description: 'ChatGPT, Gemini and Copilot: prompts are allowed (and captured by AI Prompt Capture), file uploads are blocked.' },
+    description: 'ChatGPT, Gemini and Copilot: prompts are allowed (and captured by AI Prompt Capture), file uploads are blocked. Exception that sits above the AI/ML rule on purpose; other AI apps fall through to it.' },
   { key: 'CAC-Slack-NoFileUpload', type: 'ENTERPRISE_COLLABORATION', applications: ['SLACK'],
     actions: ['ALLOW_ENTERPRISE_COLLABORATION_CHAT', 'BLOCK_ENTERPRISE_COLLABORATION_UPLOAD'],
     fallbackActions: ['BLOCK_ENTERPRISE_COLLABORATION_UPLOAD'],
-    description: 'Slack: chat is allowed, file uploads are blocked.' }
+    description: 'Slack: chat is allowed, file uploads are blocked. Exception that sits above the collaboration rule on purpose; other collaboration apps fall through to it.' }
 ];
 
 function generateCloudAppControlRules(tier, complianceFramework, prefix = 'ZTP') {

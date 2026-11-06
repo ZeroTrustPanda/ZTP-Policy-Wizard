@@ -1,8 +1,17 @@
 # Changelog
 
-## v2.0.0 → v2.8.0 — 2026-10-19 to 2026-10-30
+## v2.0.0 → v2.9.0 — 2026-10-19 to 2026-11-06
 
-Release notes for the whole 2.x line: [docs/release-notes/v2.8.0.md](docs/release-notes/v2.8.0.md).
+Release notes for the whole 2.x line: [docs/release-notes/v2.9.0.md](docs/release-notes/v2.9.0.md).
+
+### 2.9.0
+- **Geo-block** (`templates.js`): `geoFirewallRules` makes one outbound rule (`-FW-Geo-Block-Out`); `-FW-Geo-Block-In` and its compliance-map entry removed.
+- **Leftover cleanup** (`ZiaEngine.cleanup`, `runZia({ cleanup })`): after the upserts, every rule list the run worked on (`rulePaths`) is checked for rules named `<prefix>-…` that are not in this run's ledger (default, predefined and `<prefix>-AIG-…` rules excluded). Dry run: `DELETE` rows with `leftover: true`. Apply: `keepLeftovers` (`"category|name"`, not part of the plan hash: keeping only removes deletions) → `KEPT`; others are deleted and recorded in Undo as `POST` with the full body. Tagged rules with another prefix produce a warning only. Opt-in: only the ZIA plan / apply / verify calls pass `cleanup` (drift check does not). Write forecast counts deletions.
+- **Snapshots:** `POST` undo steps send their body (`CREATE AGAIN` / `CREATED AGAIN` in the results).
+- **AI Guard** (`aiguard.js`): step 5 reuses an enabled, unscoped, non-predefined firewall rule that blocks QUIC (network service or application) with no broad allow above it; step 6 reuses a non-predefined, unscoped DECRYPT rule with no criteria above every Do Not Decrypt rule. Reused rules show as `NO_CHANGE` with a note.
+- **Overlaps** (`frameworks.js` `dedupeOverlaps`): UCaaS apps out of Allow-Collab; DNS DoH rule dropped when CAC-Block-DoH is enabled. `zia-areas.js` orders DLP block rules bulk → combined → simple. ZTH eBook URL rules: NEWLY_REG_DOMAINS only in Caution-New-Domains, ANONYMIZER only in Block-Legal-Liability. CAC exception descriptions.
+- **End User Notifications** (`server/v2/eun.js`, `routes29.js`): `GET /api/v2/eun`, `POST /api/v2/eun/preview|plan|apply`. Theme → `<style>` + heading + message (+ inline logo) in `customText` / `cautionCustomText`; `displayReason`, `displayCompanyName`, `displayCompanyLogo`, `supportEmail`, `supportPhone`, `orgPolicyLink` written only when the tenant returns them. Validation: colours, font list, lengths, https policy link, CSS without markup / `@import` / `expression()` / remote `url()`, logo PNG/JPEG/GIF by magic bytes and ≤ 10 240 bytes. Uses `ZiaEngine.upsertSettings` (diff, Undo, activation); a refused PUT with the logo is retried without it. Warns when the tenant uses its own hosted page.
+- **UI:** Internet Access › Block Page & Logo (theme builder, in-browser logo compression with canvas, download for the portal, Advanced CSS, sandboxed preview iframe, dry run / apply); dry run Leftover panel with Keep boxes (guided POV and Internet Access POV).
 
 ### 2.8.0
 - **Shadow check** (`server/v2/shadow.js`): every planned rule body (the engine's new `planned` record) is compared with the customer's enabled rules above it in the same list (URL, Cloud Firewall, DNS, File Type, Cloud App Control per type, SSL). Shadowed / partial / duplicate (same outcome counts as duplicate); certain matches only; scoped rules counted, Zscaler-managed rules skipped. Returned by `POST /api/v2/zia/plan` as `shadow` and kept with the POV.
