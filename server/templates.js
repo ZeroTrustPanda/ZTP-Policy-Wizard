@@ -336,34 +336,13 @@ function generateFirewallRules(tier, complianceFramework, prefix = 'ZTP') {
     state: 'ENABLED',
     action: 'BLOCK_DROP',
     nwApplications: ['QUIC'],
-    description: 'Block QUIC to force TCP for SSL inspectability.',
+    placeFirst: true,   // v2.10: rule 1, above Zscaler's predefined firewall rules
+    description: 'Block QUIC to force TCP for SSL inspectability. Kept at the top of the firewall policy.',
     tier,
     complianceMapping: mapToCompliance('fw_quic', complianceFramework)
   });
 
-  // Allow core web + DNS + auth traffic
-  rules.push({
-    name: `${prefix}-Allow-Web`,
-    order: order++,
-    state: 'ENABLED',
-    action: 'ALLOW',
-    nwApplications: ['HTTP', 'HTTPS', 'HTTP2', 'DNS', 'SSL'],
-    description: 'Allow HTTP, HTTPS, HTTP2, DNS, and SSL traffic.',
-    tier,
-    complianceMapping: mapToCompliance('fw_allow_web', complianceFramework)
-  });
 
-  // Allow NTP
-  rules.push({
-    name: `${prefix}-Allow-NTP`,
-    order: order++,
-    state: 'ENABLED',
-    action: 'ALLOW',
-    nwApplications: ['NTP'],
-    description: 'Allow NTP for time synchronization.',
-    tier,
-    complianceMapping: mapToCompliance('fw_ntp', complianceFramework)
-  });
 
   // Allow collaboration (Teams, Zoom, WebEx, etc.)
   rules.push({
@@ -441,10 +420,24 @@ function generateFirewallRules(tier, complianceFramework, prefix = 'ZTP') {
 // SSL INSPECTION TEMPLATES
 // ========================
 
+// v2.10: Microsoft 365 Copilot is decrypted by its own rule at the top of SSL Inspection, above Zscaler's auto-created
+// Office 365 one-click bypass (which would otherwise exempt it). Matched by a wildcard destination group of Copilot's own
+// domains (the same list AI Guard uses); the rest of Microsoft 365 stays under the one-click bypass.
+const COPILOT_DOMAINS = ['.copilot.microsoft.com', 'copilot.microsoft.com', '.substrate.office.com', '.substrate.svc.cloud.microsoft', '.augloop.office.com',
+  'copilot.cloud.microsoft', '.copilot.cloud.microsoft', 'www.copilot.com'];
+function copilotSslRule(prefix, tier, complianceFramework) {
+  return {
+    name: `${prefix}-SSL-Inspect-Copilot`, state: 'ENABLED', action: 'DECRYPT', placeFirst: true, copilotDomains: COPILOT_DOMAINS.slice(),
+    description: 'Inspect Microsoft Copilot (copilot.microsoft.com, Microsoft 365 Copilot substrate and augloop). Rule 1, above the Office 365 one-click bypass, so Copilot prompts are inspected while the rest of Microsoft 365 stays exempt.',
+    tier, minClientTLS: 'CLIENT_TLS_1_2', minServerTLS: 'SERVER_TLS_1_2', complianceMapping: mapToCompliance('ssl_inspect_all', complianceFramework)
+  };
+}
+
 function generateSslInspectionRules(tier, complianceFramework, prefix = 'ZTP') {
   const rules = [];
   let order = 1;
 
+  if (tier === 'STRICT' || tier === 'BALANCED') rules.push({ ...copilotSslRule(prefix, tier, complianceFramework), order: order++ });
   if (tier === 'STRICT') {
     // Inspect everything
     rules.push({
@@ -1365,29 +1358,12 @@ function generateZTHFirewallRules(prefix = 'ZTP') {
     state: 'ENABLED',
     action: 'BLOCK_DROP',
     nwApplications: ['QUIC'],
-    description: 'Block QUIC to force TCP for SSL inspectability.',
+    placeFirst: true,   // v2.10: rule 1, above Zscaler's predefined firewall rules
+    description: 'Block QUIC to force TCP for SSL inspectability. Kept at the top of the firewall policy.',
     tier: 'ZTH_EBOOK'
   });
 
-  rules.push({
-    name: `${prefix}-Allow-Web`,
-    order: order++,
-    state: 'ENABLED',
-    action: 'ALLOW',
-    nwApplications: ['HTTP', 'HTTPS', 'HTTP2', 'DNS', 'SSL'],
-    description: 'Allow HTTP, HTTPS, HTTP2, DNS, and SSL traffic.',
-    tier: 'ZTH_EBOOK'
-  });
 
-  rules.push({
-    name: `${prefix}-Allow-NTP`,
-    order: order++,
-    state: 'ENABLED',
-    action: 'ALLOW',
-    nwApplications: ['NTP'],
-    description: 'Allow NTP for time synchronization.',
-    tier: 'ZTH_EBOOK'
-  });
 
   rules.push({
     name: `${prefix}-Allow-Collab`,
@@ -1440,6 +1416,7 @@ function generateZTHSslInspectionRules(prefix = 'ZTP') {
   let order = 1;
 
   // 1. Exclude Finance, Health, Government
+  rules.push({ ...copilotSslRule(prefix, 'ZTH_EBOOK', null), order: order++ });
   rules.push({
     name: `${prefix}-SSL-Excl-Fin-Hlth-Gov`,
     order: order++,
@@ -1735,25 +1712,43 @@ function generateFileTypeControlRules(tier, complianceFramework, prefix = 'ZTP')
 // API: POST /api/v1/webApplicationRules/:rule_type
 // ========================
 
-// App-specific Cloud App Control rules that show granular controls (view but not upload / post).
-// They come first in their rule type, so they win over the category-wide rules further down.
+// App-specific Cloud App Control rules with granular controls (view but not upload / post), one rule per app so each app's
+// actions can be chosen on its own (v2.10). They come first in their rule type, so they win over the category-wide rules below.
 // App enums and actions were read from ZTH with /cloudApplications/policy and /webApplicationRules/{type}/availableActions.
 // fallbackActions: used when the tenant rejects the first set (re-runs accept either set as No change).
-const GRANULAR_CAC_RULES = [
-  { key: 'CAC-FileShare-ViewOnly', type: 'FILE_SHARE', applications: ['GDRIVE', 'DROPBOX', 'BOXNET'],
-    actions: ['ALLOW_FILE_SHARE_VIEW', 'DENY_FILE_SHARE_UPLOAD'],
-    fallbackActions: ['ALLOW_FILE_SHARE_DOWNLOAD', 'DENY_FILE_SHARE_CREATE', 'DENY_FILE_SHARE_EDIT', 'DENY_FILE_SHARE_SHARE'],
-    description: 'Google Drive, Dropbox and Box: users can open and download files but cannot upload, edit or share. Every other file-sharing app falls through to the file-sharing rule below.' },
-  { key: 'CAC-Social-ViewNoPost', type: 'SOCIAL_NETWORKING', applications: ['FACEBOOK', 'TWITTER'],
-    actions: ['ALLOW_SOCIAL_NETWORKING_VIEW', 'BLOCK_SOCIAL_NETWORKING_POST'],
-    description: 'Exception for Facebook and X: reading is allowed, posting is blocked. Sits above the social networking rule on purpose; other social apps fall through to it.' },
-  { key: 'CAC-LinkedIn-ReadOnly', type: 'SOCIAL_NETWORKING', applications: ['LINKEDIN'],
+// actions: null = no rule unless actions are chosen in the wizard (the app falls through to the category rule).
+const SOCIAL_VIEW_NO_POST = ['ALLOW_SOCIAL_NETWORKING_VIEW', 'BLOCK_SOCIAL_NETWORKING_POST'];
+const AI_NO_UPLOAD = ['ALLOW_AI_ML_WEB_USE', 'DENY_AI_ML_UPLOAD'];
+const FS_VIEW_ONLY = ['ALLOW_FILE_SHARE_VIEW', 'DENY_FILE_SHARE_UPLOAD'];
+const FS_VIEW_ONLY_FALLBACK = ['ALLOW_FILE_SHARE_DOWNLOAD', 'DENY_FILE_SHARE_CREATE', 'DENY_FILE_SHARE_EDIT', 'DENY_FILE_SHARE_SHARE'];
+const CAC_APPS = [
+  { app: 'FACEBOOK', key: 'CAC-App-Facebook', label: 'Facebook', type: 'SOCIAL_NETWORKING', actions: SOCIAL_VIEW_NO_POST,
+    description: 'Facebook: reading is allowed, posting is blocked.' },
+  { app: 'TWITTER', key: 'CAC-App-X', label: 'X (Twitter)', type: 'SOCIAL_NETWORKING', actions: SOCIAL_VIEW_NO_POST,
+    description: 'X (Twitter): reading is allowed, posting is blocked.' },
+  { app: 'LINKEDIN', key: 'CAC-App-LinkedIn', label: 'LinkedIn', type: 'SOCIAL_NETWORKING',
     actions: ['ALLOW_SOCIAL_NETWORKING_VIEW', 'BLOCK_SOCIAL_NETWORKING_POST', 'BLOCK_SOCIAL_NETWORKING_COMMENT', 'BLOCK_SOCIAL_NETWORKING_SHARE', 'BLOCK_SOCIAL_NETWORKING_UPLOAD'],
-    fallbackActions: ['ALLOW_SOCIAL_NETWORKING_VIEW', 'BLOCK_SOCIAL_NETWORKING_POST'],
-    description: 'LinkedIn: browsing and recruiting research allowed; posting, commenting, sharing and uploading are blocked. Exception that sits above the social networking rule on purpose.' },
-  { key: 'CAC-GenAI-NoUpload', type: 'AI_ML', applications: ['CHATGPT_AI', 'GOOGLE_GEMINI', 'MICROSOFT_COPILOT'],
-    actions: ['ALLOW_AI_ML_WEB_USE', 'DENY_AI_ML_UPLOAD'],
-    description: 'ChatGPT, Gemini and Copilot: prompts are allowed (and captured by AI Prompt Capture), file uploads are blocked. Exception that sits above the AI/ML rule on purpose; other AI apps fall through to it.' },
+    fallbackActions: SOCIAL_VIEW_NO_POST,
+    description: 'LinkedIn: browsing and recruiting research allowed; posting, commenting, sharing and uploading are blocked.' },
+  { app: 'CHATGPT_AI', key: 'CAC-App-ChatGPT', label: 'ChatGPT', type: 'AI_ML', actions: AI_NO_UPLOAD,
+    description: 'ChatGPT: prompts are allowed (and captured by AI Prompt Capture), file uploads are blocked.' },
+  { app: 'MICROSOFT_COPILOT', key: 'CAC-App-Copilot', label: 'Microsoft Copilot', type: 'AI_ML', actions: AI_NO_UPLOAD,
+    description: 'Microsoft Copilot: prompts are allowed (and captured by AI Prompt Capture), file uploads are blocked.' },
+  { app: 'GOOGLE_GEMINI', key: 'CAC-App-Gemini', label: 'Google Gemini', type: 'AI_ML', actions: AI_NO_UPLOAD,
+    description: 'Gemini: prompts are allowed (and captured by AI Prompt Capture), file uploads are blocked.' },
+  { app: 'CLAUDE_AI', key: 'CAC-App-Claude', label: 'Claude', type: 'AI_ML', actions: null,
+    description: 'Claude: only created when you choose its actions; otherwise it follows the AI/ML rule below.' },
+  { app: 'GDRIVE', key: 'CAC-App-GDrive', label: 'Google Drive', type: 'FILE_SHARE', actions: FS_VIEW_ONLY, fallbackActions: FS_VIEW_ONLY_FALLBACK,
+    description: 'Google Drive: users can open and download files but cannot upload, edit or share.' },
+  { app: 'DROPBOX', key: 'CAC-App-Dropbox', label: 'Dropbox', type: 'FILE_SHARE', actions: FS_VIEW_ONLY, fallbackActions: FS_VIEW_ONLY_FALLBACK,
+    description: 'Dropbox: users can open and download files but cannot upload, edit or share.' },
+  { app: 'BOXNET', key: 'CAC-App-Box', label: 'Box', type: 'FILE_SHARE', actions: FS_VIEW_ONLY, fallbackActions: FS_VIEW_ONLY_FALLBACK,
+    description: 'Box: users can open and download files but cannot upload, edit or share.' }
+];
+const CATEGORY_RULE = { SOCIAL_NETWORKING: 'social networking', AI_ML: 'AI/ML', FILE_SHARE: 'file-sharing' };
+const GRANULAR_CAC_RULES = [
+  ...CAC_APPS.map(a => ({ key: a.key, type: a.type, applications: [a.app], actions: a.actions, fallbackActions: a.fallbackActions, appId: a.app, appLabel: a.label,
+    description: `${a.description} Exception that sits above the ${CATEGORY_RULE[a.type]} rule on purpose; other apps fall through to it.` })),
   { key: 'CAC-Slack-NoFileUpload', type: 'ENTERPRISE_COLLABORATION', applications: ['SLACK'],
     actions: ['ALLOW_ENTERPRISE_COLLABORATION_CHAT', 'BLOCK_ENTERPRISE_COLLABORATION_UPLOAD'],
     fallbackActions: ['BLOCK_ENTERPRISE_COLLABORATION_UPLOAD'],
@@ -1772,8 +1767,9 @@ function generateCloudAppControlRules(tier, complianceFramework, prefix = 'ZTP')
       type: g.type,
       ruleType: g.type,
       applications: g.applications.slice(),
-      actions: g.actions.slice(),
+      actions: g.actions ? g.actions.slice() : [],
       ...(g.fallbackActions ? { fallbackActions: g.fallbackActions.slice() } : {}),
+      ...(g.appId ? { appId: g.appId, appLabel: g.appLabel, appOptional: !g.actions } : {}),
       granular: true,
       description: g.description,
       tier,
@@ -1954,7 +1950,8 @@ const ACTION_POLICY_TYPES = {
 };
 
 // Rules that keep the internet working; flipping them to Block would cut off all users.
-const LOCKED_RULE_SUFFIXES = new Set(['Allow-Web', 'Allow-NTP']);
+// v2.10: Allow-Web and Allow-NTP are gone (Zscaler's default proxy-traffic and Recommended firewall rules cover them)
+const LOCKED_RULE_SUFFIXES = new Set([]);
 
 // Cloud App Control action bases that use DENY_ instead of BLOCK_ (from the
 // webApplicationRules action enum in the Automation Hub docs).
@@ -2349,6 +2346,7 @@ function generateChecklist(template) {
 }
 
 module.exports = {
+  CAC_APPS,
   ACTION_POLICY_TYPES,
   RULE_POLICY_TYPES,
   ruleKey,

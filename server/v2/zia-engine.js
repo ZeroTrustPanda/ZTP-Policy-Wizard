@@ -158,6 +158,12 @@ class ZiaEngine {
       const changes = diff(want, existing);
       // A catch-all rule that is no longer last (e.g. it sits above Zscaler's predefined rules) is moved to the bottom.
       let moveTo = null;
+      // v2.10: a rule that belongs at the top (Block-QUIC, Inspect Copilot) is moved back to order 1
+      // ("at the top" = above every Zscaler predefined rule, so a second top rule such as AI Guard's does not make it move back and forth)
+      if (spec.placeFirst && existing.order !== undefined && existing.order !== 1) {
+        const pre = (this.cache[spec.listPath] || []).filter(o => o && o.predefined && !o.defaultRule && o.id !== existing.id).map(o => o.order || 0);
+        if (pre.length ? existing.order > Math.min(...pre) : true) { moveTo = 1; changes.push(`order (${existing.order} → 1)`); }
+      }
       if (spec.placeLast) {
         const others = (this.cache[spec.listPath] || []).filter(o => o && !o.defaultRule && o.id !== existing.id && o.order !== undefined);
         const max = Math.max(0, ...others.map(o => o.order));
@@ -190,17 +196,29 @@ class ZiaEngine {
       }
     }
     if (this.dryRun) {
-      if (spec.build && !spec.placeLast) await this.nextOrder(spec.orderPath || spec.listPath, spec.orderOpts);
+      if (spec.build && !spec.placeLast && !spec.placeFirst) await this.nextOrder(spec.orderPath || spec.listPath, spec.orderOpts);
       return this.record({ category, name, action: 'CREATE', id: `new:${++this.seq}` });
     }
     let takenOrder;
     const orderPath = spec.orderPath || spec.listPath;
     try {
       let created;
-      if (spec.build) takenOrder = spec.placeLast ? await this.lastOrder(orderPath) : await this.nextOrder(orderPath, spec.orderOpts);
+      if (spec.build) takenOrder = spec.placeFirst ? 1 : spec.placeLast ? await this.lastOrder(orderPath) : await this.nextOrder(orderPath, spec.orderOpts);
       const createBody = spec.build ? clampDescription(spec.build(takenOrder)) : clampDescription(body);
       try { created = await this.client.apiCall('POST', spec.createPath, createBody); }
-      catch (e) {
+      catch (e0) {
+        let e = e0;
+        // v2.10: a tenant that does not allow a custom rule at order 1 gets it right after its predefined rules
+        if (spec.placeFirst && /not allowed at order/i.test(String(e0.message))) {
+          const all = (this.cache[spec.listPath] || []).filter(x => x && !x.defaultRule);
+          const after = Math.max(0, ...all.filter(x => x.predefined).map(x => x.order || 0)) + 1;
+          try {
+            created = await this.client.apiCall('POST', spec.createPath, { ...createBody, order: after });
+            this.warnings.push(`${name}: ZIA did not allow it at the top, so it was placed after the predefined rules (order ${after}). Move it to the top in the ZIA portal.`);
+            e = null;
+          } catch (e1) { e = e1; }
+        }
+        if (e) {
         // v2.8: a create that timed out may still have been made. Look for it by name before trying again, so it is never made twice.
         if (/Request timeout/.test(String(e.message))) {
           this.cache[spec.listPath] = null;
@@ -219,13 +237,15 @@ class ZiaEngine {
         if (retry.warning) this.warnings.push(`${name}: ${retry.warning}`);
         created = await this.client.apiCall('POST', spec.createPath, retry.body);
         }
+        }
       }
+      if (spec.placeFirst) { const k = `order:${orderPath}`; if (typeof this.cache[k] === 'number') this.cache[k]++; }   // everything below moved down one
       this.wrote = true;
       if (created && created.id !== undefined) this.undo.push({ op: 'DELETE', path: spec.updatePath(created.id), label: `${category}: ${name}` });
       this.cache[spec.listPath] = null;
       return this.record({ category, name, action: 'CREATE', id: created && (created.id !== undefined ? created.id : created.configuredName) });
     } catch (e) {
-      if (takenOrder !== undefined && !spec.placeLast) this.releaseOrder(orderPath, takenOrder);
+      if (takenOrder !== undefined && !spec.placeLast && !spec.placeFirst) this.releaseOrder(orderPath, takenOrder);
       return this.record({ category, name, action: 'FAILED', error: e.message });
     }
   }
@@ -326,7 +346,7 @@ function firewallBody(rule, order) {
 /** A rule with no category or app scope (urlCategories empty or ['ANY']) catches all remaining traffic. */
 function isSslCatchAll(rule) {
   const cats = rule.urlCategories || [];
-  return (!cats.length || (cats.length === 1 && cats[0] === 'ANY')) && !(rule.cloudApplications || []).length && rule.placeLast !== false;
+  return (!cats.length || (cats.length === 1 && cats[0] === 'ANY')) && !(rule.cloudApplications || []).length && !(rule.copilotDomains || []).length && !(rule.destIpGroups || []).length && !rule.placeFirst && rule.placeLast !== false;
 }
 function sslBody(rule, order) {
   const decrypt = rule.action === 'INSPECT' || rule.action === 'DECRYPT';
@@ -338,6 +358,7 @@ function sslBody(rule, order) {
     : { type: 'DO_NOT_DECRYPT', doNotDecryptSubActions: { serverCertificates: 'ALLOW', bypassOtherPolicies: false, ocspCheck: false, blockSslTrafficWithNoSniEnabled: false },
         showEUN: false, showEUNATP: false, overrideDefaultCertificate: false };
   if (rule.urlCategories && rule.urlCategories.length && !(rule.urlCategories.length === 1 && rule.urlCategories[0] === 'ANY')) b.urlCategories = rule.urlCategories;
+  if (Array.isArray(rule.destIpGroups) && rule.destIpGroups.length) b.destIpGroups = rule.destIpGroups.map(g => ({ id: g.id, name: g.name }));
   if (decrypt && rule.sslInterceptionCert && rule.sslInterceptionCert.id !== undefined) {
     b.action.overrideDefaultCertificate = true;
     b.action.sslInterceptionCert = { id: rule.sslInterceptionCert.id, name: rule.sslInterceptionCert.name };
@@ -444,18 +465,27 @@ async function runZia(client, template, { dryRun, logger, cleanup = null }) {
       eng.record({ category: 'Cloud Firewall', name: r.name, action: 'SKIPPED', error: 'None of its network services could be found or created.' }); continue;
     }
     await eng.upsert({ category: 'Cloud Firewall', name: r.name, listPath: '/api/v1/firewallFilteringRules', createPath: '/api/v1/firewallFilteringRules',
-      updatePath: id => `/api/v1/firewallFilteringRules/${id}`, orderPath: '/api/v1/firewallFilteringRules', build: order => firewallBody(r, order) });
+      updatePath: id => `/api/v1/firewallFilteringRules/${id}`, orderPath: '/api/v1/firewallFilteringRules', build: order => firewallBody(r, order), placeFirst: !!r.placeFirst });
   }
   if (P.sslInspection) {
     let sslLast = null;
+    // v2.10: the Copilot rule matches a wildcard destination group of Copilot's domains, created or updated first
+    for (const r of P.sslInspection.filter(x => (x.copilotDomains || []).length)) {
+      const gname = `${String(r.name).replace(/-SSL-Inspect-Copilot$/, '')}-Copilot-Domains`;
+      const g = await eng.upsert({ category: 'Destination Group', name: gname, listPath: '/api/v1/ipDestinationGroups', createPath: '/api/v1/ipDestinationGroups',
+        updatePath: id => `/api/v1/ipDestinationGroups/${id}`, body: { name: gname, type: 'DSTN_DOMAIN', addresses: r.copilotDomains.slice(), description: 'Microsoft Copilot domains, inspected above the Office 365 one-click bypass. Created by the ZTP Policy Wizard.' } });
+      if (g.action === 'FAILED') { r.skipReason = `Its destination group ${gname} could not be created.`; continue; }
+      r.destIpGroups = [{ id: g.id, name: gname }];
+    }
     for (const r of P.sslInspection) {
+      if (r.skipReason && !dryRun) { eng.record({ category: 'SSL Inspection', name: r.name, action: 'SKIPPED', error: r.skipReason }); continue; }
       if (r.action !== 'INSPECT' && r.action !== 'DECRYPT' && Array.isArray(r.urlCategories) && r.urlCategories.length === 0) {
         eng.record({ category: 'SSL Inspection', name: r.name, action: 'SKIPPED', error: 'Do Not Inspect with no categories left would exempt all traffic.' }); continue;
       }
       await eng.upsert({ category: 'SSL Inspection', name: r.name, listPath: '/api/v1/sslInspectionRules', createPath: '/api/v1/sslInspectionRules',
         updatePath: id => `/api/v1/sslInspectionRules/${id}`, orderPath: '/api/v1/sslInspectionRules', orderOpts: { afterPredefined: true }, build: order => sslBody(r, order),
         // The catch-all (inspect everything remaining) goes last, below "Zscaler Recommended Exemptions" and the other predefined rules.
-        placeLast: isSslCatchAll(r),
+        placeLast: isSslCatchAll(r), placeFirst: !!r.placeFirst,
         createFallback: (e, body) => {
           if (!/not allowed at order/i.test(String(e.message))) return null;
           const all = eng.cache['/api/v1/sslInspectionRules'] || [];

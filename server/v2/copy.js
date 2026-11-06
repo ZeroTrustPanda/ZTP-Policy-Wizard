@@ -55,7 +55,7 @@ module.exports = {
     reauth: 'Automatically Attempt ZPA Reauthentication: on by default for Windows and macOS. Set per app profile (the profile stops following the global Platform Settings value).'
   },
   zpa: {
-    locationBanner: 'The App Connector Group is created in San Jose, CA. Change its location in the ZPA admin portal after the wizard so users are steered to the nearest connectors.',
+    locationBanner: 'Pick where the customer\'s App Connectors will run (the data center or cloud region nearest the apps). ZPA uses it to steer users to the nearest connectors. Re-running with another city moves the group there.',
     keyNote: 'The provisioning key is a secret. It is also retrievable later in the ZPA console (Configuration & Control › Private Infrastructure › Provisioning Keys).',
     connectorGroupDescription: 'Created by the Zscaler Policy Wizard for a proof of value.',
     appSegmentDescription: 'Basic wildcard application segment created by the Zscaler Policy Wizard.',

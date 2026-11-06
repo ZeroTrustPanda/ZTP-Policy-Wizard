@@ -1,8 +1,17 @@
 # Changelog
 
-## v2.0.0 → v2.9.0 — 2026-10-19 to 2026-11-06
+## v2.0.0 → v2.10.0 — 2026-10-19 to 2026-11-06
 
-Release notes for the whole 2.x line: [docs/release-notes/v2.9.0.md](docs/release-notes/v2.9.0.md).
+Release notes for the whole 2.x line: [docs/release-notes/v2.10.0.md](docs/release-notes/v2.10.0.md).
+
+### 2.10.0
+- **Per-app Cloud App Control** (`templates.js` `CAC_APPS`): one rule per app (`CAC-App-Facebook|X|LinkedIn|ChatGPT|Copilot|Gemini|Claude|GDrive|Dropbox|Box`) replaces the grouped granular rules; Slack unchanged. `appActions` input (`{ APP: [actions] }`) in `generate()` (`cleanAppActions`: upper-case names of the rule type, one verb per operation); chosen actions drop the fallback set and get a generated description; Claude (`actions: null`) only in the plan when chosen, always in the catalog. Catalog rows carry `appId`, `ruleType`, `actions`, `defaultActions`.
+- **`GET /api/v2/zia/cac-apps`** (`routes210.js`): `availableActions` per app, grouped into operations and verbs (conditional access left out); empty list → whole-app web-use actions; `defaults` = first set if offered, else the fallback set. Cached 10 minutes per session.
+- **SSL** (`copilotSslRule`): `<prefix>-SSL-Inspect-Copilot` (DECRYPT, TLS 1.2) in Strict, Balanced-based and ZTH eBook profiles, matched by `<prefix>-Copilot-Domains` (DSTN_DOMAIN, created / updated before the SSL rules); `sslBody` sends `destIpGroups`; `isSslCatchAll` ignores it.
+- **Engine `placeFirst`:** created at order 1 (refused → right after the predefined rules, with a warning), moved back to 1 on re-runs when a predefined rule sits above it; the order counter shifts by one after each top insert. Used by Block-QUIC and Inspect Copilot.
+- **Firewall:** Allow-Web and Allow-NTP removed from every profile (and from the locked set and the compliance map).
+- **ZPA** (`zpa.js` `LOCATIONS`, `connectorLocation`): `connectorLocation` `{ id }` or a custom city with country code and coordinates (validated); compared on re-runs when chosen (San Jose stays create-only otherwise). `GET /api/v2/zpa/locations`.
+- **UI:** Actions editor per app on the Rules page (operation × verb, Not set, Reset, summary); location picker with custom entry on the ZPA page.
 
 ### 2.9.0
 - **Geo-block** (`templates.js`): `geoFirewallRules` makes one outbound rule (`-FW-Geo-Block-Out`); `-FW-Geo-Block-In` and its compliance-map entry removed.
