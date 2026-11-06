@@ -66,7 +66,7 @@ const TESTS = [
   { id: 'aiguard-chain', product: 'AIGUARD', title: 'AI prompts reach AI Guard', match: /-AIG-Forward$/,
     steps: ['On a test machine with Client Connector, open ChatGPT, Claude or Copilot and send a harmless prompt.', 'Send a prompt that the AI Guard detection policy should catch (for example a toxic phrase, or a fake card number).', 'Open the AI Guard portal › Insights.'],
     expect: 'Both prompts appear in AI Guard with the user name; the second is flagged (or blocked) by the detection policy. ZIA Web Insights shows the request forwarded by Proxy Chaining.' },
-  { id: 'aiguard-copilot', product: 'AIGUARD', title: 'Microsoft 365 Copilot inspected', match: /-AIG-Inspect$/,
+  { id: 'aiguard-copilot', product: 'AIGUARD', title: 'Microsoft 365 Copilot inspected', match: /-SSL-Inspect-Copilot$/,
     steps: ['Open Copilot (copilot.microsoft.com or Copilot Chat in Microsoft 365) and send a prompt.', 'In ZIA Web Insights, filter on the user and copilot.microsoft.com / substrate.office.com.'],
     expect: 'The transactions show as inspected (not bypassed by the Office 365 one-click rule) and the prompt is visible in AI Guard.' },
   { id: 'aiguard-quic', product: 'AIGUARD', title: 'QUIC blocked for AI apps', match: /-AIG-NoQUIC$/,

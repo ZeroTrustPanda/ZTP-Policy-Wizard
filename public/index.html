@@ -643,7 +643,7 @@
     // ========================
     // App Version
     // ========================
-    const APP_VERSION = '2.10.0';
+    const APP_VERSION = '2.10.1';
     const BUILD_DATE = '2026-03-30';
 
     // ========================
@@ -1201,6 +1201,7 @@
                     <summary style={{cursor:'pointer', fontWeight:600, fontSize:'14px'}}>Version history</summary>
                     <div style={{marginTop:'0.75rem', lineHeight:1.7}}>
                     <div style={{paddingLeft:'1rem', fontSize:'12px'}}>
+                      <div><strong>v2.10.1</strong> — AI Guard no longer adds an SSL rule of its own: Copilot is inspected by SSL Inspection's Inspect Microsoft Copilot rule and the other AI apps by Inspect All. An AIG-Inspect rule from an earlier version is removed (Undo puts it back).</div>
                       <div><strong>v2.10.0</strong> — Pick each cloud app's actions (Facebook, LinkedIn, X, ChatGPT, Copilot, Gemini, Claude, Google Drive, Dropbox, Box) one operation at a time, from what the customer's tenant offers. Inspect Microsoft Copilot is SSL rule 1, above the Office 365 one-click bypass, with Inspect All after Zscaler's rules and the exemptions. Block-QUIC is firewall rule 1; Allow-Web and Allow-NTP are gone because Zscaler's default rules cover them. ZPA: pick the App Connector Group's city instead of San Jose.</div>
                       <div><strong>v2.9.0</strong> — No more duplicate rules: one outbound geo-block rule instead of an in and an out rule; the dry run lists rules left over from earlier runs (another baseline or prefix, a rule turned off, a rule a newer version renamed) with a Keep box each, and Apply removes the rest (Undo puts them back); AI Guard reuses an existing QUIC block; overlaps inside one run fixed (ZTH eBook new domains and anonymizers, UCaaS vs Allow-Collab, DoH, DLP order). Block Page &amp; Logo: a theme builder for ZIA's block and caution pages (colours, font, words, support contact, extra CSS, live preview), written through the API with a dry run and Undo; any logo is compressed to under 10 KB in your browser, placed on the pages and offered as a download for the portal's Company Logo.</div>
                       <div><strong>v2.8.0</strong> — Shadow check in the dry run (customer rules above the POV rules that decide first, certain matches only). Prove it explains why: Client Connector and PAC bypasses, SSL inspection, then the deciding rule, and whether that agrees with the expected result. POV posture score at the start and end, with the change in the report. What ZIA cannot see: SSL exemptions, Client Connector and PAC bypasses. Safer writes: the apply stops if the tenant changed since the dry run, each object is read again before it is changed, everything created carries a [ZTP POV] tag, ZIA API budget forecast. New DLP content (sensitive conditions, clinical notes and bulk PHI for healthcare; CUI with decontrol exclusion; source code; keys and tokens) and SaaS and Email DLP. SOC 2, ISO/IEC 27001, NIST CSF 2.0 and GLBA profiles, with Aligned / Partial / Gaps in the compliance pack. Word downloads for the report and the compliance pack. With thanks to Jason Smith and Mike Preissner (see Credits).</div>
@@ -3232,7 +3233,7 @@
                   <div className="form-hint">From the AI Guard guide: {ctx.proxy.address}, port {ctx.proxy.port}. Some tenants use forward.zseclipse.net; use what your AI Guard portal shows.</div></div>; })()}
 
           <h3 style={{fontSize:'14px', margin:'1rem 0 0.5rem'}}>What ZIA does</h3>
-          {opt('sslInspect', 'Inspect the AI apps (above every SSL bypass)', 'Adds an SSL Inspect rule for the AI app domains at the top, above every Do Not Decrypt rule including "Office 365 One Click" and Zscaler\'s exemptions. Without it Microsoft 365 Copilot is never decrypted, so it can\'t reach AI Guard.')}
+          {opt('sslInspect', 'Make sure the AI apps are inspected', 'Uses SSL Inspection\'s own rules, no separate AI Guard rule: "Inspect Microsoft Copilot" at the top, above the Office 365 one-click bypass (created here if the Internet Access run has not made it yet), and Inspect All for ChatGPT, Claude, Gemini and the rest. Without them Copilot is never decrypted and can\'t reach AI Guard.')}
           {opt('blockQuic', 'Block QUIC (Block/ICMP)', 'AI apps fall back to TLS over TCP, which ZIA can inspect and chain. Required by the guide.')}
           {opt('promptCapture', 'Capture AI prompts in ZIA logs', ctx.genAiLicensed === false ? 'Needs the Gen AI Security licence (not on this tenant).' : 'Turns on Gen AI prompt capture for the chosen apps (Web Insights shows prompts up to 2 KB).', ctx.genAiLicensed === false)}
 
