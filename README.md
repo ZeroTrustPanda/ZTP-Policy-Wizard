@@ -1,20 +1,20 @@
-# 🐼 ZeroTrustPanda — ZTP Policy Wizard v2.10.1
+# 🐼 ZeroTrustPanda — ZTP Policy Wizard v2.10.2
 
 Proof-of-value automation for Zscaler SEs: Zscaler Internet Access (ZIA), Zscaler Client Connector (ZCC), Zscaler Private Access (ZPA) and Zscaler Digital Experience (ZDX), all with one set of OneAPI (ZIdentity) client credentials.
 
-## ⬇️ Download v2.10.1 (nothing to install)
+## ⬇️ Download v2.10.2 (nothing to install)
 
 | Computer | Download (click to download) |
 |---|---|
-| **Mac with Apple silicon (M1–M4)** | [**ZTP-Wizard-2.10.1-macos-arm64.zip**](https://github.com/ZeroTrustPanda/ZTP-Policy-Wizard/raw/standalone/standalone/release/ZTP-Wizard-2.10.1-macos-arm64.zip) |
-| Windows 10/11 (64-bit) | [ZTP-Wizard-2.10.1-windows-x64.zip](https://github.com/ZeroTrustPanda/ZTP-Policy-Wizard/raw/standalone/standalone/release/ZTP-Wizard-2.10.1-windows-x64.zip) |
-| Intel Mac | [ZTP-Wizard-2.10.1-macos-x64.zip](https://github.com/ZeroTrustPanda/ZTP-Policy-Wizard/raw/standalone/standalone/release/ZTP-Wizard-2.10.1-macos-x64.zip) |
+| **Mac with Apple silicon (M1–M4)** | [**ZTP-Wizard-2.10.2-macos-arm64.zip**](https://github.com/ZeroTrustPanda/ZTP-Policy-Wizard/raw/standalone/standalone/release/ZTP-Wizard-2.10.2-macos-arm64.zip) |
+| Windows 10/11 (64-bit) | [ZTP-Wizard-2.10.2-windows-x64.zip](https://github.com/ZeroTrustPanda/ZTP-Policy-Wizard/raw/standalone/standalone/release/ZTP-Wizard-2.10.2-windows-x64.zip) |
+| Intel Mac | [ZTP-Wizard-2.10.2-macos-x64.zip](https://github.com/ZeroTrustPanda/ZTP-Policy-Wizard/raw/standalone/standalone/release/ZTP-Wizard-2.10.2-macos-x64.zip) |
 
 Unzip and double-click `ZTP-Wizard`. Your browser opens the wizard at `http://127.0.0.1:3000`, and your API credentials stay on your computer. The builds aren't code-signed yet. On a Mac, right-click → *Open* → *Open* the first time. On Windows, SmartScreen → *More info* → *Run anyway*.
 
-**Release notes (2.0 → 2.10.1):** [docs/release-notes/v2.10.1.md](docs/release-notes/v2.10.1.md) · **Change log:** [CHANGELOG.md](CHANGELOG.md) · **Releases:** [GitHub releases](https://github.com/ZeroTrustPanda/ZTP-Policy-Wizard/releases)
+**Release notes (2.0 → 2.10.2):** [docs/release-notes/v2.10.2.md](docs/release-notes/v2.10.2.md) · **Change log:** [CHANGELOG.md](CHANGELOG.md) · **Releases:** [GitHub releases](https://github.com/ZeroTrustPanda/ZTP-Policy-Wizard/releases)
 
-## What's in 2.x (2.0 → 2.10.1)
+## What's in 2.x (2.0 → 2.10.2)
 
 - **Per-app cloud controls, Copilot inspection, rule order (2.10):**
   - Pick each app's actions (Facebook, LinkedIn, X, ChatGPT, Copilot, Gemini, Claude, Google Drive, Dropbox, Box) per operation, from what the tenant offers.
@@ -113,7 +113,7 @@ Unzip and double-click `ZTP-Wizard`. Your browser opens the wizard at `http://12
   - A layout that fits any window size.
   - An update badge.
 
-The full feature list, by product and by version, is in the [release notes](docs/release-notes/v2.10.1.md).
+The full feature list, by product and by version, is in the [release notes](docs/release-notes/v2.10.2.md).
 
 ## 1.9 flows (still available)
 
@@ -307,6 +307,7 @@ The DLP module uses a **dictionary-first** approach:
 
 | Version | Changes |
 |---------|---------|
+| **2.10.2** | macOS Client Connector profile matches Windows (no PAC URL, same defaults and bypass apps); Windows and macOS share one forwarding profile. |
 | **2.10.1** | AI Guard uses SSL Inspection's Copilot rule and Inspect All; no separate AI Guard SSL rule. |
 | **2.10.0** | Per-app Cloud App Control actions; Inspect Microsoft Copilot at SSL rule 1; Block-QUIC at firewall rule 1, Allow-Web / Allow-NTP removed; ZPA App Connector location picker. |
 | **2.9.0** | One outbound geo-block rule; leftover cleanup with Keep and Undo; AI Guard reuses an existing QUIC block; overlap fixes (ZTH eBook, UCaaS, DoH, DLP order); custom block and caution pages (theme builder, CSS, preview) and a logo compressed to under 10 KB. |

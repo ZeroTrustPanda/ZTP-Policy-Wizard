@@ -161,8 +161,10 @@ const WINDOWS_BEST_PRACTICE_SETTINGS = [
 // ========================
 // macOS — reference profile "MAC" (ID 66609)
 // ========================
-const MAC_BYPASS_APPS = BYPASS_APPS.filter(a => [3, 5, 13].includes(a.id));
-const MAC_PAC_URL = 'https://pac.zscaler.net/zscaler.net/recommended.pac';
+// v2.10.2: the macOS profile matches the Windows one. No app profile PAC URL (the Windows profile has none, and on a Mac the
+// hosted PAC sent traffic the wrong way), fail-close, DNS exclusion priority and automatic packet capture stay at the portal
+// defaults, the same six IP-based bypass apps, and the CLI and ZPA re-authentication notice as on Windows.
+const MAC_BYPASS_APPS = BYPASS_APPS;
 const sameIds = (got, want) => JSON.stringify((got || []).map(String).sort()) === JSON.stringify(want.map(String).sort());
 
 const MAC_BEST_PRACTICE_SETTINGS = [
@@ -185,24 +187,6 @@ const MAC_BEST_PRACTICE_SETTINGS = [
     verify: (p) => String(p.policyExtension?.blockPrivateRelay) === '1'
   },
   {
-    key: 'failCloseTunnelExit',
-    label: 'Fail-close on tunnel process exit: Off',
-    category: 'Security',
-    description: 'Does not lock down traffic when the Client Connector tunnel process exits. The portal default locks traffic down.',
-    value: 'Off (no lockdown)', portalDefault: 'On (lockdown)', impact: 'caution',
-    apply: (b) => { b.policyExtension.zccFailCloseSettingsLockdownOnTunnelProcessExit = '0'; b.zccFailCloseSettingsLockdownOnTunnelProcessExit = 0; },
-    verify: (p) => num(p.policyExtension?.zccFailCloseSettingsLockdownOnTunnelProcessExit) === 0
-  },
-  {
-    key: 'pacUrl',
-    label: 'App Profile PAC URL: Zscaler recommended',
-    category: 'Network',
-    description: 'Uses the Zscaler-hosted recommended PAC file for this app profile.',
-    value: MAC_PAC_URL, portalDefault: '(none)', impact: 'info',
-    apply: (b) => { b.pac_url = MAC_PAC_URL; },
-    verify: (p) => p.pac_url === MAC_PAC_URL
-  },
-  {
     key: 'dnsIncludeAll',
     label: 'Domain Inclusions: all domains (*)',
     category: 'Network',
@@ -210,15 +194,6 @@ const MAC_BEST_PRACTICE_SETTINGS = [
     value: '*', portalDefault: '(empty)', impact: 'info',
     apply: (b) => { b.policyExtension.packetTunnelDnsIncludeList = '*'; b.packetTunnelDnsIncludeList = ['*']; },
     verify: (p) => p.policyExtension?.packetTunnelDnsIncludeList === '*'
-  },
-  {
-    key: 'prioritizeDnsExclusionsOff',
-    label: 'Prioritize DNS Exclusions: Off',
-    category: 'Network',
-    description: 'DNS exclusions do not take priority over inclusions. The portal default prioritizes exclusions.',
-    value: 'Off', portalDefault: 'On', impact: 'info',
-    apply: (b) => { b.policyExtension.prioritizeDnsExclusions = 0; b.prioritizeDnsExclusions = '0'; },
-    verify: (p) => num(p.policyExtension?.prioritizeDnsExclusions) === 0
   },
   {
     key: 'flowBasedTunnel',
@@ -247,6 +222,24 @@ const MAC_BEST_PRACTICE_SETTINGS = [
     appIds: MAC_BYPASS_APPS.map(a => a.id),
     apply: (b) => { b.appServiceIds = b.__bypassIds ? b.__bypassIds.slice() : MAC_BYPASS_APPS.map(a => a.id); },
     verify: (p) => sameIds(p.appServiceIds, MAC_BYPASS_APPS.map(a => a.id))
+  },
+  {
+    key: 'enableCli',
+    label: 'Enable Zscaler CLI',
+    category: 'Security',
+    description: 'Allows the Client Connector command-line interface on endpoints for troubleshooting. Disable-without-password options stay at their defaults.',
+    value: 'On', portalDefault: 'Off', impact: 'info',
+    apply: (b) => { b.policyExtension.generateCliPasswordContract.enableCli = true; },
+    verify: (p) => p.policyExtension?.generateCliPasswordContract?.enableCli === true
+  },
+  {
+    key: 'zpaReauthNotice',
+    label: 'ZPA Reauthentication Advance Notice (30 min)',
+    category: 'User Experience',
+    description: 'Warns users 30 minutes before their ZPA authentication expires so they can re-authenticate before access drops.',
+    value: 'On, 30 minutes', portalDefault: 'Off', impact: 'info',
+    apply: (b) => { b.policyExtension.advanceZpaReauth = true; b.policyExtension.advanceZpaReauthTime = 30; },
+    verify: (p) => p.policyExtension?.advanceZpaReauth === true && num(p.policyExtension?.advanceZpaReauthTime) === 30
   },
   {
     key: 'notificationFramework',
@@ -300,19 +293,6 @@ const MAC_BEST_PRACTICE_SETTINGS = [
     value: 'On', portalDefault: 'Off', impact: 'info',
     apply: (b) => { b.policyExtension.enableLocalPacketCapture = '1'; b.enableLocalPacketCapture = '1'; b.policyExtension.enableLocalPacketCaptureV2 = 1; },
     verify: (p) => String(p.policyExtension?.enableLocalPacketCapture) === '1'
-  },
-  {
-    key: 'packetCaptureExtrasOff',
-    label: 'Automatic Packet Capture Extras: Off',
-    category: 'Troubleshooting',
-    description: 'Turns off automatic packet capture for critical and other sections and the extra capture disk space.',
-    value: 'Off', portalDefault: 'On (512 MB extra space)', impact: 'info',
-    apply: (b) => {
-      for (const k of ['enableAPCforCriticalSections', 'enableAPCforOtherSections', 'enablePCAdditionalSpace']) { b.policyExtension[k] = '0'; b[k] = '0'; }
-      b.policyExtension.pcAdditionalSpace = '0'; b.pcAdditionalSpace = [];
-    },
-    verify: (p) => ['enableAPCforCriticalSections', 'enableAPCforOtherSections', 'enablePCAdditionalSpace', 'pcAdditionalSpace']
-      .every(k => num(p.policyExtension?.[k]) === 0)
   },
   {
     key: 'allUsers',
@@ -397,11 +377,11 @@ const TEMPLATES = {
   macos: {
     BEST_PRACTICE: {
       id: 'BEST_PRACTICE', name: 'Zscaler POV Best Practice', icon: '⭐',
-      description: 'Common Client Connector settings from the Zscaler POV best practice guide: SSL certificate, iCloud Private Relay block, recommended PAC, Teams / Zoom / AVD IP bypass, flow-based tunnel, reconnect on wake, notification framework, local packet capture, applies to all users.',
+      description: 'The same settings as the Windows best practice profile where macOS has them: SSL certificate, Microsoft 365 / Teams / Zoom / AVD IP bypass, all-domain DNS inclusion, notification framework, ZPA re-authentication notice, CLI, applies to all users. Plus for Macs: iCloud Private Relay block, flow-based tunnel, reconnect on wake. No app profile PAC file.',
       source: 'Zscaler POV best practice guide',
       recommendedForwardingProfile: null,
       // Same values as the portal default, but MAC stores them as strings; keeps the clone byte-identical.
-      baseApply: (b) => { b.policyExtension.deleteDHCPOption121Routes = '{"trusted":"1","offTrusted":"1","vpnTrusted":"1","splitVpnTrusted":"1"}'; },
+      baseApply: (b) => { b.policyExtension.deleteDHCPOption121Routes = '{"trusted":"1","offTrusted":"1","vpnTrusted":"1","splitVpnTrusted":"1"}'; b.pac_url = ''; },
       settings: [...MAC_BEST_PRACTICE_SETTINGS, tamperSetting('macos'), reauthSetting('macos')]
     },
     PORTAL_DEFAULT: {

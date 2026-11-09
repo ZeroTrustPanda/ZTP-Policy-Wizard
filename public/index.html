@@ -643,7 +643,7 @@
     // ========================
     // App Version
     // ========================
-    const APP_VERSION = '2.10.1';
+    const APP_VERSION = '2.10.2';
     const BUILD_DATE = '2026-03-30';
 
     // ========================
@@ -1201,6 +1201,7 @@
                     <summary style={{cursor:'pointer', fontWeight:600, fontSize:'14px'}}>Version history</summary>
                     <div style={{marginTop:'0.75rem', lineHeight:1.7}}>
                     <div style={{paddingLeft:'1rem', fontSize:'12px'}}>
+                      <div><strong>v2.10.2</strong> — macOS Client Connector matches Windows: no app profile PAC URL (an old one is cleared), fail-close, DNS exclusion priority and packet capture left at the portal defaults, the same bypass apps, CLI and ZPA re-authentication notice; Windows and macOS share one forwarding profile.</div>
                       <div><strong>v2.10.1</strong> — AI Guard no longer adds an SSL rule of its own: Copilot is inspected by SSL Inspection's Inspect Microsoft Copilot rule and the other AI apps by Inspect All. An AIG-Inspect rule from an earlier version is removed (Undo puts it back).</div>
                       <div><strong>v2.10.0</strong> — Pick each cloud app's actions (Facebook, LinkedIn, X, ChatGPT, Copilot, Gemini, Claude, Google Drive, Dropbox, Box) one operation at a time, from what the customer's tenant offers. Inspect Microsoft Copilot is SSL rule 1, above the Office 365 one-click bypass, with Inspect All after Zscaler's rules and the exemptions. Block-QUIC is firewall rule 1; Allow-Web and Allow-NTP are gone because Zscaler's default rules cover them. ZPA: pick the App Connector Group's city instead of San Jose.</div>
                       <div><strong>v2.9.0</strong> — No more duplicate rules: one outbound geo-block rule instead of an in and an out rule; the dry run lists rules left over from earlier runs (another baseline or prefix, a rule turned off, a rule a newer version renamed) with a Keep box each, and Apply removes the rest (Undo puts them back); AI Guard reuses an existing QUIC block; overlaps inside one run fixed (ZTH eBook new domains and anonymizers, UCaaS vs Allow-Collab, DoH, DLP order). Block Page &amp; Logo: a theme builder for ZIA's block and caution pages (colours, font, words, support contact, extra CSS, live preview), written through the API with a dry run and Undo; any logo is compressed to under 10 KB in your browser, placed on the pages and offered as a download for the portal's Company Logo.</div>
@@ -5447,7 +5448,8 @@
       const [fwdMode, setFwdMode] = useState(seed && !seed.newForwardingProfile && seed.forwardingProfileId ? 'existing' : 'new'); // 'new' | 'existing'
       const [fwdTemplateId, setFwdTemplateId] = useState((seed && seed.newForwardingProfile && seed.newForwardingProfile.templateId) || 'BEST_PRACTICE');
       const [fwdEnabled, setFwdEnabled] = useState(null);
-      const [fwdName, setFwdName] = useState((seed && seed.newForwardingProfile && seed.newForwardingProfile.name) || `${prefix}-FWD-${initTag}-BestPractice`);
+      // v2.10.2: one forwarding profile shared by the Windows and macOS app profiles, so both forward the same way
+      const [fwdName, setFwdName] = useState((seed && seed.newForwardingProfile && seed.newForwardingProfile.name) || `${prefix}-FWD-BestPractice`);
       const [plan, setPlan] = useState(null);
       const [busy, setBusy] = useState(false);
       const [confirmed, setConfirmed] = useState(false);
@@ -5527,7 +5529,6 @@
         if (id === platform) return;
         const from = ZCC_PLATFORMS.find(p => p.id === platform), to = ZCC_PLATFORMS.find(p => p.id === id);
         setForm(f => ({ ...f, name: f.name.replace(`-${from.nameTag}-`, `-${to.nameTag}-`) }));
-        setFwdName(n => n.replace(`-${from.nameTag}-`, `-${to.nameTag}-`));
         setFwdMode(to.fwdDefault);
         setPlatform(id);
       };
@@ -5713,6 +5714,7 @@
                     <label className="form-label">Forwarding Profile Name</label>
                     <input type="text" value={fwdName} maxLength={128} onChange={e => { setPlan(null); setFwdName(e.target.value); }} data-field="fwdName" />
                     {fwdNameTaken && <div className="form-hint" style={{color:'var(--accent-amber)'}}>A forwarding profile with this name already exists. It will be updated with these settings (shown as Update in the dry run).</div>}
+                    <div className="form-hint" data-fwdshared>The Windows and macOS app profiles share this forwarding profile, so both platforms forward traffic the same way. Give it a different name only if the Macs need their own.</div>
                   </div>
                   {fwdTemplate.settings.length === 0 ? (
                     <div className="alert alert-info"><span>ℹ Portal Default has no extra settings: Tunnel with Local Proxy for ZIA, ZPA tunnel except on VPN-Trusted networks.</span></div>
