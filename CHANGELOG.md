@@ -1,8 +1,12 @@
 # Changelog
 
-## v2.0.0 → v2.10.1 — 2026-10-19 to 2026-11-06
+## v2.0.0 → v2.10.2 — 2026-10-19 to 2026-11-09
 
-Release notes for the whole 2.x line: [docs/release-notes/v2.10.1.md](docs/release-notes/v2.10.1.md).
+Release notes for the whole 2.x line: [docs/release-notes/v2.10.2.md](docs/release-notes/v2.10.2.md).
+
+### 2.10.2
+- **macOS app profile** (`zcc-app-profile-templates.js`): removed `pacUrl` (recommended.pac), `failCloseTunnelExit`, `prioritizeDnsExclusionsOff`, `packetCaptureExtrasOff`; bypass apps = the Windows six; added `enableCli` and `zpaReauthNotice`; `baseApply` sets `pac_url: ''`. `planAppProfile` reports a stored PAC URL that differs from the body as a change, so re-runs clear it.
+- **Forwarding profile:** the default name is `<prefix>-FWD-BestPractice` for both platforms (no per-platform rename), so the macOS app profile links to the same forwarding profile as Windows.
 
 ### 2.10.1
 - **AI Guard SSL** (`aiguard.js` step 6): no `<prefix>-AIG-Inspect`. Uses the shared `<prefix>-SSL-Inspect-Copilot` rule and `<prefix>-Copilot-Domains` group (`copilotSslRule`, `sslBody`, engine `placeFirst`); NO_CHANGE when the rule is enabled, DECRYPT and above every predefined rule; keeps an interception certificate set by the Internet Access run. Warns when no Inspect All rule exists. An existing AIG-Inspect is deleted (Undo: POST). Runbook test `aiguard-copilot` matches the shared rule.
