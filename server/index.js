@@ -2535,6 +2535,8 @@ async function planAppProfile(zccClient, platform, input, ownPrefix = null) {
       for (const k of Object.keys(listsWant)) if (JSON.stringify(listsNow[k]) !== JSON.stringify(listsWant[k])) changeReasons.push(`${k}: ${listsNow[k].join(',') || 'none'} → ${listsWant[k].join(',') || 'none'}`);
       if (ids(stored.appServiceIds) !== ids(body.appServiceIds)) changeReasons.push(`bypass apps: ${ids(stored.appServiceIds)} → ${ids(body.appServiceIds)}`);
       if (String(Number(stored.active) || 0) !== String(Number(body.active) || 0)) changeReasons.push('enabled state');
+      // v2.10.2: a PAC URL left on the profile by an earlier version (macOS) is cleared
+      if ((stored.pac_url || '') !== (body.pac_url || '')) changeReasons.push(`PAC URL: ${stored.pac_url || 'none'} → ${body.pac_url || 'none'}`);
       const storedFwd = String(stored?.onNetPolicy?.id ?? stored?.forwardingProfileId ?? 0);
       if (fwdPlan) { if (fwdPlan.action !== 'NO_CHANGE' || storedFwd !== String(fwdPlan.existingId)) changeReasons.push('forwarding profile'); }
       else if (storedFwd !== String(Number(forwardingProfileId) || 0)) changeReasons.push('forwarding profile');
