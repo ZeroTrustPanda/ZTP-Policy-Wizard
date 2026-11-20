@@ -84,9 +84,9 @@ function probeName(appName, kind) {
   return String(appName).trim().substring(0, 64 - suffix.length) + suffix;
 }
 
-function buildWebMonitor({ appName, url, frequency = 300, klass = 'CUSTOM' }) {
+function buildWebMonitor({ appName, url, frequency = 300, klass = 'CUSTOM', exactName = null }) {
   return {
-    name: probeName(appName, 'web'), type: 'WEB', active: true, class: klass,
+    name: exactName ? String(exactName).trim().slice(0, 64) : probeName(appName, 'web'), type: 'WEB', active: true, class: klass,
     timeoutSeconds: 60, expiresAtTimestamp: 0, frequencyInSeconds: Number(frequency) || 300,
     url: String(url).trim(), requestMethods: ['GET'], requestHeaders: [], retries: 1, requestTimeoutSeconds: 60,
     followRedirects: true, maxRedirects: 5, responseCodes: ['200-299', '304'], responseHeaders: [],
@@ -94,13 +94,26 @@ function buildWebMonitor({ appName, url, frequency = 300, klass = 'CUSTOM' }) {
   };
 }
 
-function buildCloudPathMonitor({ appName, host, frequency = 300, protocol = 'ADAPTIVE', followWebId = null, klass = 'CUSTOM' }) {
+/** v2.11: put a port into a URL (https://host/ + 8443 → https://host:8443/); a bare host becomes https://host/. */
+function withPort(url, port) {
+  let u = String(url || '').trim();
+  if (!u) return '';
+  if (!/^https?:\/\//i.test(u)) u = `https://${u.replace(/^\/+/, '')}`;
+  try {
+    const x = new URL(u);
+    if (port && !x.port && !((x.protocol === 'https:' && Number(port) === 443) || (x.protocol === 'http:' && Number(port) === 80))) x.port = String(port);
+    return x.toString();
+  } catch (e) { return u; }
+}
+const defaultPort = (url) => { try { const x = new URL(url); return x.port ? Number(x.port) : (x.protocol === 'http:' ? 80 : 443); } catch (e) { return 443; } };
+
+function buildCloudPathMonitor({ appName, host, frequency = 300, protocol = 'ADAPTIVE', followWebId = null, klass = 'CUSTOM', tcpPort = 443, exactName = null }) {
   const body = {
-    name: probeName(appName, 'cloudpath'), type: 'TRACERT', active: true, class: klass,
+    name: exactName ? `${String(exactName).trim().slice(0, 54)} CloudPath` : probeName(appName, 'cloudpath'), type: 'TRACERT', active: true, class: klass,
     timeoutSeconds: 60, expiresAtTimestamp: 0, frequencyInSeconds: Number(frequency) || 300,
     host: String(host).trim(), protocol: CLOUDPATH_PROTOCOLS.includes(protocol) ? protocol : 'ADAPTIVE',
     requestTimeoutSeconds: 60, maxPacketCount: 5, packetIntervalMs: 1000, packetTimeoutMs: 1000,
-    udpPort: 33434, tcpPort: 443, reverseLookupEnabled: true,
+    udpPort: 33434, tcpPort: Number(tcpPort) || 443, reverseLookupEnabled: true,
     ...ALL_TARGETS()
   };
   if (body.protocol === 'ADAPTIVE' || body.protocol === 'TCP') body.tcpType = 'RESILIENT_TCP';
@@ -109,6 +122,7 @@ function buildCloudPathMonitor({ appName, host, frequency = 300, protocol = 'ADA
 }
 
 module.exports = {
+  withPort, defaultPort,
   PROBE_FREQUENCIES, CLOUDPATH_PROTOCOLS, PREDEFINED_INFO, TEMPLATES,
   getTemplate, getTemplateCatalog, hostOf, probeName, buildWebMonitor, buildCloudPathMonitor
 };

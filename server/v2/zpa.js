@@ -280,7 +280,7 @@ function validateBulkApps(apps) {
     const key = String(a.name || '').trim().toLowerCase();
     if (key && seen.has(key)) errors.push(`${label}: the name is used twice (also row ${seen.get(key)}).`); else seen.set(key, a.row || '?');
     const dests = Array.isArray(a.destinations) ? a.destinations : splitCell(a.destinations);
-    if (!dests.length) errors.push(`${label}: no destinations (FQDN, *.domain, IP or CIDR).`);
+    if (!dests.length) errors.push(`${label}: enter the customer's host names or IPs (FQDN, *.domain, IP or CIDR).`);
     for (const d of dests) { const c = classifyEntry(d); if (!c.ok) errors.push(`${label}: "${d}" ${c.why}.`); }
     const tcp = parsePortRanges(a.tcpPorts), udp = parsePortRanges(a.udpPorts);
     errors.push(...tcp.errors.map(e => `${label}: TCP ${e}`), ...udp.errors.map(e => `${label}: UDP ${e}`));

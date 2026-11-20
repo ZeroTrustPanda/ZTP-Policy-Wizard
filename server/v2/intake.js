@@ -22,7 +22,7 @@ const COMMON_ZDX_PREDEFINED = ['OUTLOOK'];
 const PRESETS = {
   HEALTHCARE: {
     id: 'HEALTHCARE', name: 'Healthcare', icon: '🏥', baseline: 'HIPAA',
-    description: 'Hospital or health system: HIPAA baseline; EHR, single sign-on and imaging as ZPA segments; clinical reference apps in ZDX.',
+    description: 'Hospital or health system: HIPAA baseline; Epic, Oracle Health, MEDITECH, Synapse and Visage PACS, Imprivata and clinical SaaS ready to turn on in ZPA and ZDX.',
     apps: [
       { name: 'Epic Hyperspace', destinations: ['epic.{domain}', 'epicweb.{domain}'], ports: '443; 80', zdx: 'https://epicweb.{domain}/' },
       { name: 'Epic Interconnect', destinations: ['interconnect.{domain}'], ports: '443' },
@@ -40,7 +40,7 @@ const PRESETS = {
   },
   GENERAL: {
     id: 'GENERAL', name: 'General enterprise', icon: '🏢', baseline: 'BALANCED',
-    description: 'Any organization: Balanced baseline; common internal apps on ZPA; common SaaS apps in ZDX.',
+    description: 'Any organization: Balanced baseline; Active Directory, file shares, Citrix, Horizon, SAP and business SaaS ready to turn on in ZPA and ZDX.',
     apps: [],
     zdxApps: [
       { name: 'Salesforce', url: 'https://login.salesforce.com/' },
@@ -51,7 +51,7 @@ const PRESETS = {
   },
   FINANCE: {
     id: 'FINANCE', name: 'Financial services', icon: '🏦', baseline: 'PCI',
-    description: 'Bank, insurer or payments: PCI DSS baseline; core banking and trading apps on ZPA; market data and HR SaaS in ZDX.',
+    description: 'Bank, insurer or payments: PCI DSS baseline; core banking, Bloomberg and business SaaS ready to turn on in ZPA and ZDX.',
     apps: [
       { name: 'Core banking', destinations: ['core.{domain}'], ports: '443' },
       { name: 'Trading platform', destinations: ['trade.{domain}'], ports: '443; 8443' }
@@ -65,7 +65,7 @@ const PRESETS = {
   },
   FEDERAL: {
     id: 'FEDERAL', name: 'Federal and public sector', icon: '🏛️', baseline: 'FEDRAMP_MOD',
-    description: 'Federal, state or local agency, or a contractor that serves one: FedRAMP Moderate baseline (pick CMMC, Zero Trust, IRS 1075, CJIS or GovRAMP instead); case management and HR apps on ZPA; login.gov and USAJOBS in ZDX.',
+    description: 'Federal, state or local agency, or a contractor that serves one: FedRAMP Moderate baseline (pick CMMC, Zero Trust, IRS 1075, CJIS or GovRAMP instead); ArcGIS, case management and government sites ready to turn on in ZPA and ZDX.',
     apps: [
       { name: 'Case management', destinations: ['cases.{domain}'], ports: '443' },
       { name: 'Financial management', destinations: ['finance.{domain}'], ports: '443' },
@@ -81,7 +81,7 @@ const PRESETS = {
   },
   EDUCATION: {
     id: 'EDUCATION', name: 'Education', icon: '🎓', baseline: 'BALANCED',
-    description: 'School district, college or university: Balanced baseline; student information system on ZPA; learning platforms in ZDX.',
+    description: 'School district, college or university: Balanced baseline; Banner, the student information system and learning platforms ready to turn on in ZPA and ZDX.',
     apps: [
       { name: 'Student information system', destinations: ['sis.{domain}'], ports: '443' }
     ],
@@ -97,27 +97,20 @@ const PRESETS = {
 
 const DOMAIN_RE = /^(?=.{1,253}$)(?!-)[A-Za-z0-9-]{1,63}(?<!-)(\.(?!-)[A-Za-z0-9-]{1,63}(?<!-))+$/;
 
-/** Fill a preset for one customer domain (returns copies). */
+/**
+ * Fill a preset for one customer domain (returns copies).
+ * v2.11: nothing is prefilled any more except the *.domain wildcard (built in the browser). The vertical's EHR, PACS, SaaS
+ * and other apps are toggles in the ZPA and ZDX app catalog (app-catalog.js), so there is nothing to delete.
+ */
 function preset(id, domain) {
   const p = PRESETS[id] || PRESETS.BLANK;
-  const d = String(domain || '').trim().toLowerCase();
-  const sub = (v) => String(v).replace(/\{domain\}/g, d || 'example.org');
-  const common = p.commonOnly ? COMMON_APPS.filter(a => p.commonOnly.includes(a.name)) : COMMON_APPS;
-  const apps = [...common, ...p.apps].map(a => ({ name: a.name, destinations: a.destinations.map(sub), ports: a.ports, zdx: a.zdx ? sub(a.zdx) : null, common: !!a.common }));
-  const zdxApps = [...apps.filter(a => a.zdx).map(a => ({ name: a.name, url: a.zdx })), ...(p.zdxApps || []).map(z => ({ name: z.name, url: sub(z.url) }))];
-  return {
-    ...p, apps, zdxApps, zdxPredefined: p.id === 'BLANK' ? [] : COMMON_ZDX_PREDEFINED.slice(),
-    notes: p.notes.slice()
-  };
+  return { ...p, apps: [], zdxApps: [], zdxPredefined: p.id === 'BLANK' ? [] : COMMON_ZDX_PREDEFINED.slice(), notes: p.notes.slice() };
 }
 
-/** Suggest a prefix from the customer name: letters and digits, up to 12, upper case. */
+/** v2.11: the prefix is the first three letters or digits of the customer name, upper case (Hajny → HAJ); padded with X if shorter. */
 function suggestPrefix(name) {
-  const s = String(name || '').replace(/[^A-Za-z0-9 ]/g, ' ').trim();
-  if (!s) return '';
-  const words = s.split(/\s+/);
-  const initials = words.length > 1 ? words.map(w => w[0]).join('') : words[0];
-  return (initials.length >= 3 ? initials : words.join('')).toUpperCase().slice(0, 12);
+  const s = String(name || '').replace(/[^A-Za-z0-9]/g, '').toUpperCase();
+  return s ? (s + 'XXX').slice(0, 3) : '';
 }
 
 function validateIntake(i) {
@@ -128,7 +121,11 @@ function validateIntake(i) {
 }
 
 function catalog() {
-  return Object.values(PRESETS).map(p => ({ id: p.id, name: p.name, icon: p.icon, baseline: p.baseline, description: p.description, appCount: (p.commonOnly ? p.commonOnly.length : COMMON_APPS.length) + p.apps.length, zdxCount: (p.zdxApps || []).length }));
+  const AC = require('./app-catalog');
+  return Object.values(PRESETS).map(p => {
+    const mine = AC.catalog(p.id).apps.filter(a => a.mine && p.id !== 'BLANK');
+    return { id: p.id, name: p.name, icon: p.icon, baseline: p.baseline, description: p.description, appCount: mine.filter(a => a.zpa.length).length, zdxCount: mine.filter(a => a.zdx.length).length };
+  });
 }
 
 module.exports = { PRESETS, COMMON_APPS, preset, catalog, suggestPrefix, validateIntake };

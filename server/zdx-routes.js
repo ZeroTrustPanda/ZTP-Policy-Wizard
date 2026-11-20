@@ -35,6 +35,7 @@ function findCollection(collections, kind) {
 }
 
 const isWeb = (m) => m.type === 'WEB';
+const portOf = (url) => { try { const u = new URL(String(url)); return u.port ? Number(u.port) : (u.protocol === 'http:' ? 80 : 443); } catch (e) { return null; } };
 const isPath = (m) => m.type === 'TRACERT' || m.type === 'TRACERT_V2' || m.type === 'HIFI_MTR';
 
 /**
@@ -147,46 +148,94 @@ async function planZdx(zdx, input) {
   }
 
   // ---- Custom apps
+  // v2.11: a custom app can carry several probes (an app-catalog entry such as Epic: Epic HSW, Epic Web BLOB…), each with its
+  // own URL and port, and can go into its own collection (named after the vendor). The older shape { name, url } is one probe.
   const seenNames = new Set();
+  const namedCols = new Map();   // collection name (lower case) → { name, id|null }
   for (const c of customIn) {
     const name = String(c.name || '').trim();
-    const url = String(c.url || '').trim();
-    const host = T.hostOf(url);
-    const entry = { kind: 'custom', key: null, name: name || '(unnamed)', url, host, steps: [] };
+    const multi = Array.isArray(c.probes);
+    const frequency = T.PROBE_FREQUENCIES.includes(Number(c.frequency)) ? Number(c.frequency) : 300;
+    const protocol = T.CLOUDPATH_PROTOCOLS.includes(c.protocol) ? c.protocol : 'ADAPTIVE';
+    const probes = (multi ? c.probes : [{ name, url: c.url, cloudpath: c.cloudpath, port: null }]).map(pr => {
+      const port = pr.port === undefined || pr.port === null || pr.port === '' ? null : Number(pr.port);
+      const url = T.withPort(String(pr.url || '').trim(), port);
+      return { name: String(pr.name || '').trim(), url, host: T.hostOf(url), port, cloudpath: pr.cloudpath !== false && c.cloudpath !== false };
+    });
+    const first = probes[0] || { url: '', host: null };
+    const entry = { kind: 'custom', key: null, name: name || '(unnamed)', url: first.url, host: first.host, multi, probes, steps: [] };
     out.push(entry);
     if (!NAME_RE.test(name)) { checks.push({ name: `Custom app "${entry.name}": name`, status: 'fail', detail: 'Use 1–64 letters, numbers, spaces or - _ . ( ) : / & +' }); continue; }
     if (seenNames.has(name.toLowerCase())) { checks.push({ name: `Custom app "${name}": name`, status: 'fail', detail: 'Listed twice' }); continue; }
     seenNames.add(name.toLowerCase());
-    if (!host) { checks.push({ name: `Custom app "${name}": URL`, status: 'fail', detail: 'Enter a full http:// or https:// URL' }); continue; }
-    const frequency = T.PROBE_FREQUENCIES.includes(Number(c.frequency)) ? Number(c.frequency) : 300;
-    const protocol = T.CLOUDPATH_PROTOCOLS.includes(c.protocol) ? c.protocol : 'ADAPTIVE';
-    Object.assign(entry, { frequency, protocol, cloudpath: c.cloudpath !== false });
+    if (!probes.length) { checks.push({ name: `Custom app "${name}": probes`, status: 'fail', detail: 'Turn on at least one probe' }); continue; }
+    let bad = false;
+    for (const pr of probes) {
+      if (multi && !NAME_RE.test(pr.name)) { checks.push({ name: `${name}: probe name "${pr.name || '(empty)'}"`, status: 'fail', detail: 'Use 1–64 letters, numbers, spaces or - _ . ( ) : / & +' }); bad = true; }
+      if (pr.port !== null && !(Number.isInteger(pr.port) && pr.port >= 1 && pr.port <= 65535)) { checks.push({ name: `${name}: ${pr.name || 'probe'} port`, status: 'fail', detail: 'Port 1–65535' }); bad = true; }
+      if (!pr.host) { checks.push({ name: multi ? `${name}: ${pr.name || 'probe'} URL` : `Custom app "${name}": URL`, status: 'fail', detail: multi ? 'Enter the customer\'s host or URL for this probe (for example https://epic-hsw.hospital.org/)' : 'Enter a full http:// or https:// URL' }); bad = true; }
+    }
+    if (bad) continue;
+    Object.assign(entry, { frequency, protocol, cloudpath: probes.some(pr => pr.cloudpath) });
+    // collection: the vendor's own when asked for, else the Custom Apps Collection
+    let colName = null;
+    if (c.collection && String(c.collection).trim()) {
+      colName = String(c.collection).trim().slice(0, 64);
+      const key = colName.toLowerCase();
+      if (!namedCols.has(key)) {
+        const found = collections.find(x => String(x.name).toLowerCase() === key);
+        namedCols.set(key, { name: colName, id: found ? found.id : null });
+      }
+      entry.collection = colName;
+    }
 
+    const webName = (pr) => multi ? pr.name.slice(0, 64) : T.probeName(name, 'web');
+    const pathName = (pr) => multi ? `${pr.name.slice(0, 54)} CloudPath` : T.probeName(name, 'cloudpath');
     const same = apps.find(a => a.type !== 'PREDEFINED' && String(a.name).toLowerCase() === name.toLowerCase());
     if (same) {
       const sameMons = monitors.filter(m => m.application?.id === same.id);
-      const sameWeb = sameMons.find(m => isWeb(m) && T.hostOf(m.url) === host);
-      if (sameWeb) {
-        entry.appId = same.id;
-        entry.steps.push({ op: 'none', label: `Already monitored by "${same.name}" (ID ${same.id}) — skipped` });
-        checks.push({ name: `Custom app "${name}"`, status: 'pass', detail: `Already exists with a Web probe for ${host}; nothing to create` });
-      } else {
+      entry.appId = same.id;
+      const missing = probes.filter(pr => !sameMons.some(m => isWeb(m) && T.hostOf(m.url) === pr.host && portOf(m.url) === portOf(pr.url)));
+      if (!multi && missing.length) {
         checks.push({ name: `Custom app "${name}": name`, status: 'fail', detail: `An app with this name already exists (ID ${same.id}) for a different URL. Choose another name.` });
+        continue;
       }
+      if (!missing.length) {
+        entry.steps.push({ op: 'none', label: `Already monitored by "${same.name}" (ID ${same.id}) — skipped` });
+        checks.push({ name: `Custom app "${name}"`, status: 'pass', detail: `Already exists with ${probes.length > 1 ? 'these probes' : `a Web probe for ${first.host}`}; nothing to create` });
+        continue;
+      }
+      for (const pr of missing) {
+        entry.steps.push({ op: 'createWeb', label: `Add Web probe "${webName(pr)}" for ${pr.url} to "${same.name}"`, body: T.buildWebMonitor({ appName: name, url: pr.url, frequency, exactName: multi ? pr.name : null }), probe: pr.name });
+        if (pr.cloudpath) entry.steps.push({ op: 'createCloudPath', label: `Add CloudPath probe "${pathName(pr)}" to ${pr.host}${pr.port ? `:${pr.port}` : ''} (${protocol})`, body: T.buildCloudPathMonitor({ appName: name, host: pr.host, frequency, protocol, tcpPort: pr.port || T.defaultPort(pr.url), exactName: multi ? pr.name : null }), probe: pr.name });
+      }
+      checks.push({ name: `Custom app "${name}"`, status: 'pass', detail: `Exists (ID ${same.id}); ${missing.length} probe(s) added: ${missing.map(pr => pr.name || pr.host).join(', ')}` });
       continue;
     }
-    const otherHost = monitors.find(m => isWeb(m) && T.hostOf(m.url) === host);
-    if (otherHost) warnings.push(`${host} is already probed by "${otherHost.name}" in app "${otherHost.application?.name}". A second app will probe it too.`);
-    if (!colCus) missingCol.add('custom');
-    entry.steps.push({ op: 'createCustom', label: `Create custom app "${name}" (inactive)` });
-    entry.steps.push({ op: 'createWeb', label: `Create Web probe for ${url}`, body: T.buildWebMonitor({ appName: name, url, frequency }) });
-    if (entry.cloudpath) entry.steps.push({ op: 'createCloudPath', label: `Create CloudPath probe to ${host} (${protocol})`, body: T.buildCloudPathMonitor({ appName: name, host, frequency, protocol }) });
+    for (const pr of probes) {
+      const otherHost = monitors.find(m => isWeb(m) && T.hostOf(m.url) === pr.host && portOf(m.url) === portOf(pr.url));
+      if (otherHost) warnings.push(`${pr.host} is already probed by "${otherHost.name}" in app "${otherHost.application?.name}". A second app will probe it too.`);
+    }
+    if (!colName && !colCus) missingCol.add('custom');
+    entry.steps.push({ op: 'createCustom', label: `Create custom app "${name}" (inactive)${colName ? ` in the "${colName}" collection` : ''}` });
+    for (const pr of probes) {
+      entry.steps.push({ op: 'createWeb', label: `Create Web probe ${multi ? `"${webName(pr)}" ` : ''}for ${pr.url}`, body: T.buildWebMonitor({ appName: name, url: pr.url, frequency, exactName: multi ? pr.name : null }), probe: pr.name });
+      if (pr.cloudpath) entry.steps.push({ op: 'createCloudPath', label: `Create CloudPath probe ${multi ? `"${pathName(pr)}" ` : ''}to ${pr.host}${pr.port ? `:${pr.port}` : ''} (${protocol})`, body: T.buildCloudPathMonitor({ appName: name, host: pr.host, frequency, protocol, tcpPort: pr.port || T.defaultPort(pr.url), exactName: multi ? pr.name : null }), probe: pr.name });
+    }
     entry.steps.push({ op: 'activateApp', label: `Turn on "${name}"` });
-    checks.push({ name: `Custom app "${name}"`, status: 'pass', detail: `${host} · Web${entry.cloudpath ? ' + CloudPath' : ''} · every ${frequency / 60} min · all users` });
+    checks.push({ name: `Custom app "${name}"`, status: 'pass', detail: multi
+      ? `${probes.map(pr => `${pr.name} → ${pr.host}${pr.port ? `:${pr.port}` : ''}`).join('; ')} · every ${frequency / 60} min · all users${colName ? ` · collection ${colName}` : ''}`
+      : `${first.host} · Web${entry.cloudpath ? ' + CloudPath' : ''} · every ${frequency / 60} min · all users` });
   }
+  // vendor collections that are not in the tenant yet are created first
+  const newNamed = [...namedCols.values()].filter(x => !x.id && out.some(e => e.collection && e.collection.toLowerCase() === x.name.toLowerCase() && e.steps.some(s => s.op === 'createCustom')));
 
-  if (missingCol.size) {
+  if (missingCol.size || newNamed.length) {
     const setup = { kind: 'setup', key: 'collections', name: 'ZDX tenant setup', steps: [] };
+    for (const x of newNamed) {
+      setup.steps.push({ op: 'createCollection', collectionName: x.name, label: `Create the "${x.name}" collection` });
+      checks.splice(1, 0, { name: `"${x.name}" collection`, status: 'pass', detail: 'Not in this tenant yet — will be created first' });
+    }
     for (const k of ['predefined', 'custom']) {
       if (!missingCol.has(k)) continue;
       setup.steps.push({ op: 'createCollection', collectionKind: k, label: `Create the "${COLLECTION_DEFAULTS[k].name}" (new ZDX tenant)` });
@@ -200,7 +249,7 @@ async function planZdx(zdx, input) {
   if (!changes && !checks.some(c => c.status === 'fail')) warnings.push('Everything selected is already on. Apply will make no changes.');
   return {
     ok: !checks.some(c => c.status === 'fail'), checks, warnings, apps: out, changes,
-    _ctx: { colPre, colCus }
+    _ctx: { colPre, colCus, named: Object.fromEntries([...namedCols.values()].filter(x => x.id).map(x => [x.name.toLowerCase(), { id: x.id, name: x.name }])) }
   };
 }
 
@@ -215,6 +264,12 @@ async function runApp(zdx, entry, ctx) {
     if (entry.kind === 'setup') {
       for (const s of entry.steps) {
         if (s.op !== 'createCollection') continue;
+        if (s.collectionName) {
+          const col = await step(s.label, () => zdx.createCollection({ name: s.collectionName, type: 'END_USER', active: true, description: `${s.collectionName} probes (created by ZTP Policy Wizard)`, tags: [], filters: {} }));
+          if (!col?.id) throw Object.assign(new Error('ZDX did not return the new collection'), { zdxMessage: 'ZDX did not return the new collection' });
+          ctx.named = ctx.named || {}; ctx.named[s.collectionName.toLowerCase()] = { id: col.id, name: col.name || s.collectionName };
+          continue;
+        }
         const d = COLLECTION_DEFAULTS[s.collectionKind];
         const col = await step(s.label, () => zdx.createCollection({ name: d.name, type: 'END_USER', active: true, description: d.description, tags: [], filters: {} }));
         if (!col?.id) throw Object.assign(new Error('ZDX did not return the new collection'), { zdxMessage: 'ZDX did not return the new collection' });
@@ -250,18 +305,21 @@ async function runApp(zdx, entry, ctx) {
     }
 
     // custom
-    let appId = null, webId = null;
+    let appId = entry.appId || null, webId = null;
+    res.created.monitorIds = [];
     for (const s of entry.steps) {
       if (s.op === 'none') { res.steps.push({ label: s.label, ok: true, skipped: true }); continue; }
       if (s.op === 'createCustom') {
-        const app = await step(s.label, () => zdx.createApp({ type: 'CUSTOM', name: entry.name, description: 'Created by ZTP Policy Wizard (Zscaler POV best practice)', active: false, collection: { id: ctx.colCus.id, name: ctx.colCus.name } }));
-        appId = app?.id; res.created.appId = appId;
+        const col = entry.collection ? (ctx.named || {})[entry.collection.toLowerCase()] : ctx.colCus;
+        if (!col) throw Object.assign(new Error(`Collection "${entry.collection}" not found`), { zdxMessage: `Collection "${entry.collection}" not found` });
+        const app = await step(s.label, () => zdx.createApp({ type: 'CUSTOM', name: entry.name, description: 'Created by ZTP Policy Wizard (Zscaler POV best practice)', active: false, collection: { id: col.id, name: col.name } }));
+        appId = app?.id; res.created.appId = appId; res.created.newApp = true;
       } else if (s.op === 'createWeb') {
         const m = await step(s.label, () => zdx.createMonitor(appId, s.body));
-        webId = m?.id; res.created.webId = webId;
+        webId = m?.id; res.created.webId = res.created.webId || webId; res.created.monitorIds.push(webId);
       } else if (s.op === 'createCloudPath') {
         const m = await step(s.label, () => zdx.createMonitor(appId, { ...s.body, followWebMonitor: { id: Number(webId) } }));
-        res.created.cloudPathId = m?.id;
+        res.created.cloudPathId = res.created.cloudPathId || m?.id; res.created.monitorIds.push(m?.id);
       } else if (s.op === 'activateApp') {
         await step(s.label, () => zdx.activateApp(appId));
       }
@@ -271,9 +329,10 @@ async function runApp(zdx, entry, ctx) {
     // Roll back a half-created custom app so a failed run leaves nothing behind
     if (entry.kind === 'custom' && res.created.appId) {
       const rb = [];
-      try { if (res.created.cloudPathId) { await zdx.deleteMonitor(res.created.appId, res.created.cloudPathId); rb.push('CloudPath probe'); } } catch (x) { /* reported below */ }
-      try { if (res.created.webId) { await zdx.deleteMonitor(res.created.appId, res.created.webId); rb.push('Web probe'); } } catch (x) { /* reported below */ }
-      try { await zdx.deleteApp(res.created.appId); rb.push('app'); } catch (x) { rb.push(`app NOT removed (ID ${res.created.appId}): ${x.message}`); }
+      for (const mid of (res.created.monitorIds || []).filter(Boolean).reverse()) {
+        try { await zdx.deleteMonitor(res.created.appId, mid); rb.push('probe'); } catch (x) { /* reported below */ }
+      }
+      if (res.created.newApp) { try { await zdx.deleteApp(res.created.appId); rb.push('app'); } catch (x) { rb.push(`app NOT removed (ID ${res.created.appId}): ${x.message}`); } }
       res.rolledBack = rb.join(', ');
     }
     return res;
@@ -299,7 +358,12 @@ async function verifyZdx(zdx, plan, results) {
     const wantPath = entry.kind === 'custom' ? entry.cloudpath : entry.wantPath;
     if (wantWeb) rows.push({ app: entry.name, check: 'Web probe is on', ok: !!web?.active, detail: web ? `${web.name} · ${web.url}` : 'not found' });
     if (wantPath) rows.push({ app: entry.name, check: 'CloudPath probe is on', ok: !!path?.active, detail: path ? `${path.name} · ${path.host}${path.followWebMonitor ? ` · follows ${path.followWebMonitor.name}` : ''}` : 'not found' });
-    if (entry.kind === 'custom' && web) rows.push({ app: entry.name, check: 'Web probe URL', ok: T.hostOf(web.url) === entry.host, detail: web.url });
+    if (entry.kind === 'custom' && entry.multi) {
+      for (const pr of entry.probes) {
+        const w = mons.find(m => isWeb(m) && T.hostOf(m.url) === pr.host && portOf(m.url) === portOf(pr.url));
+        rows.push({ app: entry.name, check: `${pr.name} Web probe`, ok: !!w?.active, detail: w ? w.url : 'not found' });
+      }
+    } else if (entry.kind === 'custom' && web) rows.push({ app: entry.name, check: 'Web probe URL', ok: T.hostOf(web.url) === entry.host, detail: web.url });
   }
   return rows;
 }

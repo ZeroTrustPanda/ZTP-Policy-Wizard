@@ -1,8 +1,16 @@
 # Changelog
 
-## v2.0.0 → v2.10.2 — 2026-10-19 to 2026-11-09
+## v2.0.0 → v2.11.0 — 2026-10-19 to 2026-11-20
 
-Release notes for the whole 2.x line: [docs/release-notes/v2.10.2.md](docs/release-notes/v2.10.2.md).
+Release notes for the whole 2.x line: [docs/release-notes/v2.11.0.md](docs/release-notes/v2.11.0.md).
+
+### 2.11.0
+- **App catalog** (`server/v2/app-catalog.js`, `GET /api/v2/app-catalog?vertical=`): categories and apps with `verticals`, optional `collection`, `zpa` rows `{ name, placeholder, tcp, udp, on }` and `zdx` rows `{ name, placeholder|fill, port, path, on }`; `mine` marks the vertical's apps.
+- **UI** `AppCatalogPicker` (search, other-vertical switch, categories as collapsible sections, per-row tick, host with the placeholder as hint, ports / port), `catalogToZpa` and `catalogToZdx`. ZPA: catalog rows are merged with the typed / CSV rows (`allApps`); `catalog` saved in the payload for resume; guided start = the wildcard only. ZDX: catalog apps sent as `custom` entries with `probes` and `collection`; predefined apps grouped (`ZDX_PREDEF_GROUPS`).
+- **ZDX multi-probe apps** (`zdx-routes.js`): `custom[].probes[]` (`name`, `url`, `port`) and `custom[].collection`. Probe names exact (`<name>`, `<name> CloudPath`); `withPort` puts a non-default port in the URL; CloudPath `tcpPort` = the row's port. Missing named collections are created in the setup step. An existing app gets only the probes it lacks (matched by host and port). Rollback deletes every probe created in the run, and the app only if it was new. The single `{ name, url }` shape is unchanged.
+- **Intake:** `suggestPrefix` = first three letters/digits, upper case, padded with X; intake input limited to three; presets no longer prefill ZPA apps or ZDX custom apps (counts come from the catalog).
+- **Frameworks:** `HHS_CPG.json`, `HICP_405D.json` (healthcare DLP, objectives and areas mapped to the goals / practices); listed after HITRUST; AI Guard uses the HIPAA profile for them.
+- ZPA: an application row with no destinations says to enter the customer's host names.
 
 ### 2.10.2
 - **macOS app profile** (`zcc-app-profile-templates.js`): removed `pacUrl` (recommended.pac), `failCloseTunnelExit`, `prioritizeDnsExclusionsOff`, `packetCaptureExtrasOff`; bypass apps = the Windows six; added `enableCli` and `zpaReauthNotice`; `baseApply` sets `pac_url: ''`. `planAppProfile` reports a stored PAC URL that differs from the body as a change, so re-runs clear it.
