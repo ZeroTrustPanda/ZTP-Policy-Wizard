@@ -132,17 +132,22 @@ function desired(t, current, { withLogo = true } = {}) {
     customText: message(t, 'block', { withLogo }),
     cautionCustomText: message(t, 'caution', { withLogo }),
     displayReason: !!t.showReason,
+    // the live API names these displayCompName / displayCompLogo (ZTH 2026-11-20); the SDK names (displayCompany*) are kept as a fallback
+    displayCompName: !!t.showCompanyName,
     displayCompanyName: !!t.showCompanyName,
     // the portal logo (Administration › Organization) shows on the page too: turn it off when the theme embeds its own
+    displayCompLogo: !t.logo,
     displayCompanyLogo: !t.logo,
     supportEmail: t.supportEmail || undefined,
     supportPhone: t.supportPhone || undefined,
     orgPolicyLink: t.policyLink || undefined
   };
   const values = {}, missing = [];
+  const ALIAS = { displayCompanyName: 'displayCompName', displayCompName: 'displayCompanyName', displayCompanyLogo: 'displayCompLogo', displayCompLogo: 'displayCompanyLogo' };
   for (const [k, v] of Object.entries(want)) {
     if (v === undefined) continue;
-    if (current && Object.prototype.hasOwnProperty.call(current, k)) values[k] = v; else missing.push(k);
+    if (current && Object.prototype.hasOwnProperty.call(current, k)) values[k] = v;
+    else if (!(ALIAS[k] && current && Object.prototype.hasOwnProperty.call(current, ALIAS[k]))) missing.push(k);
   }
   return { values, missing };
 }
@@ -195,7 +200,7 @@ async function run(client, theme, { dryRun, logger }) {
       catch (e) {
         if (!t.logo || !/length|too long|exceed|size|INVALID_INPUT|400/i.test(String(e.message))) throw e;
         const slim = desired(t, current, { withLogo: false }).values;
-        await client.apiCall('PUT', '/api/v1/eun', { ...merged, ...slim, displayCompanyLogo: true });
+        await client.apiCall('PUT', '/api/v1/eun', { ...merged, ...slim, ...('displayCompLogo' in merged ? { displayCompLogo: true } : { displayCompanyLogo: true }) });
         logoDropped = true;
         return { notes: ['ZIA did not accept the logo inside the page text, so the pages were saved without it and the portal company logo is shown instead. Upload the compressed logo in Administration › Organization.'] };
       }
