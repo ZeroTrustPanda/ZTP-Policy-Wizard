@@ -32,6 +32,9 @@ function operations(actions, type) {
 }
 
 function register(app, requireAuth, { v2 }) {
+  // v2.11: ZPA / ZDX app catalog (toggles by category; the vertical's apps are marked "mine")
+  app.get('/api/v2/app-catalog', requireAuth, (req, res) => res.json(require('./app-catalog').catalog(req.query.vertical)));
+
   app.get('/api/v2/zpa/locations', requireAuth, (req, res) => res.json({ locations: require('./zpa').LOCATIONS.map(l => ({ id: l.id, label: l.label, countryCode: l.countryCode })), default: 'us-sjc' }));
 
   app.get('/api/v2/zia/cac-apps', requireAuth, async (req, res) => {

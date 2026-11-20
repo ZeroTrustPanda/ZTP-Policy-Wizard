@@ -28,4 +28,7 @@ module.exports = [
   require('./ISO_27001.json'),
   require('./NIST_CSF_2.json'),
   require('./GLBA.json'),
+  // v2.11 healthcare
+  require('./HHS_CPG.json'),
+  require('./HICP_405D.json'),
 ];

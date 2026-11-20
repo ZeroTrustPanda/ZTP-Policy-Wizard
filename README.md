@@ -1,4 +1,4 @@
-# 🐼 ZeroTrustPanda — ZTP Policy Wizard v2.10.2
+# 🐼 ZeroTrustPanda — ZTP Policy Wizard v2.11.0
 
 Proof-of-value automation for Zscaler SEs: Zscaler Internet Access (ZIA), Zscaler Client Connector (ZCC), Zscaler Private Access (ZPA) and Zscaler Digital Experience (ZDX), all with one set of OneAPI (ZIdentity) client credentials.
 
@@ -8,9 +8,9 @@ No Node.js, no npm, nothing to install. Click your download, unzip it, and doubl
 
 | Computer | Download (click to download) |
 |---|---|
-| **Mac with Apple silicon (M1–M4)** | [**ZTP-Wizard-2.10.2-macos-arm64.zip**](https://github.com/ZeroTrustPanda/ZTP-Policy-Wizard/raw/standalone/standalone/release/ZTP-Wizard-2.10.2-macos-arm64.zip) |
-| Windows 10/11 (64-bit) | [ZTP-Wizard-2.10.2-windows-x64.zip](https://github.com/ZeroTrustPanda/ZTP-Policy-Wizard/raw/standalone/standalone/release/ZTP-Wizard-2.10.2-windows-x64.zip) |
-| Intel Mac | [ZTP-Wizard-2.10.2-macos-x64.zip](https://github.com/ZeroTrustPanda/ZTP-Policy-Wizard/raw/standalone/standalone/release/ZTP-Wizard-2.10.2-macos-x64.zip) |
+| **Mac with Apple silicon (M1–M4)** | [**ZTP-Wizard-2.11.0-macos-arm64.zip**](https://github.com/ZeroTrustPanda/ZTP-Policy-Wizard/raw/standalone/standalone/release/ZTP-Wizard-2.11.0-macos-arm64.zip) |
+| Windows 10/11 (64-bit) | [ZTP-Wizard-2.11.0-windows-x64.zip](https://github.com/ZeroTrustPanda/ZTP-Policy-Wizard/raw/standalone/standalone/release/ZTP-Wizard-2.11.0-windows-x64.zip) |
+| Intel Mac | [ZTP-Wizard-2.11.0-macos-x64.zip](https://github.com/ZeroTrustPanda/ZTP-Policy-Wizard/raw/standalone/standalone/release/ZTP-Wizard-2.11.0-macos-x64.zip) |
 
 The wizard starts on `http://127.0.0.1:3000` (or the next free port), opens your browser, and keeps your API credentials on your computer. Logs go to `ZTP-Wizard/logs` in your home folder.
 
@@ -18,11 +18,16 @@ The wizard starts on `http://127.0.0.1:3000` (or the next free port), opens your
 - **Mac:** right-click `ZTP-Wizard` → *Open* → *Open*. If macOS still refuses, run `xattr -d com.apple.quarantine ZTP-Wizard` in the unzipped folder. If it then reports "killed", also run `codesign --force --sign - ZTP-Wizard`.
 - **Windows:** SmartScreen → *More info* → *Run anyway*.
 
-These are the same features as the v2.10.2 server version on `main`. The UI is compiled ahead of time, with React and fonts built in, so it works without reaching any CDN; only the Zscaler API calls need the network.
+These are the same features as the v2.11.0 server version on `main`. The UI is compiled ahead of time, with React and fonts built in, so it works without reaching any CDN; only the Zscaler API calls need the network.
 
-**Release notes (2.0 → 2.10.2):** [docs/release-notes/v2.10.2.md](docs/release-notes/v2.10.2.md) · **Change log:** [CHANGELOG.md](CHANGELOG.md) · **Releases:** [GitHub releases](https://github.com/ZeroTrustPanda/ZTP-Policy-Wizard/releases)
+**Release notes (2.0 → 2.11.0):** [docs/release-notes/v2.11.0.md](docs/release-notes/v2.11.0.md) · **Change log:** [CHANGELOG.md](CHANGELOG.md) · **Releases:** [GitHub releases](https://github.com/ZeroTrustPanda/ZTP-Policy-Wizard/releases)
 
-## What's in 2.x (2.0 → 2.10.2)
+## What's in 2.x (2.0 → 2.11.0)
+
+- **App catalog, three-letter prefix, healthcare profiles (2.11):**
+  - ZPA and ZDX apps are toggles by category instead of a prefilled list: Epic (Hyperspace Web, Web BLOB…), Oracle Health, MEDITECH, Synapse and Visage PACS, Imprivata, Citrix, Horizon, SAP and more, with the vendor's ports and a hint for each customer host. Each ZDX app gets its own collection and named probes (Epic HSW, Epic Web BLOB).
+  - The prefix is three characters from the customer name (Hajny → HAJ), editable.
+  - HHS HPH Cybersecurity Performance Goals and 405(d) HICP compliance profiles.
 
 - **Per-app cloud controls, Copilot inspection, rule order (2.10):**
   - Pick each app's actions (Facebook, LinkedIn, X, ChatGPT, Copilot, Gemini, Claude, Google Drive, Dropbox, Box) per operation, from what the tenant offers.
@@ -121,7 +126,7 @@ These are the same features as the v2.10.2 server version on `main`. The UI is c
   - A layout that fits any window size.
   - An update badge.
 
-The full feature list, by product and by version, is in the [release notes](docs/release-notes/v2.10.2.md).
+The full feature list, by product and by version, is in the [release notes](docs/release-notes/v2.11.0.md).
 
 ## 1.9 flows (still available)
 
@@ -202,7 +207,7 @@ The API client needs the ZDX scope. ZDX refuses some hosts (for example `www.zsc
 
 ## Compliance Frameworks
 
-HIPAA, HITRUST CSF, NIST 800-53, NIST 800-171, PCI-DSS, CJIS, SOX, FERPA, GDPR
+HIPAA, HITRUST CSF, HHS HPH CPGs, 405(d) HICP, NIST 800-53, NIST 800-171, PCI-DSS, CJIS, SOX, FERPA, GDPR
 
 Each framework maps specific controls to the generated rules. Compliance evidence is available in the Review step.
 
@@ -315,6 +320,7 @@ The DLP module uses a **dictionary-first** approach:
 
 | Version | Changes |
 |---------|---------|
+| **2.11.0** | App catalog for ZPA and ZDX (toggles by category, vendor ports, host hints, one ZDX app per vendor with named probes); three-letter prefix; HHS HPH CPG and 405(d) HICP profiles. |
 | **2.10.2** | macOS Client Connector profile matches Windows (no PAC URL, same defaults and bypass apps); Windows and macOS share one forwarding profile. |
 | **2.10.1** | AI Guard uses SSL Inspection's Copilot rule and Inspect All; no separate AI Guard SSL rule. |
 | **2.10.0** | Per-app Cloud App Control actions; Inspect Microsoft Copilot at SSL rule 1; Block-QUIC at firewall rule 1, Allow-Web / Allow-NTP removed; ZPA App Connector location picker. |

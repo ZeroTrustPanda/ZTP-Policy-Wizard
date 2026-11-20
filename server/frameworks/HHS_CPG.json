@@ -1,0 +1,385 @@
+{
+  "id": "HHS_CPG",
+  "type": "compliance",
+  "name": "HHS HPH CPGs",
+  "fullName": "HHS Healthcare and Public Health Sector Cybersecurity Performance Goals (essential and enhanced)",
+  "description": "Voluntary HHS goals for hospitals and health systems: ten essential goals (known vulnerabilities, email security, MFA, encryption in transit…) and ten enhanced goals (segmentation, detection, central logging, configuration management…).",
+  "version": "2026.11.1",
+  "researchedAt": "2026-11-20",
+  "baseTier": "BALANCED",
+  "complianceKey": "HHS_CPG",
+  "sources": [
+    {
+      "id": "hhs-cpg",
+      "title": "HHS Healthcare and Public Health Cybersecurity Performance Goals",
+      "url": "https://hhscyber.hhs.gov/cybersecurity-performance-goals.html"
+    },
+    {
+      "id": "icd10",
+      "title": "CDC/NCHS ICD-10-CM Official Guidelines for Coding and Reporting FY2026",
+      "url": "https://ftp.cdc.gov/pub/health_statistics/nchs/publications/ICD10CM/2026/ICD-10-CM-October-2025-Guidelines.pdf"
+    },
+    {
+      "id": "mbi",
+      "title": "CMS: Understanding the Medicare Beneficiary Identifier (MBI) format",
+      "url": "https://www.hhs.gov/guidance/sites/default/files/hhs-guidance-documents/Understanding-the-MBI-052918.pdf"
+    }
+  ],
+  "controls": [
+    {
+      "id": "E1",
+      "name": "Mitigate known vulnerabilities",
+      "source": "hhs-cpg"
+    },
+    {
+      "id": "E2",
+      "name": "Email security",
+      "source": "hhs-cpg"
+    },
+    {
+      "id": "E3",
+      "name": "Multifactor authentication",
+      "source": "hhs-cpg"
+    },
+    {
+      "id": "E4",
+      "name": "Basic cybersecurity training",
+      "source": "hhs-cpg"
+    },
+    {
+      "id": "E5",
+      "name": "Strong encryption",
+      "source": "hhs-cpg"
+    },
+    {
+      "id": "E6",
+      "name": "Revoke credentials for departing workforce members",
+      "source": "hhs-cpg"
+    },
+    {
+      "id": "E7",
+      "name": "Basic incident planning and preparedness",
+      "source": "hhs-cpg"
+    },
+    {
+      "id": "E8",
+      "name": "Unique credentials",
+      "source": "hhs-cpg"
+    },
+    {
+      "id": "E9",
+      "name": "Separate user and privileged accounts",
+      "source": "hhs-cpg"
+    },
+    {
+      "id": "E10",
+      "name": "Vendor/supplier cybersecurity requirements",
+      "source": "hhs-cpg"
+    },
+    {
+      "id": "N1",
+      "name": "Asset inventory",
+      "source": "hhs-cpg"
+    },
+    {
+      "id": "N2",
+      "name": "Third party vulnerability disclosure",
+      "source": "hhs-cpg"
+    },
+    {
+      "id": "N3",
+      "name": "Third party incident reporting",
+      "source": "hhs-cpg"
+    },
+    {
+      "id": "N4",
+      "name": "Cybersecurity testing",
+      "source": "hhs-cpg"
+    },
+    {
+      "id": "N5",
+      "name": "Cybersecurity mitigation",
+      "source": "hhs-cpg"
+    },
+    {
+      "id": "N6",
+      "name": "Detect and respond to relevant threats and TTPs",
+      "source": "hhs-cpg"
+    },
+    {
+      "id": "N7",
+      "name": "Network segmentation",
+      "source": "hhs-cpg"
+    },
+    {
+      "id": "N8",
+      "name": "Centralized log collection",
+      "source": "hhs-cpg"
+    },
+    {
+      "id": "N9",
+      "name": "Centralized incident planning and preparedness",
+      "source": "hhs-cpg"
+    },
+    {
+      "id": "N10",
+      "name": "Configuration management",
+      "source": "hhs-cpg"
+    }
+  ],
+  "areas": {
+    "urlFiltering": {
+      "controls": [
+        "N6",
+        "E2"
+      ],
+      "rationale": "Block malicious, phishing and high-risk categories; restrict web destinations that expose ePHI to unauthorized parties."
+    },
+    "cloudAppControl": {
+      "controls": [
+        "E10",
+        "N7"
+      ],
+      "rationale": "Control file-sharing, webmail and AI apps where ePHI can leave the organization."
+    },
+    "fileTypeControl": {
+      "controls": [
+        "N6"
+      ],
+      "rationale": "Block executable and script downloads from untrusted sources."
+    },
+    "advancedThreatProtection": {
+      "controls": [
+        "N6",
+        "E1"
+      ],
+      "rationale": "Botnet, phishing, malicious content and cryptomining protections guard ePHI integrity."
+    },
+    "firewallFiltering": {
+      "controls": [
+        "N7"
+      ],
+      "rationale": "Restrict outbound protocols and tunnels that bypass inspection."
+    },
+    "dnsSecurity": {
+      "controls": [
+        "N6"
+      ],
+      "rationale": "Block DNS resolution of malicious and newly registered domains; stop DNS tunneling."
+    },
+    "sslInspection": {
+      "controls": [
+        "N6",
+        "E5"
+      ],
+      "rationale": "Inspect encrypted traffic so malware and ePHI exfiltration controls work; exempt health and finance sites for privacy."
+    },
+    "dlpMonitor": {
+      "controls": [
+        "N8"
+      ],
+      "rationale": "Monitor-only DLP gives visibility into ePHI in motion without disrupting care workflows."
+    },
+    "dlpBlock": {
+      "controls": [
+        "E5",
+        "N6"
+      ],
+      "rationale": "Block ePHI identifiers (SSN, MBI, MRN, ICD-10 with diagnosis context, NPI) leaving to unsanctioned destinations."
+    },
+    "endpointDlp": {
+      "controls": [
+        "N1"
+      ],
+      "rationale": "Monitor ePHI copied to USB storage, personal cloud sync and printers (device and media controls)."
+    },
+    "sandbox": {
+      "controls": [
+        "N6"
+      ],
+      "rationale": "Detonate unknown files before delivery; quarantine high-risk types."
+    },
+    "aiPromptCapture": {
+      "controls": [
+        "N8",
+        "E10"
+      ],
+      "rationale": "Record GenAI prompts so PHI shared with AI tools is auditable."
+    }
+  },
+  "dlp": {
+    "monitorEngines": [
+      "HIPAA",
+      "PCI"
+    ],
+    "blockRules": [
+      {
+        "key": "PHI-Identifiers",
+        "label": "PHI-Identifiers",
+        "dictionaries": [
+          "predefined:SSN",
+          "custom:MBI",
+          "custom:MRN"
+        ],
+        "controls": [
+          "E5",
+          "N6"
+        ]
+      },
+      {
+        "key": "PHI-Clinical",
+        "label": "PHI-Clinical",
+        "dictionaries": [
+          "predefined:MEDICAL",
+          "custom:ICD10",
+          "predefined:NPI_LEAKAGE"
+        ],
+        "controls": [
+          "E5",
+          "N6"
+        ]
+      },
+      {
+        "key": "Payment-Cards",
+        "label": "Payment-Cards",
+        "dictionaries": [
+          "predefined:CREDIT_CARD"
+        ],
+        "controls": [
+          "E5",
+          "N6"
+        ]
+      },
+      {
+        "key": "PHI-Sensitive",
+        "label": "PHI-Sensitive",
+        "why": "A specially protected condition (substance use, HIV, psychotherapy, genetic) together with a patient identifier.",
+        "dictionaries": [
+          "custom:PHI_SENSITIVE",
+          "custom:MRN",
+          "custom:DOB_LABEL",
+          "custom:MBI",
+          "custom:HEALTH_PLAN_ID"
+        ],
+        "expression": "(({PHI_SENSITIVE} > 0) AND (({MRN} > 0) OR ({DOB_LABEL} > 0) OR ({MBI} > 0) OR ({HEALTH_PLAN_ID} > 0)))",
+        "controls": [
+          "E5",
+          "N6"
+        ]
+      },
+      {
+        "key": "PHI-Narrative",
+        "label": "PHI-Narrative",
+        "why": "Clinical note wording together with a patient identifier (discharge summaries, progress notes).",
+        "dictionaries": [
+          "custom:CLINICAL_NOTES",
+          "custom:MRN",
+          "custom:DOB_LABEL",
+          "custom:HEALTH_PLAN_ID"
+        ],
+        "expression": "(({CLINICAL_NOTES} > 2) AND (({MRN} > 0) OR ({DOB_LABEL} > 0) OR ({HEALTH_PLAN_ID} > 0)))",
+        "controls": [
+          "E5",
+          "N6"
+        ]
+      },
+      {
+        "key": "PHI-Bulk",
+        "label": "PHI-Bulk",
+        "why": "Fifty or more patient identifiers in one transfer: a bulk export, whatever the destination.",
+        "dictionaries": [
+          "custom:MRN",
+          "custom:MBI",
+          "predefined:SSN",
+          "custom:DOB_LABEL"
+        ],
+        "expression": "(({MRN} > 49) OR ({MBI} > 49) OR ({SSN} > 49) OR ({DOB_LABEL} > 49))",
+        "controls": [
+          "E5",
+          "N6"
+        ]
+      }
+    ],
+    "endpointChannels": [
+      "REMOVABLE_DRIVE_TRANSFER",
+      "PERSONAL_CLOUD_STORAGE",
+      "PRINTING"
+    ]
+  },
+  "objectives": {
+    "MALWARE": [
+      "N6",
+      "E1"
+    ],
+    "THREAT_SITES": [
+      "N6",
+      "E2"
+    ],
+    "ACCEPTABLE_USE": [],
+    "PRODUCTIVITY": [],
+    "LEAST_FUNCTION": [
+      "N10",
+      "N5"
+    ],
+    "BOUNDARY": [
+      "N7"
+    ],
+    "ALLOW_EXCEPTION": [
+      "N7"
+    ],
+    "INFO_FLOW": [
+      "N7",
+      "E10"
+    ],
+    "DATA_LOSS": [
+      "E5",
+      "N6"
+    ],
+    "DATA_MONITOR": [
+      "N8"
+    ],
+    "MEDIA": [
+      "N1"
+    ],
+    "INSPECT_TLS": [
+      "N6",
+      "N8"
+    ],
+    "PRIVACY_EXEMPT": [],
+    "DNS": [
+      "N6"
+    ],
+    "DNS_TUNNEL": [
+      "N6",
+      "N8"
+    ],
+    "SANDBOX": [
+      "N6",
+      "E1"
+    ],
+    "ISOLATION": [
+      "N6"
+    ],
+    "MOBILE_CODE": [
+      "N6"
+    ],
+    "AI_GOV": [
+      "E10",
+      "N6"
+    ],
+    "TIME_SYNC": [
+      "N8"
+    ],
+    "REMOTE_ACCESS": [
+      "E3",
+      "N7"
+    ],
+    "SESSION": [
+      "E3"
+    ],
+    "APP_PROTECT": [
+      "E1",
+      "N5"
+    ]
+  }
+}
