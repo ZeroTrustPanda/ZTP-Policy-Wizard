@@ -643,7 +643,7 @@
     // ========================
     // App Version
     // ========================
-    const APP_VERSION = '2.11.0';
+    const APP_VERSION = '2.11.1';
     const BUILD_DATE = '2026-03-30';
 
     // ========================
@@ -1201,6 +1201,7 @@
                     <summary style={{cursor:'pointer', fontWeight:600, fontSize:'14px'}}>Version history</summary>
                     <div style={{marginTop:'0.75rem', lineHeight:1.7}}>
                     <div style={{paddingLeft:'1rem', fontSize:'12px'}}>
+                      <div><strong>v2.11.1</strong> — Tested live on a Zscaler tenant. Block and caution pages use the tenant's names for the company name and logo switches. A clear message when ZDX refuses a probe address (Zscaler's own sites).</div>
                       <div><strong>v2.11.0</strong> — App catalog for Private Access and Digital Experience: apps are toggles grouped by category instead of a prefilled list. Epic (Hyperspace Web, Web BLOB, Interconnect, Perimeter Authentication…), Oracle Health, MEDITECH, Fujifilm Synapse and Visage PACS, Imprivata, Citrix, Horizon, SAP and apps for the other verticals, each with the vendor's ports and a hint for the customer host to fill in. Each ZDX app gets its own collection with named probes (Epic HSW, Epic Web BLOB). The prefix is three characters from the customer name (Hajny → HAJ). New healthcare profiles: HHS HPH Cybersecurity Performance Goals and 405(d) HICP.</div>
                       <div><strong>v2.10.2</strong> — macOS Client Connector matches Windows: no app profile PAC URL (an old one is cleared), fail-close, DNS exclusion priority and packet capture left at the portal defaults, the same bypass apps, CLI and ZPA re-authentication notice; Windows and macOS share one forwarding profile.</div>
                       <div><strong>v2.10.1</strong> — AI Guard no longer adds an SSL rule of its own: Copilot is inspected by SSL Inspection's Inspect Microsoft Copilot rule and the other AI apps by Inspect All. An AIG-Inspect rule from an earlier version is removed (Undo puts it back).</div>

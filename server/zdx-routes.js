@@ -28,6 +28,12 @@ const COLLECTION_DEFAULTS = {
   predefined: { name: 'Predefined Apps Collection', description: 'Collection for Predefined Applications (created by ZTP Policy Wizard)' }
 };
 
+// ZDX answers "Rejected: restricted url" for hosts it will not probe (Zscaler's own sites, for example).
+function zdxError(e) {
+  const m = e.zdxMessage || e.message || '';
+  if (/restricted url/i.test(m)) return `${m}. ZDX does not allow probes to this address (Zscaler's own sites are refused). Use the customer's own host name.`;
+  return m;
+}
 function findCollection(collections, kind) {
   const want = kind === 'custom' ? 'custom apps collection' : 'predefined apps collection';
   return collections.find(c => String(c.name).toLowerCase() === want)
@@ -258,7 +264,7 @@ async function runApp(zdx, entry, ctx) {
   const res = { name: entry.name, kind: entry.kind, ok: true, steps: [], created: {} };
   const step = async (label, fn) => {
     try { const r = await fn(); res.steps.push({ label, ok: true }); return r; }
-    catch (e) { res.steps.push({ label, ok: false, error: e.zdxMessage || e.message }); res.ok = false; throw e; }
+    catch (e) { res.steps.push({ label, ok: false, error: zdxError(e) }); res.ok = false; throw e; }
   };
   try {
     if (entry.kind === 'setup') {
