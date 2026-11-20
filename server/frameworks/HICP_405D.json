@@ -1,0 +1,339 @@
+{
+  "id": "HICP_405D",
+  "type": "compliance",
+  "name": "405(d) HICP",
+  "fullName": "HHS 405(d) Health Industry Cybersecurity Practices (2023 edition)",
+  "description": "The 405(d) program's ten practices for the five biggest healthcare threats (social engineering, ransomware, loss of equipment or data, insider data loss, attacks on connected medical devices).",
+  "version": "2026.11.1",
+  "researchedAt": "2026-11-20",
+  "baseTier": "BALANCED",
+  "complianceKey": "HICP_405D",
+  "sources": [
+    {
+      "id": "hicp",
+      "title": "HHS 405(d) Health Industry Cybersecurity Practices (HICP), 2023 edition",
+      "url": "https://hhscyber.hhs.gov/cornerstone-hicp.html"
+    },
+    {
+      "id": "icd10",
+      "title": "CDC/NCHS ICD-10-CM Official Guidelines for Coding and Reporting FY2026",
+      "url": "https://ftp.cdc.gov/pub/health_statistics/nchs/publications/ICD10CM/2026/ICD-10-CM-October-2025-Guidelines.pdf"
+    },
+    {
+      "id": "mbi",
+      "title": "CMS: Understanding the Medicare Beneficiary Identifier (MBI) format",
+      "url": "https://www.hhs.gov/guidance/sites/default/files/hhs-guidance-documents/Understanding-the-MBI-052918.pdf"
+    }
+  ],
+  "controls": [
+    {
+      "id": "P1",
+      "name": "Email protection systems",
+      "source": "hicp"
+    },
+    {
+      "id": "P2",
+      "name": "Endpoint protection systems",
+      "source": "hicp"
+    },
+    {
+      "id": "P3",
+      "name": "Identity and access management",
+      "source": "hicp"
+    },
+    {
+      "id": "P4",
+      "name": "Data protection and loss prevention",
+      "source": "hicp"
+    },
+    {
+      "id": "P5",
+      "name": "IT asset management",
+      "source": "hicp"
+    },
+    {
+      "id": "P6",
+      "name": "Network management",
+      "source": "hicp"
+    },
+    {
+      "id": "P7",
+      "name": "Vulnerability management",
+      "source": "hicp"
+    },
+    {
+      "id": "P8",
+      "name": "Security operations center and incident response",
+      "source": "hicp"
+    },
+    {
+      "id": "P9",
+      "name": "Network connected medical device security",
+      "source": "hicp"
+    },
+    {
+      "id": "P10",
+      "name": "Cybersecurity oversight and governance",
+      "source": "hicp"
+    }
+  ],
+  "areas": {
+    "urlFiltering": {
+      "controls": [
+        "P1",
+        "P2"
+      ],
+      "rationale": "Block malicious, phishing and high-risk categories; restrict web destinations that expose ePHI to unauthorized parties."
+    },
+    "cloudAppControl": {
+      "controls": [
+        "P4",
+        "P6"
+      ],
+      "rationale": "Control file-sharing, webmail and AI apps where ePHI can leave the organization."
+    },
+    "fileTypeControl": {
+      "controls": [
+        "P2"
+      ],
+      "rationale": "Block executable and script downloads from untrusted sources."
+    },
+    "advancedThreatProtection": {
+      "controls": [
+        "P2",
+        "P8"
+      ],
+      "rationale": "Botnet, phishing, malicious content and cryptomining protections guard ePHI integrity."
+    },
+    "firewallFiltering": {
+      "controls": [
+        "P6",
+        "P9"
+      ],
+      "rationale": "Restrict outbound protocols and tunnels that bypass inspection."
+    },
+    "dnsSecurity": {
+      "controls": [
+        "P6",
+        "P8"
+      ],
+      "rationale": "Block DNS resolution of malicious and newly registered domains; stop DNS tunneling."
+    },
+    "sslInspection": {
+      "controls": [
+        "P6",
+        "P8"
+      ],
+      "rationale": "Inspect encrypted traffic so malware and ePHI exfiltration controls work; exempt health and finance sites for privacy."
+    },
+    "dlpMonitor": {
+      "controls": [
+        "P4",
+        "P8"
+      ],
+      "rationale": "Monitor-only DLP gives visibility into ePHI in motion without disrupting care workflows."
+    },
+    "dlpBlock": {
+      "controls": [
+        "P4"
+      ],
+      "rationale": "Block ePHI identifiers (SSN, MBI, MRN, ICD-10 with diagnosis context, NPI) leaving to unsanctioned destinations."
+    },
+    "endpointDlp": {
+      "controls": [
+        "P4",
+        "P5"
+      ],
+      "rationale": "Monitor ePHI copied to USB storage, personal cloud sync and printers (device and media controls)."
+    },
+    "sandbox": {
+      "controls": [
+        "P2"
+      ],
+      "rationale": "Detonate unknown files before delivery; quarantine high-risk types."
+    },
+    "aiPromptCapture": {
+      "controls": [
+        "P4",
+        "P10"
+      ],
+      "rationale": "Record GenAI prompts so PHI shared with AI tools is auditable."
+    }
+  },
+  "dlp": {
+    "monitorEngines": [
+      "HIPAA",
+      "PCI"
+    ],
+    "blockRules": [
+      {
+        "key": "PHI-Identifiers",
+        "label": "PHI-Identifiers",
+        "dictionaries": [
+          "predefined:SSN",
+          "custom:MBI",
+          "custom:MRN"
+        ],
+        "controls": [
+          "P4"
+        ]
+      },
+      {
+        "key": "PHI-Clinical",
+        "label": "PHI-Clinical",
+        "dictionaries": [
+          "predefined:MEDICAL",
+          "custom:ICD10",
+          "predefined:NPI_LEAKAGE"
+        ],
+        "controls": [
+          "P4"
+        ]
+      },
+      {
+        "key": "Payment-Cards",
+        "label": "Payment-Cards",
+        "dictionaries": [
+          "predefined:CREDIT_CARD"
+        ],
+        "controls": [
+          "P4"
+        ]
+      },
+      {
+        "key": "PHI-Sensitive",
+        "label": "PHI-Sensitive",
+        "why": "A specially protected condition (substance use, HIV, psychotherapy, genetic) together with a patient identifier.",
+        "dictionaries": [
+          "custom:PHI_SENSITIVE",
+          "custom:MRN",
+          "custom:DOB_LABEL",
+          "custom:MBI",
+          "custom:HEALTH_PLAN_ID"
+        ],
+        "expression": "(({PHI_SENSITIVE} > 0) AND (({MRN} > 0) OR ({DOB_LABEL} > 0) OR ({MBI} > 0) OR ({HEALTH_PLAN_ID} > 0)))",
+        "controls": [
+          "P4"
+        ]
+      },
+      {
+        "key": "PHI-Narrative",
+        "label": "PHI-Narrative",
+        "why": "Clinical note wording together with a patient identifier (discharge summaries, progress notes).",
+        "dictionaries": [
+          "custom:CLINICAL_NOTES",
+          "custom:MRN",
+          "custom:DOB_LABEL",
+          "custom:HEALTH_PLAN_ID"
+        ],
+        "expression": "(({CLINICAL_NOTES} > 2) AND (({MRN} > 0) OR ({DOB_LABEL} > 0) OR ({HEALTH_PLAN_ID} > 0)))",
+        "controls": [
+          "P4"
+        ]
+      },
+      {
+        "key": "PHI-Bulk",
+        "label": "PHI-Bulk",
+        "why": "Fifty or more patient identifiers in one transfer: a bulk export, whatever the destination.",
+        "dictionaries": [
+          "custom:MRN",
+          "custom:MBI",
+          "predefined:SSN",
+          "custom:DOB_LABEL"
+        ],
+        "expression": "(({MRN} > 49) OR ({MBI} > 49) OR ({SSN} > 49) OR ({DOB_LABEL} > 49))",
+        "controls": [
+          "P4"
+        ]
+      }
+    ],
+    "endpointChannels": [
+      "REMOVABLE_DRIVE_TRANSFER",
+      "PERSONAL_CLOUD_STORAGE",
+      "PRINTING"
+    ]
+  },
+  "objectives": {
+    "MALWARE": [
+      "P2",
+      "P8"
+    ],
+    "THREAT_SITES": [
+      "P1",
+      "P8"
+    ],
+    "ACCEPTABLE_USE": [
+      "P10"
+    ],
+    "PRODUCTIVITY": [
+      "P10"
+    ],
+    "LEAST_FUNCTION": [
+      "P6",
+      "P2"
+    ],
+    "BOUNDARY": [
+      "P6",
+      "P9"
+    ],
+    "ALLOW_EXCEPTION": [
+      "P6"
+    ],
+    "INFO_FLOW": [
+      "P4",
+      "P6"
+    ],
+    "DATA_LOSS": [
+      "P4"
+    ],
+    "DATA_MONITOR": [
+      "P4",
+      "P8"
+    ],
+    "MEDIA": [
+      "P4",
+      "P5"
+    ],
+    "INSPECT_TLS": [
+      "P6",
+      "P8"
+    ],
+    "PRIVACY_EXEMPT": [],
+    "DNS": [
+      "P6",
+      "P8"
+    ],
+    "DNS_TUNNEL": [
+      "P6",
+      "P8"
+    ],
+    "SANDBOX": [
+      "P2",
+      "P8"
+    ],
+    "ISOLATION": [
+      "P2"
+    ],
+    "MOBILE_CODE": [
+      "P2"
+    ],
+    "AI_GOV": [
+      "P4",
+      "P10"
+    ],
+    "TIME_SYNC": [
+      "P8"
+    ],
+    "REMOTE_ACCESS": [
+      "P3",
+      "P6"
+    ],
+    "SESSION": [
+      "P3"
+    ],
+    "APP_PROTECT": [
+      "P7",
+      "P2"
+    ]
+  }
+}

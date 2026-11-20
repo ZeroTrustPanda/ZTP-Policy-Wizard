@@ -643,7 +643,7 @@
     // ========================
     // App Version
     // ========================
-    const APP_VERSION = '2.10.2';
+    const APP_VERSION = '2.11.0';
     const BUILD_DATE = '2026-03-30';
 
     // ========================
@@ -1165,7 +1165,7 @@
                         </div>
                         <div className="card" style={{margin:'1rem 0 0'}}>
                           <div style={{fontSize:'13px', color:'var(--text-secondary)'}}>Version <strong style={{color:'var(--text-primary)'}}>{APP_VERSION}</strong></div>
-                          <div style={{fontSize:'13px', color:'var(--text-secondary)', marginTop:'4px'}}>Compliance profiles: HIPAA, HITRUST CSF, NIST 800-53, NIST 800-171, PCI DSS, CJIS, SOX, FERPA, GDPR, GLBA, SOC 2, ISO/IEC 27001, NIST CSF 2.0, FedRAMP Moderate and High, CMMC 2.0 Level 2, Federal Zero Trust, IRS Pub 1075, GovRAMP</div>
+                          <div style={{fontSize:'13px', color:'var(--text-secondary)', marginTop:'4px'}}>Compliance profiles: HIPAA, HITRUST CSF, HHS HPH CPGs, 405(d) HICP, NIST 800-53, NIST 800-171, PCI DSS, CJIS, SOX, FERPA, GDPR, GLBA, SOC 2, ISO/IEC 27001, NIST CSF 2.0, FedRAMP Moderate and High, CMMC 2.0 Level 2, Federal Zero Trust, IRS Pub 1075, GovRAMP</div>
                           <div style={{fontSize:'13px', marginTop:'8px'}}><a href="https://github.com/ZeroTrustPanda/ZTP-Policy-Wizard" target="_blank" rel="noreferrer" style={{color:'var(--accent-blue)'}}>Source and release notes on GitHub</a></div>
                         </div>
                       </div>
@@ -1201,6 +1201,7 @@
                     <summary style={{cursor:'pointer', fontWeight:600, fontSize:'14px'}}>Version history</summary>
                     <div style={{marginTop:'0.75rem', lineHeight:1.7}}>
                     <div style={{paddingLeft:'1rem', fontSize:'12px'}}>
+                      <div><strong>v2.11.0</strong> — App catalog for Private Access and Digital Experience: apps are toggles grouped by category instead of a prefilled list. Epic (Hyperspace Web, Web BLOB, Interconnect, Perimeter Authentication…), Oracle Health, MEDITECH, Fujifilm Synapse and Visage PACS, Imprivata, Citrix, Horizon, SAP and apps for the other verticals, each with the vendor's ports and a hint for the customer host to fill in. Each ZDX app gets its own collection with named probes (Epic HSW, Epic Web BLOB). The prefix is three characters from the customer name (Hajny → HAJ). New healthcare profiles: HHS HPH Cybersecurity Performance Goals and 405(d) HICP.</div>
                       <div><strong>v2.10.2</strong> — macOS Client Connector matches Windows: no app profile PAC URL (an old one is cleared), fail-close, DNS exclusion priority and packet capture left at the portal defaults, the same bypass apps, CLI and ZPA re-authentication notice; Windows and macOS share one forwarding profile.</div>
                       <div><strong>v2.10.1</strong> — AI Guard no longer adds an SSL rule of its own: Copilot is inspected by SSL Inspection's Inspect Microsoft Copilot rule and the other AI apps by Inspect All. An AIG-Inspect rule from an earlier version is removed (Undo puts it back).</div>
                       <div><strong>v2.10.0</strong> — Pick each cloud app's actions (Facebook, LinkedIn, X, ChatGPT, Copilot, Gemini, Claude, Google Drive, Dropbox, Box) one operation at a time, from what the customer's tenant offers. Inspect Microsoft Copilot is SSL rule 1, above the Office 365 one-click bypass, with Inspect All after Zscaler's rules and the exemptions. Block-QUIC is firewall rule 1; Allow-Web and Allow-NTP are gone because Zscaler's default rules cover them. ZPA: pick the App Connector Group's city instead of San Jose.</div>
@@ -1830,6 +1831,96 @@
       </>);
     }
 
+    // ---------- v2.11 App catalog (ZPA segments / ZDX probes as toggles, grouped by category) ----------
+    // value: { [appId]: { on, rows: { [rowName]: { on, host, tcp, udp, port, name } } } }
+    function catalogDefaults(app, mode, domain) {
+      const rows = {};
+      for (const r of (mode === 'zdx' ? app.zdx : app.zpa)) {
+        rows[r.name] = { on: !!r.on, name: r.name, host: r.fill ? String(r.fill).replace(/\{domain\}/g, domain || 'example.org') : '', tcp: r.tcp || '', udp: r.udp || '', port: r.port || 443, path: r.path || '/' };
+      }
+      return { on: true, rows };
+    }
+    function AppCatalogPicker({ mode, vertical, domain, value, onChange, onLoaded }) {
+      const [cat, setCat] = useState(null);
+      const [showAll, setShowAll] = useState(!vertical);
+      const [q, setQ] = useState('');
+      useEffect(() => { api.call('GET', `/v2/app-catalog?vertical=${encodeURIComponent(vertical || '')}`).then(c => { setCat(c); if (onLoaded) onLoaded(c.apps); }).catch(() => setCat({ categories: [], apps: [] })); }, [vertical]);
+      if (!cat) return <div className="form-hint"><span className="spinner"></span> Loading the app catalog…</div>;
+      const has = (a) => (mode === 'zdx' ? a.zdx : a.zpa).length > 0;
+      const visible = cat.apps.filter(a => has(a) && (showAll || a.mine || (value[a.id] && value[a.id].on)) && (!q || (a.name + ' ' + (a.description || '')).toLowerCase().includes(q.toLowerCase())));
+      const ph = (r) => String(r.placeholder || '').replace(/\{domain\}/g, domain || 'domain');
+      const toggleApp = (a) => { const cur = value[a.id]; onChange({ ...value, [a.id]: cur ? { ...cur, on: !cur.on } : catalogDefaults(a, mode, domain) }); };
+      const setRow = (a, rn, patch) => { const cur = value[a.id]; onChange({ ...value, [a.id]: { ...cur, rows: { ...cur.rows, [rn]: { ...cur.rows[rn], ...patch } } } }); };
+      const onCount = Object.values(value).filter(v => v && v.on).length;
+      return (
+        <div data-appcatalog={mode}>
+          <div style={{display:'flex', gap:'10px', alignItems:'center', flexWrap:'wrap', marginBottom:'0.5rem'}}>
+            <input type="text" placeholder="Search apps" value={q} onChange={e => setQ(e.target.value)} style={{maxWidth:'220px'}} data-catalogsearch />
+            {vertical && <label style={{fontSize:'12px', display:'flex', gap:'4px', alignItems:'center', cursor:'pointer'}}><input type="checkbox" checked={showAll} onChange={e => setShowAll(e.target.checked)} data-catalogall /> Show apps from other verticals</label>}
+            <span className="form-hint" style={{margin:0}}>{onCount} on</span>
+          </div>
+          {cat.categories.map(c => {
+            const list = visible.filter(a => a.category === c.id);
+            if (!list.length) return null;
+            const onHere = list.filter(a => value[a.id] && value[a.id].on).length;
+            return (
+              <details key={c.id} open={onHere > 0 || list.some(a => a.mine && a.verticals[0] !== 'ALL')} style={{marginBottom:'6px', border:'1px solid var(--border)', borderRadius:'6px', padding:'4px 10px'}} data-catalogcat={c.id}>
+                <summary style={{cursor:'pointer', fontWeight:600, fontSize:'13px', padding:'4px 0'}}>{c.name} <span className="form-hint" style={{fontWeight:400}}>· {list.length} app{list.length === 1 ? '' : 's'}{onHere ? ` · ${onHere} on` : ''}</span></summary>
+                {list.map(a => { const st = value[a.id]; const on = !!(st && st.on); const rows = mode === 'zdx' ? a.zdx : a.zpa; return (
+                  <div key={a.id} className="toggle-item" style={{alignItems:'flex-start'}} data-catalogapp={a.id}>
+                    <div style={{flex:1}}>
+                      <label style={{cursor:'pointer'}} onClick={() => toggleApp(a)}>{a.name}{!a.mine && <span className="badge badge-category" style={{marginLeft:'6px'}}>{a.verticals.join(', ').toLowerCase()}</span>}</label>
+                      {a.description && <div className="form-hint">{a.description}</div>}
+                      {on && (
+                        <table className="diff-table" style={{marginTop:'6px'}}><tbody>
+                          {rows.map(r => { const rv = st.rows[r.name] || {}; return (
+                            <tr key={r.name} data-catalogrow={`${a.id}:${r.name}`} style={{opacity: rv.on ? 1 : 0.55}}>
+                              <td style={{width:'28px'}}><input type="checkbox" checked={!!rv.on} onChange={e => setRow(a, r.name, { on: e.target.checked })} /></td>
+                              <td style={{width:'26%'}}>{mode === 'zdx' ? <input type="text" value={rv.name} maxLength={64} onChange={e => setRow(a, r.name, { name: e.target.value })} style={{width:'100%', fontSize:'12px'}} data-catalogname /> : <span style={{fontSize:'12px'}}>{r.name}</span>}</td>
+                              <td><input type="text" value={rv.host} placeholder={ph(r)} onChange={e => setRow(a, r.name, { host: e.target.value.trim() })} style={{width:'100%', fontSize:'12px'}} data-cataloghost /></td>
+                              {mode === 'zdx'
+                                ? <td style={{width:'90px'}}><input type="number" min="1" max="65535" value={rv.port} onChange={e => setRow(a, r.name, { port: Number(e.target.value) })} style={{width:'80px', fontSize:'12px'}} title="Port" data-catalogport /></td>
+                                : <><td style={{width:'18%'}}><input type="text" value={rv.tcp} onChange={e => setRow(a, r.name, { tcp: e.target.value })} placeholder="TCP" style={{width:'100%', fontSize:'12px'}} title="TCP ports" data-catalogtcp /></td>
+                                   <td style={{width:'12%'}}><input type="text" value={rv.udp} onChange={e => setRow(a, r.name, { udp: e.target.value })} placeholder="UDP" style={{width:'100%', fontSize:'12px'}} title="UDP ports" /></td></>}
+                            </tr>); })}
+                        </tbody></table>
+                      )}
+                      {on && a.source && <div className="form-hint" style={{marginTop:'2px'}}>Ports from {a.source}. Confirm them with the customer.</div>}
+                    </div>
+                    <div className={`toggle-switch ${on ? 'active' : ''}`} onClick={() => toggleApp(a)}><div className="toggle-knob"></div></div>
+                  </div>); })}
+              </details>
+            );
+          })}
+        </div>
+      );
+    }
+    /** Catalog choices → ZDX custom apps (one app per catalog entry, one probe per ticked row). */
+    function catalogToZdx(value, apps) {
+      const out = [];
+      for (const a of apps || []) {
+        const st = value[a.id];
+        if (!st || !st.on) continue;
+        const probes = Object.values(st.rows).filter(r => r.on).map(r => {
+          const h = String(r.host || '').trim();
+          const url = !h ? '' : /^https?:\/\//i.test(h) ? h : `https://${h.replace(/\/+$/, '')}${r.path || '/'}`;
+          return { name: r.name, url, port: Number(r.port) || null };
+        });
+        if (probes.length) out.push({ name: a.name, collection: a.collection || null, catalogId: a.id, probes, cloudpath: true, frequency: 300, protocol: 'ADAPTIVE' });
+      }
+      return out;
+    }
+    /** Catalog choices → ZPA application rows. */
+    function catalogToZpa(value, apps) {
+      const out = [];
+      for (const a of apps || []) {
+        const st = value[a.id];
+        if (!st || !st.on) continue;
+        for (const r of Object.values(st.rows)) if (r.on) out.push({ name: r.name, destinations: r.host, tcpPorts: r.tcp, udpPorts: r.udp, settings: {}, catalogId: a.id });
+      }
+      return out;
+    }
+
     function ZpaWizard({ meta, prefix, setError, onReport, guided }) {
       const [ctx, setCtx] = useState(null);
       // v2.4: init = { domains } or { apps } from the preset, or the saved choices of a POV being resumed ({ saved: body }); seed = template choices
@@ -1848,8 +1939,12 @@
       const [pra, setPra] = useState({ rdpHost: '', sshHost: '', ...((saved && saved.pra) || {}) });
       const [iso, setIso] = useState({ enabled: true, copyPaste: 'none', uploadDownload: 'none', allowPrinting: false, watermark: true, watermarkMessage: 'Zscaler POV', ...((saved || seedZ).isolationProfile || {}) });
       const [ba, setBa] = useState({ domain: '', port: '443', certificateId: '', ...((saved && saved.browserAccess) || {}) });
-      const [bulk, setBulk] = useState(!!(init.apps && init.apps.length));
-      const [apps, setApps] = useState(() => (init.apps || []).map(a => ({ ...a, settings: a.settings || {} })));            // [{ name, destinations[], tcpPorts, udpPorts, row, settings }]
+      // v2.11: catalog toggles (Epic, PACS, AD…) produce segment rows; `apps` holds the rows typed in or uploaded as CSV
+      const [cat, setCat] = useState(() => (saved && saved.catalog) || init0.catalog || {});
+      const [catApps, setCatApps] = useState([]);
+      const [bulk, setBulk] = useState(!!((init.apps && init.apps.length) || Object.keys((saved && saved.catalog) || init0.catalog || {}).length));
+      const [apps, setApps] = useState(() => (init.apps || []).filter(a => !a.catalogId).map(a => ({ ...a, settings: a.settings || {} })));            // [{ name, destinations[], tcpPorts, udpPorts, row, settings }]
+      const allApps = [...catalogToZpa(cat, catApps), ...apps];
       const [csvErrors, setCsvErrors] = useState([]);
       const [csvName, setCsvName] = useState('');
       const [openApp, setOpenApp] = useState(null);
@@ -1860,13 +1955,13 @@
       const [reveal, setReveal] = useState(false);
       const [confirmed, setConfirmed] = useState(false);
       useEffect(() => { api.call('GET', '/v2/zpa/context').then(setCtx).catch(e => setCtx({ error: e.message })); }, []);
-      useEffect(() => { setPlan(null); setConfirmed(false); }, [JSON.stringify([form, settings, bulk, apps, policies, pra, iso, ba, loc])]);
+      useEffect(() => { setPlan(null); setConfirmed(false); }, [JSON.stringify([form, settings, bulk, allApps, policies, pra, iso, ba, loc])]);
       useEffect(() => {
-        if (bulk && !apps.length) { setErrors([]); return; }
-        const t = setTimeout(() => api.call('POST', '/v2/zpa/validate', bulk ? { apps: apps.map(a => ({ ...a, destinations: destList(a.destinations) })), settings, pra, browserAccess: ba } : { domains: form.domains, tcpPorts: form.tcpPorts, udpPorts: form.udpPorts, settings, pra, browserAccess: ba }).then(r => setErrors(r.errors)).catch(() => {}), 250);
+        if (bulk && !allApps.length) { setErrors([]); return; }
+        const t = setTimeout(() => api.call('POST', '/v2/zpa/validate', bulk ? { apps: allApps.map(a => ({ ...a, destinations: destList(a.destinations) })), settings, pra, browserAccess: ba } : { domains: form.domains, tcpPorts: form.tcpPorts, udpPorts: form.udpPorts, settings, pra, browserAccess: ba }).then(r => setErrors(r.errors)).catch(() => {}), 250);
         return () => clearTimeout(t);
-      }, [form.domains, form.tcpPorts, form.udpPorts, settings.healthReporting, bulk, JSON.stringify(apps), pra.rdpHost, pra.sshHost, ba.domain, ba.port]);
-      const body = () => ({ prefix, ...(bulk ? { apps: apps.map(a => ({ ...a, destinations: destList(a.destinations) })) } : { domains: form.domains, tcpPorts: form.tcpPorts, udpPorts: form.udpPorts }), settings, connectorGroupId: form.connectorGroupId || null, connectorLocation: loc, descriptions: form.descriptions, policies, pra,
+      }, [form.domains, form.tcpPorts, form.udpPorts, settings.healthReporting, bulk, JSON.stringify(allApps), pra.rdpHost, pra.sshHost, ba.domain, ba.port]);
+      const body = () => ({ prefix, ...(bulk ? { apps: allApps.map(a => ({ ...a, destinations: destList(a.destinations) })), catalog: cat } : { domains: form.domains, tcpPorts: form.tcpPorts, udpPorts: form.udpPorts }), settings, connectorGroupId: form.connectorGroupId || null, connectorLocation: loc, descriptions: form.descriptions, policies, pra,
         isolationProfile: policies.isolation ? iso : { ...iso, enabled: false }, browserAccess: ba.domain.trim() ? ba : {} });
       const downloadTemplate = () => {
         const blob = new Blob([meta.copy.zpa.bulkTemplate], { type: 'text/csv' });
@@ -1920,7 +2015,7 @@
             <tr><td>Provisioning Key</td><td><code>{n('provisioning-key')}</code> · App Connector · max usage 5</td></tr>
             <tr><td>Segment Group</td><td><code>{n('segment-group')}</code></td></tr>
             <tr><td>Server Group</td><td><code>{n('server-group')}</code> · Dynamic Server Discovery on</td></tr>
-            <tr><td>Application Segment{bulk ? 's' : ''}</td><td>{bulk ? (apps.length ? apps.map(a => <code key={a.name} style={{marginRight:'6px'}}>{segName(a.name)}</code>) : 'One per application in the uploaded CSV') : <code>{n('app-segment')}</code>}</td></tr>
+            <tr><td>Application Segment{bulk ? 's' : ''}</td><td>{bulk ? (allApps.length ? allApps.map(a => <code key={a.name} style={{marginRight:'6px'}}>{segName(a.name)}</code>) : 'One per application you turn on or add') : <code>{n('app-segment')}</code>}</td></tr>
             {policies.access && <tr><td>Access policy</td><td><code>{n('access-policy')}</code> · anyone signed in to ZPA can reach these applications</td></tr>}
             {ba.domain.trim() && <tr><td>Browser Access</td><td><code>{n('browser-access')}</code> · https://{ba.domain.trim()} with no client</td></tr>}
             {policies.timeout && <tr><td>Timeout policy</td><td><code>{n('timeout-policy')}</code> · re-authenticate every 8 hours, or after 1 hour idle</td></tr>}
@@ -1945,6 +2040,10 @@
           </div>
           {bulk ? (
             <div className="card" style={{background:'var(--bg-input)'}} data-zpabulk>
+              <h3 style={{fontSize:'14px', margin:'0 0 0.25rem'}}>App catalog</h3>
+              <div className="form-hint" style={{marginBottom:'0.5rem'}}>Turn on the customer's apps; each adds its segments with the vendor's ports. Fill in the customer's host names where the grey text says what goes there.</div>
+              <AppCatalogPicker mode="zpa" vertical={guided && guided.vertical} domain={guided && guided.domain} value={cat} onChange={setCat} onLoaded={setCatApps} />
+              <h3 style={{fontSize:'14px', margin:'1rem 0 0.25rem'}}>Other applications</h3>
               <div style={{display:'flex', gap:'8px', alignItems:'center', flexWrap:'wrap', marginBottom:'0.75rem'}}>
                 <button className="btn btn-ghost btn-sm" onClick={downloadTemplate} data-zpatemplate>⬇ Download CSV template</button>
                 <label className="btn btn-primary btn-sm" style={{cursor:'pointer', margin:0}}>⬆ Upload CSV<input type="file" accept=".csv,text/csv" style={{display:'none'}} onChange={e => { loadCsv(e.target.files[0]); e.target.value = ''; }} data-zpacsv /></label>
@@ -1960,7 +2059,7 @@
                         <tr data-zpaapp={a.name}>
                           <td><input type="text" value={a.name} onChange={e => setApp(i, { name: e.target.value })} data-zpaedit="name" style={{width:'100%', fontSize:'12px'}} />
                             <div className="form-hint" style={{margin:'2px 0 0'}}><code>{segName(a.name || '…')}</code></div></td>
-                          <td><input type="text" value={destText(a.destinations)} onChange={e => setApp(i, { destinations: e.target.value })} data-zpaedit="destinations" placeholder="app.domain.com, 10.0.0.0/24" style={{width:'100%', fontSize:'12px'}} /></td>
+                          <td><input type="text" value={destText(a.destinations)} onChange={e => setApp(i, { destinations: e.target.value })} data-zpaedit="destinations" placeholder={a.placeholder || 'app.domain.com, 10.0.0.0/24'} style={{width:'100%', fontSize:'12px'}} /></td>
                           <td><input type="text" value={a.tcpPorts || ''} onChange={e => setApp(i, { tcpPorts: e.target.value })} data-zpaedit="tcp" placeholder="443, 8000-8100" style={{width:'100%', fontSize:'12px'}} /></td>
                           <td><input type="text" value={a.udpPorts || ''} onChange={e => setApp(i, { udpPorts: e.target.value })} data-zpaedit="udp" placeholder="—" style={{width:'100%', fontSize:'12px'}} /></td>
                           <td style={{fontSize:'12px'}}>{Object.keys(a.settings || {}).length ? <span className="badge badge-update">{Object.keys(a.settings).length} custom</span> : 'Shared defaults'}</td>
@@ -2245,13 +2344,11 @@
 
     const splitItems = (v) => String(v || '').split(/[,;\n]+/).map(x => x.trim()).filter(Boolean);
     const DOMAIN_OK = (d) => /^(?=.{1,253}$)(?!-)[A-Za-z0-9-]{1,63}(?<!-)(\.(?!-)[A-Za-z0-9-]{1,63}(?<!-))+$/.test(String(d || '').trim());
-    const PREFIX_OK = (p) => /^[A-Za-z0-9_-]{1,20}$/.test(String(p || ''));
+    // v2.11: the prefix is always three letters or digits. Generated from the first three of the customer name (Hajny → HAJ); editable.
+    const PREFIX_OK = (p) => /^[A-Za-z0-9]{3}$/.test(String(p || ''));
     const suggestPrefix = (name) => {
-      const s = String(name || '').replace(/[^A-Za-z0-9 ]/g, ' ').trim();
-      if (!s) return '';
-      const words = s.split(/\s+/);
-      const initials = words.length > 1 ? words.map(w => w[0]).join('') : words[0];
-      return (initials.length >= 3 ? initials : words.join('')).toUpperCase().slice(0, 12);
+      const s = String(name || '').replace(/[^A-Za-z0-9]/g, '').toUpperCase();
+      return s ? (s + 'XXX').slice(0, 3) : '';
     };
 
     // v2.3 guided POV: Readiness → Build the POV (scope) → Customer intake → Client Connector → Internet Access → Private Access → Digital Experience → Dry run & apply
@@ -2329,14 +2426,14 @@
             <div className="form-group"><label className="form-label">Customer name</label>
               <input type="text" value={g.customerName} onChange={e => setName(e.target.value)} placeholder="Maine Medical Center" data-intakename /></div>
             <div className="form-group"><label className="form-label">Prefix</label>
-              <input type="text" value={g.prefix} maxLength={20} onChange={e => set({ prefix: e.target.value.trim(), prefixEdited: true })} placeholder="MMC" data-intakeprefix
+              <input type="text" value={g.prefix} maxLength={3} onChange={e => set({ prefix: e.target.value.replace(/[^A-Za-z0-9]/g, '').toUpperCase().slice(0, 3), prefixEdited: true })} placeholder="MAI" data-intakeprefix
                 style={{borderColor: prefixBad ? 'var(--accent-red)' : undefined, fontFamily:'IBM Plex Mono, monospace'}} />
-              <div className="form-hint">{prefixBad ? 'Letters, numbers, - and _ only (max 20).' : <>Generated from the name. Objects are named <code>{g.prefix || 'PREFIX'}-…</code>; re-running with it updates them instead of duplicating.</>}
+              <div className="form-hint">{prefixBad ? 'Exactly three letters or numbers.' : <>Three characters, generated from the first three letters of the name. Objects are named <code>{g.prefix || 'PREFIX'}-…</code>; re-running with it updates them instead of duplicating.</>}
                 {g.prefixEdited && <> <a href="#" style={{color:'var(--accent-cyan)'}} onClick={e => { e.preventDefault(); set({ prefix: suggestPrefix(g.customerName), prefixEdited: false }); }}>Use generated</a></>}</div></div>
             <div className="form-group"><label className="form-label">Internal domain{needDomain ? '' : ' (optional)'}</label>
               <input type="text" value={g.domain} onChange={e => set({ domain: e.target.value.trim().toLowerCase() })} placeholder="hospital.org" data-intakedomain
                 style={{borderColor: domainBad ? 'var(--accent-red)' : undefined}} />
-              <div className="form-hint">{domainBad ? 'Not a valid domain (for example hospital.org).' : 'Saved for Private Access: a wildcard segment *.' + (g.domain || 'domain') + ' plus the preset apps.'}</div></div>
+              <div className="form-hint">{domainBad ? 'Not a valid domain (for example hospital.org).' : 'Saved for Private Access: a wildcard segment *.' + (g.domain || 'domain') + ' (turn on the customer\'s apps in the Private Access app catalog).'}</div></div>
           </div>
           <div className="form-label">Preset</div>
           <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(180px, 1fr))', gap:'8px', marginBottom:'0.75rem'}}>
@@ -2440,13 +2537,8 @@
           }
           const r = await api.call('POST', '/v2/intake/preset', { id: g.presetId, domain: g.domain, customerName: g.customerName });
           setPreset(r.preset);
-          let apps = [];
-          if (g.scope.zpa && r.preset.apps.length) {
-            const csv = 'Application Name,Destinations,Ports\r\n' + r.preset.apps.map(a => [a.name, a.destinations.join('; '), a.ports].map(x => `"${String(x).replace(/"/g, '""')}"`).join(',')).join('\r\n');
-            const parsed = await api.call('POST', '/v2/zpa/parse-csv', { text: csv });
-            apps = parsed.apps;
-          }
-          setZpaInitial(apps.length ? { apps } : { domains: g.domain ? `*.${g.domain}` : '' });
+          // v2.11: nothing prefilled but the *.domain wildcard; the vertical's apps are toggles in the ZPA app catalog
+          setZpaInitial(g.domain ? { catalog: { WILDCARD: { on: true, rows: { 'All internal apps': { on: true, name: 'All internal apps', host: `*.${g.domain}`, tcp: '1-52, 54-65535', udp: '1-52, 54-65535' } } } } } : { domains: '' });
           const key = [g.prefix, g.domain, g.presetId].join('|');
           if (key !== wizardKey) {
             setWizardKey(key);
@@ -2509,13 +2601,13 @@
           {wizardKey && g.scope.zpa && visited.has('zpa') && meta && (zpaInitial || payloads.zpa) && (
             <div style={show('zpa')} data-guide="zpa">
               <ZpaWizard key={wizardKey} meta={meta} prefix={prefix} setError={setError} onReport={onReport}
-                guided={{ initial: payloads.zpa ? { saved: payloads.zpa } : zpaInitial, seed: (T && T.zpa) || null, onBack: back, nextLabel, onNext: (body) => { setPayloads(p => ({ ...p, zpa: body })); next(); } }} />
+                guided={{ initial: payloads.zpa ? { saved: payloads.zpa } : zpaInitial, seed: (T && T.zpa) || null, vertical: g.presetId, domain: g.domain, onBack: back, nextLabel, onNext: (body) => { setPayloads(p => ({ ...p, zpa: body })); next(); } }} />
             </div>
           )}
           {wizardKey && g.scope.zdx && visited.has('zdx') && (preset || payloads.zdx) && (
             <div style={show('zdx')} data-guide="zdx">
               <ZdxWizard key={wizardKey} setError={setError}
-                guided={{ custom: (preset && preset.zdxApps) || [], predefined: (preset && preset.zdxPredefined) || [], saved: payloads.zdx || (T && T.zdx) || null, onBack: back, nextLabel, onNext: (pl) => { setPayloads(p => ({ ...p, zdx: pl })); next(); } }} />
+                guided={{ custom: (preset && preset.zdxApps) || [], predefined: (preset && preset.zdxPredefined) || [], saved: payloads.zdx || (T && T.zdx) || null, vertical: g.presetId, domain: g.domain, onBack: back, nextLabel, onNext: (pl) => { setPayloads(p => ({ ...p, zdx: pl })); next(); } }} />
             </div>
           )}
           {stage === 'run' && (<>
@@ -2986,7 +3078,7 @@
     // ========================
     // compliance baseline (intake) → AI Guard profile; tiers and the ZTH baseline use the general profile
     const AIG_PROFILE_FOR = (b) => ['HIPAA', 'HITRUST', 'PCI', 'GDPR', 'CJIS', 'FERPA', 'SOX', 'NIST_800_171', 'NIST_800_53', 'IRS_1075'].includes(b) ? b
-      : ({ FEDRAMP_MOD: 'NIST_800_53', FEDRAMP_HIGH: 'NIST_800_53', GOVRAMP: 'NIST_800_53', FED_ZT: 'NIST_800_53', CMMC_L2: 'NIST_800_171' })[b] || 'GENERAL';
+      : ({ FEDRAMP_MOD: 'NIST_800_53', FEDRAMP_HIGH: 'NIST_800_53', GOVRAMP: 'NIST_800_53', FED_ZT: 'NIST_800_53', CMMC_L2: 'NIST_800_171', HHS_CPG: 'HIPAA', HICP_405D: 'HIPAA' })[b] || 'GENERAL';
     // ---------- v2.9 Block and caution pages, company logo ----------
     /**
      * Shrink an image file in the browser until it is at most maxBytes (ZIA's company logo limit is 10 KB).
@@ -5995,6 +6087,18 @@
       return p.active ? <span className="badge badge-create">ON</span> : <span className="badge badge-risk">OFF</span>;
     }
 
+    const ZDX_PREDEF_GROUPS = [
+      { id: 'M365', name: 'Microsoft 365' }, { id: 'COLLAB', name: 'Meetings and calling' }, { id: 'IDENTITY', name: 'Identity and sign-in' },
+      { id: 'SAAS', name: 'Business SaaS' }, { id: 'OTHER', name: 'Other' }
+    ];
+    const zdxGroupOf = (a) => {
+      const k = `${a.provider} ${a.label}`.toUpperCase();
+      if (/MICROSOFT|SHAREPOINT|ONEDRIVE|OUTLOOK|EXCHANGE|OFFICE|TEAMS|AZURE/.test(k)) return 'M365';
+      if (/ZOOM|WEBEX|RINGCENTRAL|GOTO|SLACK|MEET|CHIME|DIALPAD|8X8|VONAGE/.test(k)) return 'COLLAB';
+      if (/OKTA|PING|DUO|LOGIN|IDENTITY|AUTH|SSO/.test(k)) return 'IDENTITY';
+      if (/SALESFORCE|SERVICENOW|WORKDAY|BOX|DROPBOX|GOOGLE|GMAIL|ADP|ZENDESK|ATLASSIAN|JIRA|CONFLUENCE|DOCUSIGN|SAP|ORACLE|AWS|GITHUB/.test(k)) return 'SAAS';
+      return 'OTHER';
+    };
     function ZdxWizard({ setError, onExit, guided }) {
       const seededZdx = useRef(false);
       const [step, setStep] = useState('template');
@@ -6004,6 +6108,10 @@
       const [tier, setTierState] = useState((guided && guided.saved && guided.saved.tier) || '');
       const [predef, setPredef] = useState({});   // provider -> { on, prefix, web, cloudpath }
       const [custom, setCustom] = useState([]);   // [{ name, url, cloudpath, frequency, protocol }]
+      // v2.11: app catalog (Epic, PACS, SaaS…) as toggles; each app becomes one ZDX app with a probe per ticked row
+      const [zcat, setZcat] = useState(() => (guided && guided.saved && guided.saved.catalog) || {});
+      const [zcatApps, setZcatApps] = useState([]);
+      const catCustom = catalogToZdx(zcat, zcatApps);
       const [plan, setPlan] = useState(null);
       const [busy, setBusy] = useState(false);
       const [confirmed, setConfirmed] = useState(false);
@@ -6034,7 +6142,7 @@
           (sv.predefined || []).forEach(x => { if (p[x.provider]) p[x.provider] = { ...p[x.provider], on: true, prefix: x.prefix || p[x.provider].prefix, web: x.web !== false, cloudpath: !!x.cloudpath }; });
           Object.keys(p).forEach(k => { if (providerBlocked(cat, tid, k)) p[k] = { ...p[k], on: false }; });
           setPredef(p);
-          setCustom((sv.custom || []).map(c => ({ name: c.name, url: c.url, cloudpath: c.cloudpath !== false, frequency: c.frequency || 300, protocol: c.protocol || 'ADAPTIVE' })));
+          setCustom((sv.custom || []).filter(c => !c.catalogId && !Array.isArray(c.probes)).map(c => ({ name: c.name, url: c.url, cloudpath: c.cloudpath !== false, frequency: c.frequency || 300, protocol: c.protocol || 'ADAPTIVE' })));
           setPlan(null);
           return;
         }
@@ -6069,7 +6177,8 @@
       const payload = () => ({
         templateId, tier: tier || null,
         predefined: chosenPredef.map(a => ({ provider: a.provider, prefix: predef[a.provider].prefix, web: predef[a.provider].web, cloudpath: predef[a.provider].cloudpath })),
-        custom: custom.map(c => ({ ...c, name: c.name.trim(), url: c.url.trim() }))
+        custom: [...catCustom, ...custom.map(c => ({ ...c, name: c.name.trim(), url: c.url.trim() }))],
+        catalog: zcat
       });
       const setP = (prov, patch) => { setPlan(null); setPredef(prev => ({ ...prev, [prov]: { ...prev[prov], ...patch } })); };
       const setC = (i, patch) => { setPlan(null); setCustom(prev => prev.map((c, j) => j === i ? { ...c, ...patch } : c)); };
@@ -6158,8 +6267,12 @@
             <div>
               <h3 style={{fontSize:'14px', margin:'0 0 0.25rem'}}>Zscaler predefined apps</h3>
               <div className="form-hint" style={{marginBottom:'0.75rem'}}>Zscaler maintains the Web and CloudPath probes for these. Apps marked NOT SET UP are created in the tenant first; some need the customer's tenant prefix (for example <em>contoso</em> for contoso.sharepoint.com).</div>
+              {/* v2.11: grouped by type so the list does not need scrolling */}
+              {ZDX_PREDEF_GROUPS.map(gr => { const list = catalog.predefined.filter(a => zdxGroupOf(a) === gr.id); if (!list.length) return null; const onN = list.filter(a => predef[a.provider]?.on).length; return (
+              <details key={gr.id} open={onN > 0} style={{marginBottom:'6px', border:'1px solid var(--border)', borderRadius:'6px', padding:'4px 10px'}} data-predefgroup={gr.id}>
+              <summary style={{cursor:'pointer', fontWeight:600, fontSize:'13px', padding:'4px 0'}}>{gr.name} <span className="form-hint" style={{fontWeight:400}}>· {list.length} app{list.length === 1 ? '' : 's'}{onN ? ` · ${onN} on` : ''}</span></summary>
               <div className="toggle-group">
-                {catalog.predefined.map(a => {
+                {list.map(a => {
                   const st = predef[a.provider] || {};
                   const nl = providerBlocked(catalog, tier, a.provider);
                   return (
@@ -6191,10 +6304,15 @@
                   );
                 })}
               </div>
+              </details>); })}
 
-              <h3 style={{fontSize:'14px', margin:'1.5rem 0 0.25rem'}}>Custom apps</h3>
+              <h3 style={{fontSize:'14px', margin:'1.5rem 0 0.25rem'}}>App catalog</h3>
+              <div className="form-hint" style={{marginBottom:'0.5rem'}}>Turn on the customer's apps by category. Each becomes one ZDX app (in its own collection, for example Epic) with a Web and a CloudPath probe per ticked row. Fill in the customer's host where the grey text says what goes there; the port is the vendor's.</div>
+              <AppCatalogPicker mode="zdx" vertical={guided && guided.vertical} domain={guided && guided.domain} value={zcat} onChange={(v) => { setPlan(null); setZcat(v); }} onLoaded={setZcatApps} />
+
+              <h3 style={{fontSize:'14px', margin:'1.5rem 0 0.25rem'}}>Other custom apps</h3>
               <div className="form-hint" style={{marginBottom:'0.75rem'}}>Any URL users depend on, such as an EHR, PACS viewer or intranet. Each gets a Web probe (ZDX needs one to turn the app on) and, by default, a CloudPath probe to the same host. Probes run for all users.</div>
-              {custom.length === 0 && <div className="alert alert-info"><span>ℹ No custom apps. Add one below or continue with predefined apps only.</span></div>}
+              {custom.length === 0 && <div className="form-hint">None. Add any other URL below.</div>}
               {custom.map((c, i) => (
                 <div key={i} className="card" style={{background:'var(--bg-input)', padding:'0.9rem', marginBottom:'0.6rem'}} data-custom={i}>
                   <div style={{display:'grid', gridTemplateColumns:'1fr 2fr auto', gap:'0.6rem', alignItems:'end'}}>
@@ -6227,7 +6345,7 @@
 
               <div className="btn-group">
                 <button className="btn btn-ghost" onClick={() => setStep('template')}>← Back</button>
-                <button className="btn btn-primary" onClick={() => setStep('review')} disabled={!chosenPredef.length && !custom.length}>Review →</button>
+                <button className="btn btn-primary" onClick={() => setStep('review')} disabled={!chosenPredef.length && !custom.length && !catCustom.length}>Review →</button>
               </div>
             </div>
           )}
@@ -6242,6 +6360,10 @@
                     const host = a.configured ? (a.configuredHost || a.host) : String(a.host).replace('<prefix>', st.prefix || '<prefix>');
                     return (<tr key={a.provider}><td style={{fontWeight:600}}>{a.label}</td><td><span className="badge badge-category">PREDEFINED</span></td><td>{host}</td><td>{probeSummary(st.web !== false, st.cloudpath && st.web !== false)} (Zscaler-managed)</td><td><ZdxStateBadge p={a} /></td></tr>);
                   })}
+                  {catCustom.map(c => (
+                    <tr key={'k' + c.name} data-zdxreviewcat={c.catalogId}><td style={{fontWeight:600}}>{c.name}</td><td><span className="badge badge-create">CUSTOM</span>{c.collection && <div className="form-hint" style={{margin:0}}>collection {c.collection}</div>}</td>
+                      <td>{c.probes.map(p => <div key={p.name}>{p.name}: {p.url || <em style={{color:'var(--accent-red)'}}>host needed</em>}{p.port && p.port !== 443 ? ` (port ${p.port})` : ''}</div>)}</td><td>Web + CloudPath per probe · every 5 min</td><td>New</td></tr>
+                  ))}
                   {custom.map((c, i) => (
                     <tr key={'c' + i}><td style={{fontWeight:600}}>{c.name || '(unnamed)'}</td><td><span className="badge badge-create">CUSTOM</span></td><td>{c.url}</td><td>{probeSummary(true, c.cloudpath)} · every {zdxMin(c.frequency)}{c.cloudpath ? ` · ${c.protocol}` : ''}</td><td>New</td></tr>
                   ))}
