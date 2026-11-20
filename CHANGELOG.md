@@ -1,8 +1,13 @@
 # Changelog
 
-## v2.0.0 → v2.11.0 — 2026-10-19 to 2026-11-20
+## v2.0.0 → v2.11.1 — 2026-10-19 to 2026-11-20
 
-Release notes for the whole 2.x line: [docs/release-notes/v2.11.0.md](docs/release-notes/v2.11.0.md).
+Release notes for the whole 2.x line: [docs/release-notes/v2.11.1.md](docs/release-notes/v2.11.1.md).
+
+### 2.11.1
+- **Live check on a real tenant** of 2.9 to 2.11 (Internet Access, block pages, leftovers, ZDX apps with several probes); results in the release notes.
+- **Block and caution pages** (`v2/eun.js`): the live API names the company name and logo switches `displayCompName` / `displayCompLogo`, not `displayCompanyName` / `displayCompanyLogo`. Both are sent and whichever the tenant returns is used, so the "not offered by this tenant" warning no longer appears and the portal logo is turned off when the page has its own.
+- **ZDX** (`zdx-routes.js` `zdxError`): "Rejected: restricted url" now says ZDX refuses probes to that address (Zscaler's own sites) and to use the customer's host.
 
 ### 2.11.0
 - **App catalog** (`server/v2/app-catalog.js`, `GET /api/v2/app-catalog?vertical=`): categories and apps with `verticals`, optional `collection`, `zpa` rows `{ name, placeholder, tcp, udp, on }` and `zdx` rows `{ name, placeholder|fill, port, path, on }`; `mine` marks the vertical's apps.
